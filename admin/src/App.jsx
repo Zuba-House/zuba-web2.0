@@ -63,17 +63,17 @@ function App() {
   }, [windowWidth])
 
 
-  useEffect(() => {
-    if (userData?.role !== "ADMIN") {
-      const handleContextmenu = e => {
-        e.preventDefault()
-      }
-      document.addEventListener('contextmenu', handleContextmenu)
-      return function cleanup() {
-        document.removeEventListener('contextmenu', handleContextmenu)
-      }
-    }
-  }, [userData])
+  // useEffect(() => {
+  //   if (userData?.role !== "ADMIN") {
+  //     const handleContextmenu = e => {
+  //       e.preventDefault()
+  //     }
+  //     document.addEventListener('contextmenu', handleContextmenu)
+  //     return function cleanup() {
+  //       document.removeEventListener('contextmenu', handleContextmenu)
+  //     }
+  //   }
+  // }, [userData])
 
   const router = createBrowserRouter([
     {
