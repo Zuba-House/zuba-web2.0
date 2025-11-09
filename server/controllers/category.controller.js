@@ -39,9 +39,18 @@ export async function uploadImages(request, response) {
             );
         }
 
+ 
+
+
+
+
+
         return response.status(200).json({
             images: imagesArr
         });
+
+
+ 
 
     } catch (error) {
         return response.status(500).json({
@@ -329,7 +338,7 @@ export async function updatedCategory(request, response){
       response.status(200).json({
         error:false,
         success:true,
-        category:category,
+        category:category, 
         message:"Category updated successfully"
       })
     
