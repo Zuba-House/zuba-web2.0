@@ -94,12 +94,12 @@ const Header = () => {
 
   return (
     <>
-      <header className="bg-white fixed lg:sticky left-0 w-full top-0 lg:-top-[47px] z-[101]">
-        <div className="top-strip hidden lg:block py-2 border-t-[1px] border-gray-250  border-b-[1px]">
+      <header className="bg-[#0b2735] fixed lg:sticky left-0 w-full top-0 lg:-top-[47px] z-[101]">
+        <div className="top-strip hidden lg:block py-2 border-t-[1px] border-[rgba(229,226,219,0.2)] border-b-[1px]">
           <div className="container">
             <div className="flex items-center justify-between">
               <div className="col1 w-[50%] hidden lg:block">
-                <p className="text-[12px] font-[500] mt-0 mb-0">
+                <p className="text-[12px] font-[500] mt-0 mb-0 text-[#e5e2db]">
                   Get up to 50% off new season styles, limited time only
                 </p>
               </div>
@@ -109,7 +109,7 @@ const Header = () => {
                   <li className="list-none">
                     <Link
                       to="/help-center"
-                      className="text-[11px] lg:text-[13px] link font-[500] transition"
+                      className="text-[11px] lg:text-[13px] link font-[500] transition text-[#e5e2db] hover:text-[#efb291]"
                     >
                       Help Center{" "}
                     </Link>
@@ -117,7 +117,7 @@ const Header = () => {
                   <li className="list-none">
                     <Link
                       to="/order-tracking"
-                      className="text-[11px] lg:text-[13px] link font-[500] transition"
+                      className="text-[11px] lg:text-[13px] link font-[500] transition text-[#e5e2db] hover:text-[#efb291]"
                     >
                       Order Tracking
                     </Link>
@@ -128,11 +128,11 @@ const Header = () => {
           </div>
         </div>
 
-        <div className="header py-2 lg:py-4 border-b-[1px] border-gray-250">
+        <div className="header py-2 lg:py-4 border-b-[1px] border-[rgba(229,226,219,0.2)]">
           <div className="container flex items-center justify-between">
             {
               context?.windowWidth < 992 &&
-              <Button className="!w-[35px] !min-w-[35px] !h-[35px] !rounded-full !text-gray-800" onClick={() => setIsOpenCatPanel(true)}><HiOutlineMenu size={22} /></Button>
+              <Button className="!w-[35px] !min-w-[35px] !h-[35px] !rounded-full !text-[#e5e2db] hover:!text-[#efb291]" onClick={() => setIsOpenCatPanel(true)}><HiOutlineMenu size={22} /></Button>
             }
 
             <div className="col1 w-[40%] lg:w-[25%]">
@@ -141,7 +141,7 @@ const Header = () => {
               </Link>
             </div>
 
-            <div className={`col2 fixed top-0 left-0 w-full h-full lg:w-[40%] lg:static p-2 lg:p-0 bg-white z-50 ${context?.windowWidth > 992 && '!block'} ${context?.openSearchPanel === true ? 'block' : 'hidden'}`}>
+            <div className={`col2 fixed top-0 left-0 w-full h-full lg:w-[40%] lg:static p-2 lg:p-0 bg-[#0b2735] lg:bg-transparent z-50 ${context?.windowWidth > 992 && '!block'} ${context?.openSearchPanel === true ? 'block' : 'hidden'}`}>
               <Search />
             </div>
 
@@ -151,14 +151,14 @@ const Header = () => {
                   <li className="list-none">
                     <Link
                       to="/login"
-                      className="link transition text-[15px] font-[500]"
+                      className="link transition text-[15px] font-[500] text-[#e5e2db] hover:text-[#efb291]"
                     >
                       Login
                     </Link>{" "}
-                    | &nbsp;
+                    <span className="text-[#e5e2db]">|</span> &nbsp;
                     <Link
                       to="/register"
-                      className="link  transition text-[15px]  font-[500]"
+                      className="link transition text-[15px] font-[500] text-[#e5e2db] hover:text-[#efb291]"
                     >
                       Register
                     </Link>
@@ -169,20 +169,20 @@ const Header = () => {
                       context?.windowWidth > 992 &&
                       <li>
                         <Button
-                          className="!text-[#000] myAccountWrap flex items-center gap-3 cursor-pointer"
+                          className="!text-[#e5e2db] myAccountWrap flex items-center gap-3 cursor-pointer hover:!text-[#efb291]"
                           onClick={handleClick}
                         >
-                          <Button className="!w-[40px] !h-[40px] !min-w-[40px] !rounded-full !bg-gray-200">
-                            <FaRegUser className="text-[17px] text-[rgba(0,0,0,0.7)]" />
+                          <Button className="!w-[40px] !h-[40px] !min-w-[40px] !rounded-full !bg-[rgba(229,226,219,0.15)]">
+                            <FaRegUser className="text-[17px] text-[#e5e2db]" />
                           </Button>
 
                           {
                             context?.windowWidth > 992 &&
                             <div className="info flex flex-col">
-                              <h4 className="leading-3 text-[14px] text-[rgba(0,0,0,0.6)] font-[500] mb-0 capitalize text-left justify-start">
+                              <h4 className="leading-3 text-[14px] text-[#e5e2db] font-[500] mb-0 capitalize text-left justify-start">
                                 {context?.userData?.name}
                               </h4>
-                              <span className="text-[13px] text-[rgba(0,0,0,0.6)]  font-[400] capitalize text-left justify-start">
+                              <span className="text-[13px] text-[rgba(229,226,219,0.8)] font-[400] capitalize text-left justify-start">
                                 {context?.userData?.email}
                               </span>
                             </div>
@@ -230,7 +230,7 @@ const Header = () => {
                           <Link to="/my-account" className="w-full block">
                             <MenuItem
                               onClick={handleClose}
-                              className="flex gap-2 ! !py-2"
+                              className="flex gap-2 ! !py-2 hover:!text-[#efb291]"
                             >
                               <FaRegUser className="text-[18px]" />{" "}
                               <span className="text-[14px]">My Account</span>
@@ -239,7 +239,7 @@ const Header = () => {
                           <Link to="/address" className="w-full block">
                             <MenuItem
                               onClick={handleClose}
-                              className="flex gap-2 ! !py-2"
+                              className="flex gap-2 ! !py-2 hover:!text-[#efb291]"
                             >
                               <LuMapPin className="text-[18px]" />{" "}
                               <span className="text-[14px]">Address</span>
@@ -248,7 +248,7 @@ const Header = () => {
                           <Link to="/my-orders" className="w-full block">
                             <MenuItem
                               onClick={handleClose}
-                              className="flex gap-2 ! !py-2"
+                              className="flex gap-2 ! !py-2 hover:!text-[#efb291]"
                             >
                               <IoBagCheckOutline className="text-[18px]" />{" "}
                               <span className="text-[14px]">Orders</span>
@@ -257,7 +257,7 @@ const Header = () => {
                           <Link to="/my-list" className="w-full block">
                             <MenuItem
                               onClick={handleClose}
-                              className="flex gap-2 ! !py-2"
+                              className="flex gap-2 ! !py-2 hover:!text-[#efb291]"
                             >
                               <IoMdHeartEmpty className="text-[18px]" />{" "}
                               <span className="text-[14px]">My List</span>
@@ -266,7 +266,7 @@ const Header = () => {
 
                           <MenuItem
                             onClick={logout}
-                            className="flex gap-2 ! !py-2"
+                            className="flex gap-2 ! !py-2 hover:!text-[#efb291]"
                           >
                             <IoIosLogOut className="text-[18px]" />{" "}
                             <span className="text-[14px]">Logout</span>
@@ -284,9 +284,9 @@ const Header = () => {
                   <li>
                     <Tooltip title="Wishlist">
                       <Link to="/my-list">
-                        <IconButton aria-label="cart">
+                        <IconButton aria-label="cart" className="hover:!text-[#efb291]">
                           <StyledBadge badgeContent={context?.myListData?.length !== 0 ? context?.myListData?.length : 0} color="secondary">
-                            <FaRegHeart />
+                            <FaRegHeart className="text-[#e5e2db]" />
                           </StyledBadge>
                         </IconButton>
                       </Link>
@@ -301,10 +301,11 @@ const Header = () => {
                     <IconButton
                       aria-label="cart"
                       onClick={() => context.setOpenCartPanel(true)}
+                      className="hover:!text-[#efb291]"
                     >
 
                       <StyledBadge badgeContent={context?.cartData?.length !== 0 ? context?.cartData?.length : 0} color="secondary">
-                        <MdOutlineShoppingCart />
+                        <MdOutlineShoppingCart className="text-[#e5e2db]" />
                       </StyledBadge>
                     </IconButton>
                   </Tooltip>
