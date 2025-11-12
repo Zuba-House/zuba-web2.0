@@ -1,3 +1,5 @@
+
+
 import React, { useContext, useEffect, useState } from "react";
 import { Button } from "@mui/material";
 import { BsFillBagCheckFill } from "react-icons/bs";
@@ -8,11 +10,8 @@ import { deleteData, fetchDataFromApi, postData } from "../../utils/api";
 import axios from 'axios';
 import { useNavigate } from "react-router-dom";
 import CircularProgress from '@mui/material/CircularProgress';
+import StripeCheckout from "../../components/StripeCheckout.jsx";
 
-const VITE_APP_RAZORPAY_KEY_ID = import.meta.env.VITE_APP_RAZORPAY_KEY_ID;
-const VITE_APP_RAZORPAY_KEY_SECRET = import.meta.env.VITE_APP_RAZORPAY_KEY_SECRET;
-
-const VITE_APP_PAYPAL_CLIENT_ID = import.meta.env.VITE_APP_PAYPAL_CLIENT_ID;
 const VITE_API_URL = import.meta.env.VITE_API_URL;
 
 const Checkout = () => {
@@ -22,6 +21,8 @@ const Checkout = () => {
   const [selectedAddress, setSelectedAddress] = useState("");
   const [totalAmount, setTotalAmount] = useState();
   const [isLoading, setIsloading] = useState(false);
+  const [showStripeForm, setShowStripeForm] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
   const context = useContext(MyContext);
 
   const history = useNavigate();
@@ -39,7 +40,7 @@ const Checkout = () => {
       context.cartData?.length !== 0 ?
         context.cartData?.map(item => parseInt(item.price) * item.quantity)
           .reduce((total, value) => total + value, 0) : 0)
-      ?.toLocaleString('en-US', { style: 'currency', currency: 'INR' }
+      ?.toLocaleString('en-US', { style: 'currency', currency: 'USD' }
       );
 
     // localStorage.setItem("totalAmount", context.cartData?.length !== 0 ?
@@ -53,111 +54,7 @@ const Checkout = () => {
 
 
 
-  useEffect(() => {
-
-    // Load the PayPal JavaScript SDK
-    const script = document.createElement("script");
-    script.src = `https://www.paypal.com/sdk/js?client-id=${VITE_APP_PAYPAL_CLIENT_ID}&disable-funding=card`;
-    script.async = true;
-    script.onload = () => {
-      window.paypal
-        .Buttons(
-          {
-            createOrder: async () => {
-
-              // Create order on the server
-
-              const resp = await fetch(
-                "https://v6.exchangerate-api.com/v6/8f85eea95dae9336b9ea3ce9/latest/INR"
-              );
-
-              const respData = await resp.json();
-              var convertedAmount = 0;
-
-              if (respData.result === "success") {
-                const usdToInrRate = respData.conversion_rates.USD;
-                convertedAmount = (totalAmount * usdToInrRate).toFixed(2);
-              }
-
-              const headers = {
-                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`, // Include your API key in the Authorization header
-                'Content-Type': 'application/json', // Adjust the content type as needed
-              }
-
-              const data = {
-                userId: context?.userData?._id,
-                totalAmount: convertedAmount
-              }
-
-
-              const response = await axios.get(
-                VITE_API_URL + `/api/order/create-order-paypal?userId=${data?.userId}&totalAmount=${data?.totalAmount}`, { headers }
-              );
-
-              return response?.data?.id; // Return order ID to PayPal
-
-            },
-            onApprove: async (data) => {
-              onApprovePayment(data);
-            },
-            onError: (err) => {
-              history("/order/failed");
-              console.error("PayPal Checkout onError:", err);
-            },
-          })
-        .render("#paypal-button-container");
-    };
-    document.body.appendChild(script);
-  }, [context?.cartData, context?.userData, selectedAddress]);
-
-
-
-
-  const onApprovePayment = async (data) => {
-    const user = context?.userData;
-
-    const info = {
-      userId: user?._id,
-      products: context?.cartData,
-      payment_status: "COMPLETE",
-      delivery_address: selectedAddress,
-      totalAmount: totalAmount,
-      date: new Date().toLocaleString("en-US", {
-        month: "short",
-        day: "2-digit",
-        year: "numeric",
-      })
-    };
-
-
-    // Capture order on the server
-
-    const headers = {
-      'Authorization': `Bearer ${localStorage.getItem('accessToken')}`, // Include your API key in the Authorization header
-      'Content-Type': 'application/json', // Adjust the content type as needed
-    }
-
-    const response = await axios.post(
-      VITE_API_URL + "/api/order/capture-order-paypal",
-      {
-        ...info,
-        paymentId: data.orderID
-      }, { headers }
-    ).then((res) => {
-      context.alertBox("success", res?.data?.message);
-      history("/order/success");
-      deleteData(`/api/cart/emptyCart/${context?.userData?._id}`).then((res) => {
-        context?.getCartItems();
-      })
-    });
-
-
-    if (response.data.success) {
-      context.alertBox("success", "Order completed and saved to database!");
-    }
-
-  }
-
+  // Removed PayPal integration
 
   const editAddress = (id) => {
     context?.setOpenAddressPanel(true);
@@ -175,68 +72,7 @@ const Checkout = () => {
 
 
 
-  const checkout = (e) => {
-    e.preventDefault();
-
-    if (userData?.address_details?.length !== 0) {
-      var options = {
-        key: VITE_APP_RAZORPAY_KEY_ID,
-        key_secret: VITE_APP_RAZORPAY_KEY_SECRET,
-        amount: parseInt(totalAmount * 100),
-        currency: "INR",
-        order_receipt: context?.userData?.name,
-        name: "Advanced UI Techniques",
-        description: "for testing purpose",
-        handler: function (response) {
-
-          const paymentId = response.razorpay_payment_id;
-
-          const user = context?.userData
-
-          const payLoad = {
-            userId: user?._id,
-            products: context?.cartData,
-            paymentId: paymentId,
-            payment_status: "COMPLETED",
-            delivery_address: selectedAddress,
-            totalAmt: totalAmount,
-            date: new Date().toLocaleString("en-US", {
-              month: "short",
-              day: "2-digit",
-              year: "numeric",
-            })
-          };
-
-
-          postData(`/api/order/create`, payLoad).then((res) => {
-            context.alertBox("success", res?.message);
-            if (res?.error === false) {
-              deleteData(`/api/cart/emptyCart/${user?._id}`).then((res) => {
-                context?.getCartItems();
-              })
-              history("/order/success");
-            } else {
-              history("/order/failed");
-              context.alertBox("error", res?.message);
-            }
-          });
-
-
-        },
-
-        theme: {
-          color: "#ff5252",
-        },
-      };
-
-      var pay = new window.Razorpay(options);
-      pay.open();
-    }
-    else {
-      context.alertBox("error", "Please add address");
-    }
-
-  }
+  // Removed Razorpay integration
 
 
 
@@ -283,9 +119,47 @@ const Checkout = () => {
 
   }
 
+  const handleStripeSuccess = (paymentIntent) => {
+    const user = context?.userData;
+    if (userData?.address_details?.length === 0) {
+      context.alertBox("error", "Please add address");
+      return;
+    }
+    const payLoad = {
+      userId: user?._id,
+      products: context?.cartData,
+      paymentId: paymentIntent?.id || '',
+      payment_status: "COMPLETED",
+      delivery_address: selectedAddress,
+      totalAmt: paymentIntent?.amount ? paymentIntent.amount / 100 : 0,
+      date: new Date().toLocaleString("en-US", {
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+      }),
+    };
+
+    postData(`/api/order/create`, payLoad)
+      .then((res) => {
+        context.alertBox("success", res?.message);
+        if (res?.error === false) {
+          deleteData(`/api/cart/emptyCart/${user?._id}`).then(() => {
+            context?.getCartItems();
+          });
+          history("/order/success");
+        } else {
+          history("/order/failed");
+          context.alertBox("error", res?.message);
+        }
+      })
+      .catch(() => {
+        history("/order/failed");
+      });
+  }
+
   return (
     <section className="py-3 lg:py-10 px-3">
-      <form onSubmit={checkout}>
+      <div>
         <div className="w-full lg:w-[70%] m-auto flex flex-col md:flex-row gap-5">
           <div className="leftCol w-full md:w-[60%]">
             <div className="card bg-white shadow-md p-5 rounded-md w-full">
@@ -391,7 +265,7 @@ const Checkout = () => {
                           </div>
                         </div>
 
-                        <span className="text-[14px] font-[500]">{(item?.quantity * item?.price)?.toLocaleString('en-US', { style: 'currency', currency: 'INR' })}</span>
+                        <span className="text-[14px] font-[500]">{(item?.quantity * item?.price)?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
                       </div>
                     )
                   })
@@ -402,9 +276,57 @@ const Checkout = () => {
               </div>
 
               <div className="flex items-center flex-col gap-3 mb-2">
-                <Button type="submit" className="btn-org btn-lg w-full flex gap-2 items-center"><BsFillBagCheckFill className="text-[20px]" /> Checkout</Button>
+                <div className="flex flex-col w-full items-center gap-3 mt-3">
+                  <Button
+                    className="btn-org btn-lg w-full flex gap-2 items-center"
+                    onClick={() => {
+                      setShowStripeForm((prev) => !prev);
+                      setTimeout(() => {
+                        const el = document.getElementById("stripe-payment-box");
+                        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }, 600);
+                    }}
+                    disabled={isPaying}
+                  >
+                    {showStripeForm ? "Hide Card Form" : "Pay with Card"}
+                  </Button>
 
-                <div id="paypal-button-container" className={`${userData?.address_details?.length === 0 ? 'pointer-events-none' : ''}`}></div>
+                  {showStripeForm && (
+                    <div
+                      id="stripe-payment-box"
+                      className="w-full p-4 mt-2 bg-[#f9f9f9] border border-gray-200 rounded-md shadow-sm"
+                    >
+                      <StripeCheckout
+                        amount={
+                          (() => {
+                            try {
+                              const total = context.cartData?.length > 0
+                                ? context.cartData
+                                  .map((item) => (item.price || 0) * (item.quantity || 0))
+                                  .reduce((a, b) => a + b, 0)
+                                : 0;
+                              const amount = parseFloat(total?.toFixed(2)) || 0;
+                              return amount > 0 ? amount : 0;
+                            } catch (e) {
+                              console.error("Error calculating cart total:", e);
+                              return 0;
+                            }
+                          })()
+                        }
+                        onPaid={(paymentIntent) => handleStripeSuccess(paymentIntent)}
+                        onProcessingChange={setIsPaying}
+                        onReady={() => {
+                          const el = document.getElementById("stripe-payment-box");
+                          if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }}
+                      />
+
+                      <p className="text-[13px] text-center mt-3 text-gray-600">
+                        💳 All payments are securely processed by Stripe.
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 <Button type="button" className="btn-dark btn-lg w-full flex gap-2 items-center" onClick={cashOnDelivery}>
                   {
@@ -420,7 +342,7 @@ const Checkout = () => {
             </div>
           </div>
         </div>
-      </form>
+      </div>
     </section>
   );
 };

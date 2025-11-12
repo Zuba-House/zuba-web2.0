@@ -18,6 +18,7 @@ import bannerList2Router from './route/bannerList2.route.js';
 import blogRouter from './route/blog.route.js';
 import orderRouter from './route/order.route.js';
 import logoRouter from './route/logo.route.js';
+import stripeRoute from "./routes/stripe.route.js";
 
 const app = express();
 app.use(cors());
@@ -52,6 +53,7 @@ app.use("/api/bannerList2",bannerList2Router)
 app.use("/api/blog",blogRouter)
 app.use("/api/order",orderRouter)
 app.use("/api/logo",logoRouter)
+app.use("/api/stripe", stripeRoute)
 
 
 connectDB().then(() => {
