@@ -220,17 +220,15 @@ const Sidebar = () => {
                   </Link>
                 </li>
                 <li className="w-full">
-                  <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3" onClick={() => {
-                    context.setIsOpenFullScreenPanel({
-                      open: true,
-                      model: "Add Product"
-                    })
+                  <Link to="/add-product-v2" onClick={() => {
                     context?.windowWidth < 992 && context?.setisSidebarOpen(false)
                     setSubmenuIndex(null)
                   }}>
-                    <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
-                    Product Upload
-                  </Button>
+                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
+                      Product Upload
+                    </Button>
+                  </Link>
                 </li>
 
 
@@ -270,6 +268,29 @@ const Sidebar = () => {
                     <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
                       <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
                       Add Product SIZE
+                    </Button>
+                  </Link>
+                </li>
+                <li className="w-full">
+                  <Link to="/add-product-v2" onClick={() => {
+                    context?.windowWidth < 992 && context?.setisSidebarOpen(false)
+                    setSubmenuIndex(null)
+                  }}>
+                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
+                      Add Product (New)
+                    </Button>
+                  </Link>
+                </li>
+
+                <li className="w-full">
+                  <Link to="/attributes" onClick={() => {
+                    context?.windowWidth < 992 && context?.setisSidebarOpen(false)
+                    setSubmenuIndex(null)
+                  }}>
+                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
+                      Attributes Manager
                     </Button>
                   </Link>
                 </li>

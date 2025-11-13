@@ -389,7 +389,7 @@ export const Products = () => {
                                 {
                                     context?.catData?.map((cat, index) => {
                                         return (
-                                            <MenuItem value={cat?._id}>{cat?.name}</MenuItem>
+                                            <MenuItem key={cat?._id || index} value={cat?._id}>{cat?.name}</MenuItem>
                                         )
                                     })
                                 }
@@ -419,7 +419,7 @@ export const Products = () => {
                                         return (
                                             cat?.children?.length !== 0 && cat?.children?.map((subCat, index_) => {
                                                 return (
-                                                    <MenuItem value={subCat?._id}>
+                                                    <MenuItem key={subCat?._id || index_} value={subCat?._id}>
                                                         {subCat?.name}</MenuItem>
                                                 )
                                             })
@@ -454,8 +454,7 @@ export const Products = () => {
                                             cat?.children?.length !== 0 && cat?.children?.map((subCat) => {
                                                 return (
                                                     subCat?.children?.length !== 0 && subCat?.children?.map((thirdLavelCat, index) => {
-                                                        return <MenuItem value={thirdLavelCat?._id} key={index}
-                                                        >{thirdLavelCat?.name}</MenuItem>
+                                                        return <MenuItem key={thirdLavelCat?._id || index} value={thirdLavelCat?._id}>{thirdLavelCat?.name}</MenuItem>
                                                     })
 
                                                 )
@@ -510,7 +509,7 @@ export const Products = () => {
                             {
                                 isLoading === false ? productData?.products?.length !== 0 && productData?.products?.map((product, index) => {
                                     return (
-                                        <TableRow key={index} className={product.checked === true ? '!bg-[#1976d21f]' : ''}>
+                                        <TableRow key={product?._id || index} className={product.checked === true ? '!bg-[#1976d21f]' : ''}>
                                             <TableCell style={{ minWidth: columns.minWidth }}>
                                                 <Checkbox {...label} size="small" checked={product.checked === true ? true : false}
                                                     onChange={(e) => handleCheckboxChange(e, product._id, index)}

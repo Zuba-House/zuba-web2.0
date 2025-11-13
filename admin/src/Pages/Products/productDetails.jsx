@@ -14,6 +14,7 @@ import { MdRateReview } from "react-icons/md";
 import { BsPatchCheckFill } from "react-icons/bs";
 import Rating from '@mui/material/Rating';
 import CircularProgress from '@mui/material/CircularProgress';
+import VariationsManager from './VariationsManager';
 
 const ProductDetails = () => {
 
@@ -242,6 +243,14 @@ const ProductDetails = () => {
                         </div>
 
                         <br />
+
+                        {product?.productType === 'variable' && (
+                            <div className="mb-6">
+                                <h2 className="text-[18px] font-[600] mb-3">Variations</h2>
+                                <VariationsManager productId={product?._id} />
+                            </div>
+                        )}
+
                         {
                             reviewsData?.length !== 0 &&
                             <h2 className="text-[18px] font-[500]">Customer Reviews</h2>

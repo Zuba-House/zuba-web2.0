@@ -271,8 +271,8 @@ const Dashboard = () => {
               {
                 ordersData?.length !== 0 && ordersData?.map((order, index) => {
                   return (
-                    <>
-                      <tr className="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
+                        <React.Fragment key={order?._id || index}>
+                          <tr className="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
                         <td className="px-6 py-4 font-[500]">
                           <Button
                             className="!w-[35px] !h-[35px] !min-w-[35px] !rounded-full !bg-[#f1f1f1]"
@@ -384,9 +384,9 @@ const Dashboard = () => {
                                 </thead>
                                 <tbody>
                                   {
-                                    order?.products?.map((item, index) => {
+                                    order?.products?.map((item, idx) => {
                                       return (
-                                        <tr className="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
+                                        <tr key={item?._id || idx} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
                                           <td className="px-6 py-4 font-[500]">
                                             <span className="text-gray-600">
                                               {item?._id}
@@ -430,7 +430,7 @@ const Dashboard = () => {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </React.Fragment>
                   )
                 })
 

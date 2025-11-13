@@ -13,11 +13,12 @@ import { FaFacebookF } from "react-icons/fa";
 import { AiOutlineYoutube } from "react-icons/ai";
 import { FaPinterestP } from "react-icons/fa";
 import { FaInstagram } from "react-icons/fa";
+import { FaLinkedin, FaTiktok } from "react-icons/fa";
+import { FaXTwitter } from "react-icons/fa6";
 
 import Drawer from "@mui/material/Drawer";
 import CartPanel from "../CartPanel";
 import { MyContext } from "../../App";
-
 
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
@@ -76,233 +77,313 @@ const Footer = () => {
 
           <hr className="border-[rgba(229,226,219,0.2)]" />
 
-          {/* ZeroX Intelligence: Main footer sections - already responsive with flex-col on mobile */}
+          {/* ZeroX Intelligence: UPDATED - Main footer sections with new links from old Zuba footer */}
           <div className="footer flex px-3 lg:px-0 flex-col lg:flex-row py-8 gap-6 lg:gap-0">
-            {/* ZeroX Intelligence: Removed right border on mobile, added bottom padding for separation */}
+            
+            {/* ZeroX Intelligence: Column 1 - Quick Links */}
             <div className="part1 w-full lg:w-[25%] lg:border-r border-[rgba(229,226,219,0.2)] pb-6 lg:pb-0 border-b lg:border-b-0 lg:pr-6">
-              {/* ZeroX Intelligence: Made heading responsive */}
-              <h2 className="text-[16px] sm:text-[17px] lg:text-[18px] font-[600] mb-3 lg:mb-4 text-[#e5e2db]">Contact us</h2>
-              {/* ZeroX Intelligence: Made text responsive */}
-              <p className="text-[12px] sm:text-[13px] font-[400] pb-3 lg:pb-4 text-[#e5e2db]">
-                Zuba House
-                <br />
-                
-              </p>
-
-              <Link
-                className="link text-[12px] sm:text-[13px] text-[#e5e2db] hover:text-[#efb291] break-all"
-                to="mailto:info@zubahouse.com"
-              >
-                info@zubahouse.com
-              </Link>
-
-              {/* ZeroX Intelligence: Made phone number responsive */}
-              <span className="text-[18px] sm:text-[20px] lg:text-[22px] font-[600] block w-full mt-3 mb-4 lg:mb-5 text-[#efb291]">
-                (+1) 437-557-7487
-              </span>
-
-              {/* ZeroX Intelligence: Made chat section responsive */}
-              <div className="flex items-center gap-2">
-                <IoChatboxOutline className="text-[32px] sm:text-[36px] lg:text-[40px] text-[#efb291]" />
-                <span className="text-[14px] sm:text-[15px] lg:text-[16px] font-[600] text-[#e5e2db]">
-                  Online Chat
-                  <br />
-                  Get Expert Help
-                </span>
-              </div>
+              <h2 className="text-[16px] sm:text-[17px] lg:text-[18px] font-[600] mb-3 lg:mb-4 text-[#efb291] border-b-2 border-[#efb291] pb-2 inline-block">Quick Links</h2>
+              <ul className="list mt-4">
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/about" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    About Zuba House
+                  </Link>
+                </li>
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/products" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    Shop
+                  </Link>
+                </li>
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/affiliate-program" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    Affiliate & Influencer Program
+                  </Link>
+                </li>
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/careers" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    Careers
+                  </Link>
+                </li>
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/ship-with-us" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    Ship With Us
+                  </Link>
+                </li>
+              </ul>
             </div>
 
-            {/* ZeroX Intelligence: Made links section responsive - stacks columns on mobile */}
-            <div className="part2 w-full lg:w-[40%] flex flex-col sm:flex-row pl-0 lg:pl-8 gap-6 sm:gap-4 pb-6 lg:pb-0 border-b lg:border-b-0">
-              {/* ZeroX Intelligence: Made columns full width on mobile, 50% on tablet+ */}
-              <div className="part2_col1 w-full sm:w-[50%]">
-                <h2 className="text-[16px] sm:text-[17px] lg:text-[18px] font-[600] mb-3 lg:mb-4 text-[#e5e2db]">Products</h2>
-
-                <ul className="list">
-                  {/* ZeroX Intelligence: Made list items responsive */}
-                  <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                    <Link to="/" className="link text-[#e5e2db] hover:text-[#efb291]">
-                      Prices drop
-                    </Link>
-                  </li>
-                  <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                    <Link to="/" className="link text-[#e5e2db] hover:text-[#efb291]">
-                      New products
-                    </Link>
-                  </li>
-                  <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                    <Link to="/" className="link text-[#e5e2db] hover:text-[#efb291]">
-                      Best sales
-                    </Link>
-                  </li>
-                  <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                    <Link to="/" className="link text-[#e5e2db] hover:text-[#efb291]">
-                      Contact us
-                    </Link>
-                  </li>
-                  <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                    <Link to="/" className="link text-[#e5e2db] hover:text-[#efb291]">
-                      Sitemap
-                    </Link>
-                  </li>
-                  <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                    <Link to="/" className="link text-[#e5e2db] hover:text-[#efb291]">
-                      Stores
-                    </Link>
-                  </li>
-                </ul>
-              </div>
-
-              {/* ZeroX Intelligence: Same responsive pattern for second column */}
-              <div className="part2_col2 w-full sm:w-[50%]">
-                <h2 className="text-[16px] sm:text-[17px] lg:text-[18px] font-[600] mb-3 lg:mb-4 text-[#e5e2db]">Our company</h2>
-
-                <ul className="list">
-                  <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                    <Link to="/" className="link text-[#e5e2db] hover:text-[#efb291]">
-                      Delivery
-                    </Link>
-                  </li>
-                  <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                    <Link to="/" className="link text-[#e5e2db] hover:text-[#efb291]">
-                      Legal Notice
-                    </Link>
-                  </li>
-                  <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                    <Link to="/" className="link text-[#e5e2db] hover:text-[#efb291]">
-                      Terms and conditions of use
-                    </Link>
-                  </li>
-                  <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                    <Link to="/" className="link text-[#e5e2db] hover:text-[#efb291]">
-                      About us
-                    </Link>
-                  </li>
-                  <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                    <Link to="/" className="link text-[#e5e2db] hover:text-[#efb291]">
-                      Secure payment
-                    </Link>
-                  </li>
-                  <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                    <Link to="/" className="link text-[#e5e2db] hover:text-[#efb291]">
-                      Login
-                    </Link>
-                  </li>
-                </ul>
-              </div>
+            {/* ZeroX Intelligence: Column 2 - Customer Service */}
+            <div className="part2 w-full lg:w-[25%] lg:border-r border-[rgba(229,226,219,0.2)] pb-6 lg:pb-0 border-b lg:border-b-0 lg:px-6">
+              <h2 className="text-[16px] sm:text-[17px] lg:text-[18px] font-[600] mb-3 lg:mb-4 text-[#efb291] border-b-2 border-[#efb291] pb-2 inline-block">Customer Service</h2>
+              <ul className="list mt-4">
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/return-refund-policy" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    Return & Refund Policy
+                  </Link>
+                </li>
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/order-tracking" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    Order Tracking
+                  </Link>
+                </li>
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/shipping-info" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    Shipping Info
+                  </Link>
+                </li>
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/download-app" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    Download App
+                  </Link>
+                </li>
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/report-suspicious-activity" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    Report Suspicious Activity
+                  </Link>
+                </li>
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/investors" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    Investors
+                  </Link>
+                </li>
+              </ul>
             </div>
 
-            {/* ZeroX Intelligence: Newsletter section - removed excess padding on mobile */}
-            <div className="part2 w-full lg:w-[35%] flex pl-0 lg:pl-8 flex-col pr-0 lg:pr-8">
-              {/* ZeroX Intelligence: Made newsletter heading responsive */}
-              <h2 className="text-[16px] sm:text-[17px] lg:text-[18px] font-[600] mb-2 lg:mb-4 text-[#e5e2db]">
+            {/* ZeroX Intelligence: Column 3 - Help */}
+            <div className="part3 w-full lg:w-[25%] lg:border-r border-[rgba(229,226,219,0.2)] pb-6 lg:pb-0 border-b lg:border-b-0 lg:px-6">
+              <h2 className="text-[16px] sm:text-[17px] lg:text-[18px] font-[600] mb-3 lg:mb-4 text-[#efb291] border-b-2 border-[#efb291] pb-2 inline-block">Help</h2>
+              <ul className="list mt-4">
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/help-center" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    Support Center & FAQ
+                  </Link>
+                </li>
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/sitemap" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    Sitemap
+                  </Link>
+                </li>
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/how-to-order" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    How to Order
+                  </Link>
+                </li>
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/how-to-track" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    How to Track
+                  </Link>
+                </li>
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/partner-with-us" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    Partner with Us
+                  </Link>
+                </li>
+                <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
+                  <Link to="/delete-account" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    Delete My Account
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* ZeroX Intelligence: Column 4 - Get Started + Newsletter */}
+            <div className="part4 w-full lg:w-[25%] flex pl-0 lg:pl-8 flex-col pr-0 lg:pr-0">
+              <h2 className="text-[16px] sm:text-[17px] lg:text-[18px] font-[600] mb-3 lg:mb-4 text-[#efb291] border-b-2 border-[#efb291] pb-2 inline-block">Get Started</h2>
+              
+              {/* Start Selling Button */}
+              <div className="mb-5">
+                <Link 
+                  to="/seller" 
+                  className="inline-block bg-[#efb291] text-[#0b2735] px-6 py-3 rounded-lg font-[600] transition-all hover:bg-[#e5a67d] hover:shadow-lg"
+                >
+                  Start Selling to Millions
+                </Link>
+              </div>
+
+              {/* Newsletter Section */}
+              <h3 className="text-[14px] sm:text-[15px] lg:text-[16px] font-[600] mb-2 text-[#e5e2db]">
                 Subscribe to newsletter
-              </h2>
-              {/* ZeroX Intelligence: Made description responsive */}
-              <p className="text-[12px] sm:text-[13px] text-[#e5e2db]">
-                Subscribe to our latest newsletter to get news about special
-                discounts.
+              </h3>
+              <p className="text-[12px] sm:text-[13px] text-[#e5e2db] mb-3">
+                Get news about special discounts and exclusive offers.
               </p>
 
-              <form className="mt-4 lg:mt-5">
-                {/* ZeroX Intelligence: Made input responsive */}
+              <form className="mt-2">
                 <input
-                  type="text"
-                  className="w-full h-[42px] sm:h-[45px] border outline-none pl-3 pr-3 sm:pl-4 sm:pr-4 rounded-sm mb-3 lg:mb-4 focus:border-[rgba(229,226,219,0.5)] text-[14px]"
+                  type="email"
+                  className="w-full h-[42px] sm:h-[45px] border outline-none pl-3 pr-3 sm:pl-4 sm:pr-4 rounded-sm mb-3 focus:border-[rgba(229,226,219,0.5)] text-[14px]"
                   placeholder="Your Email Address"
                 />
 
-                {/* ZeroX Intelligence: Made button full width on mobile */}
-                <Button className="btn-org w-full sm:w-auto">SUBSCRIBE</Button>
+                <Button className="btn-org w-full sm:w-auto mb-3">SUBSCRIBE</Button>
 
-                {/* ZeroX Intelligence: Made checkbox label responsive */}
                 <FormControlLabel
-                  className="mt-3 lg:mt-0 block w-full"
+                  className="mt-0 block w-full"
                   control={<Checkbox sx={{
                     color: '#e5e2db',
                     '&.Mui-checked': {
                       color: '#efb291',
                     },
                   }} />}
-                  label=" I agree to the terms and conditions and the privacy policy"
+                  label="I agree to the terms and privacy policy"
                   sx={{
                     '& .MuiFormControlLabel-label': {
                       color: '#e5e2db',
-                      fontSize: { xs: '12px', sm: '14px' }
+                      fontSize: { xs: '11px', sm: '12px' }
                     }
                   }}
                 />
               </form>
             </div>
           </div>
+
+          {/* ZeroX Intelligence: Features Banner */}
+          <div className="bg-[rgba(239,178,145,0.1)] border border-[rgba(239,178,145,0.2)] rounded-xl p-5 mt-8 mb-8">
+            <div className="flex flex-wrap justify-center gap-4 text-[12px] sm:text-[13px] text-[#e5e2db]">
+              <span className="flex items-center gap-2">
+                <span className="text-[#efb291]">🔔</span> Price-drop alerts
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="text-[#efb291]">📦</span> Track orders
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="text-[#efb291]">⚡</span> Faster checkout
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="text-[#efb291]">🛒</span> Low stock alerts
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="text-[#efb291]">🎁</span> Exclusive offers
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="text-[#efb291]">🏷️</span> Coupons & Deals
+              </span>
+            </div>
+          </div>
         </div>
       </footer>
 
-      {/* ZeroX Intelligence: Bottom strip - made fully responsive */}
-      <div className="bottomStrip border-t border-[rgba(0,0,0,0.1)] pt-3 pb-[100px] lg:pb-3 bg-white">
-        <div className="container flex items-center justify-between flex-col lg:flex-row gap-4 lg:gap-0 px-3 lg:px-0">
-          {/* ZeroX Intelligence: Social icons - maintained on all screens */}
-          <ul className="flex items-center gap-2 order-1 lg:order-1">
-            <li className="list-none">
-              <Link
-                to="/"
-                target="_blank"
-                className="w-[35px] h-[35px] rounded-full border border-[rgba(0,0,0,0.1)] flex items-center justify-center group hover:bg-primary transition-all"
-              >
-                <FaFacebookF className="text-[17px] group-hover:text-white" />
+      {/* ZeroX Intelligence: Bottom strip - Social Media, Security, Payment */}
+      <div className="bottomStrip border-t border-[rgba(0,0,0,0.1)] pt-6 pb-[100px] lg:pb-6 bg-white">
+        <div className="container px-3 lg:px-0">
+          
+          {/* Social Media & Trust Section */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+            
+            {/* Social Media */}
+            <div className="text-center">
+              <h4 className="text-[#efb291] font-[600] mb-4 text-[14px]">Connect with Zuba</h4>
+              <ul className="flex items-center justify-center gap-3">
+                <li className="list-none">
+                  <a
+                    href="https://www.instagram.com/zuba_house/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-[35px] h-[35px] rounded-full border border-[rgba(0,0,0,0.1)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
+                  >
+                    <FaInstagram className="text-[17px] text-[#0b2735] group-hover:text-white" />
+                  </a>
+                </li>
+                <li className="list-none">
+                  <a
+                    href="https://www.facebook.com/p/Zuba-House-61559578310001/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-[35px] h-[35px] rounded-full border border-[rgba(0,0,0,0.1)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
+                  >
+                    <FaFacebookF className="text-[17px] text-[#0b2735] group-hover:text-white" />
+                  </a>
+                </li>
+                <li className="list-none">
+                  <a
+                    href="https://x.com/ZubaInfo"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-[35px] h-[35px] rounded-full border border-[rgba(0,0,0,0.1)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
+                  >
+                    <FaXTwitter className="text-[17px] text-[#0b2735] group-hover:text-white" />
+                  </a>
+                </li>
+                <li className="list-none">
+                  <a
+                    href="https://www.tiktok.com/@zubahouse"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-[35px] h-[35px] rounded-full border border-[rgba(0,0,0,0.1)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
+                  >
+                    <FaTiktok className="text-[17px] text-[#0b2735] group-hover:text-white" />
+                  </a>
+                </li>
+                <li className="list-none">
+                  <a
+                    href="https://ca.linkedin.com/company/zuba-house"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-[35px] h-[35px] rounded-full border border-[rgba(0,0,0,0.1)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
+                  >
+                    <FaLinkedin className="text-[17px] text-[#0b2735] group-hover:text-white" />
+                  </a>
+                </li>
+                <li className="list-none">
+                  <a
+                    href="https://ca.pinterest.com/zubahouse2010/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-[35px] h-[35px] rounded-full border border-[rgba(0,0,0,0.1)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
+                  >
+                    <FaPinterestP className="text-[17px] text-[#0b2735] group-hover:text-white" />
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Security Certifications */}
+            <div className="text-center">
+              <h4 className="text-[#efb291] font-[600] mb-4 text-[14px]">Security Certified</h4>
+              <div className="flex flex-col gap-2 items-center">
+                <div className="bg-[rgba(239,178,145,0.1)] px-4 py-2 rounded-md text-[12px] text-[#efb291] border border-[rgba(239,178,145,0.3)]">
+                  🔒 SSL Secured
+                </div>
+                <div className="bg-[rgba(239,178,145,0.1)] px-4 py-2 rounded-md text-[12px] text-[#efb291] border border-[rgba(239,178,145,0.3)]">
+                  ✅ PCI Compliant
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Methods */}
+            <div className="text-center">
+              <h4 className="text-[#efb291] font-[600] mb-4 text-[14px]">We Accept</h4>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <img src="/visa.png" alt="Visa" className="h-[20px] sm:h-[24px] w-auto opacity-80 hover:opacity-100 transition-opacity" />
+                <img src="/master_card.png" alt="MasterCard" className="h-[20px] sm:h-[24px] w-auto opacity-80 hover:opacity-100 transition-opacity" />
+                <img src="/american_express.png" alt="American Express" className="h-[20px] sm:h-[24px] w-auto opacity-80 hover:opacity-100 transition-opacity" />
+                <img src="/carte_bleue.png" alt="Carte Bleue" className="h-[20px] sm:h-[24px] w-auto opacity-80 hover:opacity-100 transition-opacity" />
+              </div>
+            </div>
+          </div>
+
+          {/* Copyright and Legal Links */}
+          <div className="border-t border-[rgba(0,0,0,0.1)] pt-6 text-center">
+            <p className="text-[11px] sm:text-[12px] lg:text-[13px] mb-4">
+              © 2024－2025 Zuba House Inc. All Rights Reserved. <strong>Secured by ZeroX Intelligence</strong>
+            </p>
+            <div className="flex flex-wrap justify-center gap-4 text-[12px]">
+              <Link to="/terms-of-use" className="text-[#efb291] hover:text-[#e5a67d] transition-colors">
+                Terms of Use
               </Link>
-            </li>
-
-            <li className="list-none">
-              <Link
-                to="/"
-                target="_blank"
-                className="w-[35px] h-[35px] rounded-full border border-[rgba(0,0,0,0.1)] flex items-center justify-center group hover:bg-primary transition-all"
-              >
-                <AiOutlineYoutube className="text-[21px] group-hover:text-white" />
+              <Link to="/privacy-policy" className="text-[#efb291] hover:text-[#e5a67d] transition-colors">
+                Privacy Policy
               </Link>
-            </li>
-
-            <li className="list-none">
-              <Link
-                to="/"
-                target="_blank"
-                className="w-[35px] h-[35px] rounded-full border border-[rgba(0,0,0,0.1)] flex items-center justify-center group hover:bg-primary transition-all"
-              >
-                <FaPinterestP className="text-[17px] group-hover:text-white" />
+              <Link to="/consumer-health-data-privacy" className="text-[#efb291] hover:text-[#e5a67d] transition-colors">
+                Consumer Health Data Privacy
               </Link>
-            </li>
-
-            <li className="list-none">
-              <Link
-                to="/"
-                target="_blank"
-                className="w-[35px] h-[35px] rounded-full border border-[rgba(0,0,0,0.1)] flex items-center justify-center group hover:bg-primary transition-all"
-              >
-                <FaInstagram className="text-[17px] group-hover:text-white" />
+              <Link to="/privacy-choices" className="text-[#efb291] hover:text-[#e5a67d] transition-colors">
+                Your Privacy Choices
               </Link>
-            </li>
-          </ul>
-
-          {/* ZeroX Intelligence: Copyright text - made responsive and reordered */}
-          <p className="text-[11px] sm:text-[12px] lg:text-[13px] text-center mb-0 order-3 lg:order-2 px-2">
-            © 2024－2025 Zuba House Inc. All Rights Reserved. Secured by ZeroX Intelligence
-          </p>
-
-          {/* ZeroX Intelligence: Payment icons - made responsive and scrollable if needed */}
-          <div className="flex items-center gap-1 flex-wrap justify-center order-2 lg:order-3">
-            <img src="/carte_bleue.png" alt="Carte Bleue" className="h-[20px] sm:h-[24px] w-auto" />
-            <img src="/visa.png" alt="Visa" className="h-[20px] sm:h-[24px] w-auto" />
-            <img src="/master_card.png" alt="MasterCard" className="h-[20px] sm:h-[24px] w-auto" />
-            <img src="/american_express.png" alt="American Express" className="h-[20px] sm:h-[24px] w-auto" />
+            </div>
           </div>
         </div>
       </div>
-
-
-
-
-
 
       {/* Cart Panel */}
       <Drawer
@@ -316,31 +397,17 @@ const Footer = () => {
           <IoCloseSharp className="text-[20px] cursor-pointer" onClick={context.toggleCartPanel(false)} />
         </div>
 
-
         {
-
           context?.cartData?.length !== 0 ? <CartPanel data={context?.cartData} /> :
             <>
               <div className="flex items-center justify-center flex-col pt-[100px] gap-5">
-                <img src="/empty-cart.png" className="w-[150px]" />
+                <img src="/empty-cart.png" className="w-[150px]" alt="Empty Cart" />
                 <h4>Your Cart is currently empty</h4>
                 <Button className="btn-org btn-sm" onClick={context.toggleCartPanel(false)}>Continue Shopping</Button>
               </div>
             </>
-
         }
-
-
-
       </Drawer>
-
-
-
-
-
-
-
-
 
       {/* Address Panel */}
       <Drawer
@@ -354,20 +421,12 @@ const Footer = () => {
           <IoCloseSharp className="text-[20px] cursor-pointer" onClick={context.toggleAddressPanel(false)} />
         </div>
 
-
-
         <div className="w-full max-h-[100vh] overflow-auto">
           <AddAddress />
         </div>
-
-
-
       </Drawer>
 
-
-
-
-
+      {/* Product Details Modal */}
       <Dialog
         open={context?.openProductDetailsModal.open}
         fullWidth={context?.fullWidth}
@@ -397,13 +456,9 @@ const Footer = () => {
                 </div>
               </>
             }
-
           </div>
         </DialogContent>
       </Dialog>
-
-
-
     </>
   );
 };

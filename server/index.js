@@ -19,6 +19,8 @@ import blogRouter from './route/blog.route.js';
 import orderRouter from './route/order.route.js';
 import logoRouter from './route/logo.route.js';
 import stripeRoute from "./routes/stripe.route.js";
+import attributeRouter from './route/attribute.route.js';
+import variationRouter from './route/variation.route.js';
 
 const app = express();
 app.use(cors());
@@ -54,7 +56,8 @@ app.use("/api/blog",blogRouter)
 app.use("/api/order",orderRouter)
 app.use("/api/logo",logoRouter)
 app.use("/api/stripe", stripeRoute)
-
+app.use("/api/attributes", attributeRouter)
+app.use("/api/products/:id/variations", variationRouter)
 
 connectDB().then(() => {
     app.listen(process.env.PORT, () => {

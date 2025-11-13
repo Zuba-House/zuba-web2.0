@@ -53,25 +53,34 @@ const Header = () => {
 
   const location = useLocation();
 
+  const protectedRoutes = [
+    "/my-account",
+    "/my-orders",
+    "/my-list",
+    "/checkout",
+    "/order",
+    "/cart",
+    "/address"
+  ];
+
   useEffect(() => {
-
     fetchDataFromApi("/api/logo").then((res) => {
-      localStorage.setItem('logo', res?.logo[0]?.logo)
-    })
-
-
-    setTimeout(() => {
-      const token = localStorage.getItem('accessToken');
-
-      if (token !== undefined && token !== null && token !== "") {
-        const url = window.location.href
-        history(location.pathname)
-      } else {
-        history("/login")
+      if (res?.logo?.[0]?.logo) {
+        localStorage.setItem('logo', res?.logo?.[0]?.logo)
       }
-    }, [1000])
+    })
+  }, []);
 
-  }, [context?.isLogin]);
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    const isProtectedRoute = protectedRoutes.some((route) =>
+      location.pathname.startsWith(route)
+    );
+
+    if (!token && isProtectedRoute) {
+      history("/login")
+    }
+  }, [context?.isLogin, location.pathname]);
 
   const logout = () => {
     setAnchorEl(null);

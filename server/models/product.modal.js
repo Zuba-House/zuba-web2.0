@@ -19,6 +19,14 @@ const productSchema = mongoose.Schema({
         type: String,
         default: ''
     },
+
+    // Product type: "simple" (existing behavior) or "variable" (with variations)
+    productType: {
+        type: String,
+        enum: ['simple', 'variable'],
+        default: 'simple'
+    },
+
     price: {
         type: Number,
         default: 0
@@ -29,6 +37,35 @@ const productSchema = mongoose.Schema({
     default: 'USD',
     enum: ['USD', 'INR', 'EUR']
    },
+
+    // For variable products: price range display
+    priceRange: {
+        min: {
+            type: Number,
+            default: 0
+        },
+        max: {
+            type: Number,
+            default: 0
+        }
+    },
+
+    // Attributes used in this product (only for variable products)
+    // Example: [ { attributeId: ObjectId, values: [ObjectId, ObjectId] } ]
+    attributes: [
+        {
+            attributeId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'Attribute'
+            },
+            values: [
+                {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'AttributeValue'
+                }
+            ]
+        }
+    ],
 
 
 

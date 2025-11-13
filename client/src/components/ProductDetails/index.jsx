@@ -15,11 +15,8 @@ import { formatCurrency } from "../../utils/currency";
 
 
 export const ProductDetailsComponent = (props) => {
-  const [productActionIndex, setProductActionIndex] = useState(null);
   const [quantity, setQuantity] = useState(1);
-  const [selectedTabName, setSelectedTabName] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [tabError, setTabError] = useState(false);
   const [isAdded, setIsAdded] = useState(false);
   const [isAddedInMyList, setIsAddedInMyList] = useState(false);
 
@@ -27,13 +24,6 @@ export const ProductDetailsComponent = (props) => {
 
   const handleSelecteQty = (qty) => {
     setQuantity(qty);
-  }
-
-
-
-  const handleClickActiveTab = (index, name) => {
-    setProductActionIndex(index)
-    setSelectedTabName(name)
   }
 
 
@@ -73,74 +63,38 @@ export const ProductDetailsComponent = (props) => {
       return false;
     }
 
+    // Determine price: use salePrice if available, fallback to oldPrice, then price
+    const displayPrice = product?.salePrice || product?.oldPrice || product?.price;
+
     const productItem = {
       _id: product?._id,
       productTitle: product?.name,
       image: product?.images[0],
       rating: product?.rating,
-      price: product?.price,
-      oldPrice: product?.oldPrice,
-      discount: product?.discount,
+      price: displayPrice,
       quantity: quantity,
-      subTotal: parseInt(product?.price * quantity),
+      subTotal: parseInt(displayPrice * quantity),
       productId: product?._id,
       countInStock: product?.countInStock,
       brand: product?.brand,
-      size: props?.item?.size?.length !== 0 ? selectedTabName : '',
-      weight: props?.item?.productWeight?.length !== 0 ? selectedTabName : '',
-      ram: props?.item?.productRam?.length !== 0 ? selectedTabName : ''
-
     }
 
-
-
-    if (props?.item?.size?.length !== 0 || props?.item?.productWeight?.length !== 0 || props?.item?.productRam?.length !== 0) {
-      if (selectedTabName !== null) {
-        setIsLoading(true);
-
-        postData("/api/cart/add", productItem).then((res) => {
-          if (res?.error === false) {
-            context?.alertBox("success", res?.message);
-
-            context?.getCartItems();
-            setTimeout(() => {
-              setIsLoading(false);
-              setIsAdded(true)
-            }, 500);
-
-          } else {
-            context?.alertBox("error", res?.message);
-            setTimeout(() => {
-              setIsLoading(false);
-            }, 500);
-          }
-
-        })
-
+    setIsLoading(true);
+    postData("/api/cart/add", productItem).then((res) => {
+      if (res?.error === false) {
+        context?.alertBox("success", res?.message);
+        context?.getCartItems();
+        setTimeout(() => {
+          setIsLoading(false);
+          setIsAdded(true)
+        }, 500);
       } else {
-        setTabError(true);
+        context?.alertBox("error", res?.message);
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 500);
       }
-    } else {
-      setIsLoading(true);
-      postData("/api/cart/add", productItem).then((res) => {
-        if (res?.error === false) {
-          context?.alertBox("success", res?.message);
-
-          context?.getCartItems();
-          setTimeout(() => {
-            setIsLoading(false);
-            setIsAdded(true)
-          }, 500);
-
-        } else {
-          context?.alertBox("error", res?.message);
-          setTimeout(() => {
-            setIsLoading(false);
-          }, 500);
-        }
-
-      })
-    }
+    })
   }
 
 
@@ -151,18 +105,18 @@ export const ProductDetailsComponent = (props) => {
     }
 
     else {
+      // Determine price: use salePrice if available, fallback to oldPrice, then price
+      const displayPrice = item?.salePrice || item?.oldPrice || item?.price;
+
       const obj = {
         productId: item?._id,
         userId: context?.userData?._id,
         productTitle: item?.name,
         image: item?.images[0],
         rating: item?.rating,
-        price: item?.price,
-        oldPrice: item?.oldPrice,
+        price: displayPrice,
         brand: item?.brand,
-        discount: item?.discount
       }
-
 
       postData("/api/myList/add", obj).then((res) => {
         if (res?.error === false) {
@@ -197,12 +151,31 @@ export const ProductDetailsComponent = (props) => {
 
       <div className="flex flex-col sm:flex-row md:flex-row lg:flex-row items-start sm:items-center gap-4 mt-4">
         <div className="flex items-center gap-4">
-          <span className="oldPrice line-through text-gray-500 text-[20px] font-[500]">
-            {formatCurrency(props?.item?.price)}
-          </span>
-          <span className="price text-primary text-[20px]  font-[600]">
-            {formatCurrency(props?.item?.oldPrice)}
-          </span>
+          {props?.item?.salePrice && (
+            <>
+              <span className="oldPrice line-through text-gray-500 text-[20px] font-[500]">
+                {formatCurrency(props?.item?.price)}
+              </span>
+              <span className="price text-primary text-[20px] font-[600]">
+                {formatCurrency(props?.item?.salePrice)}
+              </span>
+            </>
+          )}
+          {!props?.item?.salePrice && props?.item?.oldPrice && (
+            <>
+              <span className="oldPrice line-through text-gray-500 text-[20px] font-[500]">
+                {formatCurrency(props?.item?.price)}
+              </span>
+              <span className="price text-primary text-[20px] font-[600]">
+                {formatCurrency(props?.item?.oldPrice)}
+              </span>
+            </>
+          )}
+          {!props?.item?.salePrice && !props?.item?.oldPrice && (
+            <span className="price text-primary text-[20px] font-[600]">
+              {formatCurrency(props?.item?.price)}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-4">
@@ -218,91 +191,6 @@ export const ProductDetailsComponent = (props) => {
       <p className="mt-3 pr-10 mb-5">
         {props?.item?.description}
       </p>
-
-
-      {
-        props?.item?.productRam?.length !== 0 &&
-        <div className="flex items-center gap-3">
-          <span className="text-[16px]">RAM:</span>
-          <div className="flex items-center gap-1 actions">
-            {
-              props?.item?.productRam?.map((item, index) => {
-                return (
-                  <Button
-                    key={index}
-                    className={`${productActionIndex === index ?
-                      "!bg-primary !text-white" : ""
-                      }  ${tabError === true && 'error'}`}
-                    onClick={() => handleClickActiveTab(index, item)}
-                  >
-                    {item}
-                  </Button>
-                )
-              })
-            }
-
-
-          </div>
-        </div>
-      }
-
-
-
-      {
-        props?.item?.size?.length !== 0 &&
-        <div className="flex items-center gap-3">
-          <span className="text-[16px]">SIZE:</span>
-          <div className="flex items-center gap-1 actions">
-            {
-              props?.item?.size?.map((item, index) => {
-                return (
-                  <Button
-                    key={index}
-                    className={`${productActionIndex === index ?
-                      "!bg-primary !text-white" : ""
-                      } ${tabError === true && 'error'}`}
-                    onClick={() => handleClickActiveTab(index, item)}
-                  >
-                    {item}
-                  </Button>
-                )
-              })
-            }
-
-
-          </div>
-        </div>
-      }
-
-
-
-      {
-        props?.item?.productWeight?.length !== 0 &&
-        <div className="flex items-center gap-3">
-          <span className="text-[16px]">WEIGHT:</span>
-          <div className="flex items-center gap-1 actions">
-            {
-              props?.item?.productWeight?.map((item, index) => {
-                return (
-                  <Button
-                    key={index}
-                    className={`${productActionIndex === index ?
-                      "!bg-primary !text-white" : ""
-                      }  ${tabError === true && 'error'}`}
-                    onClick={() => handleClickActiveTab(index, item)}
-                  >
-                    {item}
-                  </Button>
-                )
-              })
-            }
-
-
-          </div>
-        </div>
-      }
-
-
 
       <p className="text-[14px] mt-5 mb-2 text-[#000]">
         Free Shipping (Est. Delivery Time 2-3 Days)

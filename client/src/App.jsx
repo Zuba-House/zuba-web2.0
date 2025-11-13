@@ -18,6 +18,7 @@ import Checkout from "./Pages/Checkout";
 import MyAccount from "./Pages/MyAccount";
 import MyList from "./Pages/MyList";
 import Orders from "./Pages/Orders";
+import AboutUs from "./Pages/About";
 
 import toast, { Toaster } from 'react-hot-toast';
 import { fetchDataFromApi, postData } from "./utils/api";
@@ -279,6 +280,7 @@ function App() {
             <Route path={"/my-account"} exact={true} element={<MyAccount />} />
             <Route path={"/my-list"} exact={true} element={<MyList />} />
             <Route path={"/my-orders"} exact={true} element={<Orders />} />
+            <Route path={"/about"} exact={true} element={<AboutUs />} />
             <Route path={"/order/success"} exact={true} element={<OrderSuccess />} />
             <Route path={"/order/failed"} exact={true} element={<OrderFailed />} />
             <Route path={"/address"} exact={true} element={<Address />} />

@@ -13,32 +13,29 @@ const UploadBox = (props) => {
 
     let selectedImages = [];
 
-    const formdata = new FormData();
-
     const onChangeFile = async (e, apiEndPoint) => {
-
         try {
             setPreviews([]);
             const files = e.target.files;
 
             setUploading(true);
 
+            const formdata = new FormData();
 
             for (var i = 0; i < files.length; i++) {
 
                 if (files[i] && (files[i].type === "image/jpeg" || files[i].type === "image/jpg" ||
                     files[i].type === "image/png" ||
-                    files[i].type === "image/webp" ||  files[i].type === "image/svg+xml")
+                    files[i].type === "image/webp" || files[i].type === "image/svg+xml")
                 ) {
 
                     const file = files[i];
 
                     selectedImages.push(file);
-                    formdata.append(props?.name, file);
-
+                    formdata.append(props?.name || 'images', file);
 
                 } else {
-                    context.alertBox("error", "Please select a valid JPG , PNG or webp image file.");
+                    context.alertBox("error", "Please select a valid JPG, PNG, SVG or webp image file.");
                     setUploading(false);
                     return false;
                 }
@@ -46,13 +43,17 @@ const UploadBox = (props) => {
 
             uploadImages(apiEndPoint, formdata).then((res) => {
                 setUploading(false);
-                //props.setPreviews(res?.data?.images)
-               // setPreviews((prevItems) => [...prevItems, res?.data?.images]);
-                props.setPreviewsFun(res?.data?.images);
+                const images = Array.isArray(res?.data?.images) ? res.data.images : [];
+                props.setPreviewsFun(images);
+            }).catch((err) => {
+                setUploading(false);
+                console.error(err);
+                context.alertBox('error', 'Image upload failed');
             })
 
         } catch (error) {
             console.log(error);
+            setUploading(false);
         }
     }
 
