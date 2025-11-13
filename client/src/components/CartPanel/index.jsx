@@ -4,6 +4,7 @@ import { MdOutlineDeleteOutline } from "react-icons/md";
 import Button from "@mui/material/Button";
 import { MyContext } from "../../App";
 import { deleteData } from "../../utils/api";
+import { formatCurrency } from "../../utils/currency";
 
 const CartPanel = (props) => {
 
@@ -45,7 +46,7 @@ const CartPanel = (props) => {
                     <span className="text-[13px] sm:text-[14px]">
                       Qty : <span>{item?.quantity}</span>
                     </span>
-                    <span className="text-primary font-bold">{item?.price?.toLocaleString('en-US', { style: 'currency', currency: 'INR' })}</span>
+                    <span className="text-primary font-bold">{formatCurrency(item?.price)}</span>
                   </p>
 
                   <MdOutlineDeleteOutline className="absolute top-[10px] right-[10px] cursor-pointer text-[20px] link transition-all" onClick={() => removeItem(item?._id)} />
@@ -68,12 +69,11 @@ const CartPanel = (props) => {
           <div className="flex items-center justify-between w-full">
             <span className="text-[14px] font-[600]">{context?.cartData?.length} item</span>
             <span className="text-primary font-bold">
-              {
+              {formatCurrency(
                 (context.cartData?.length !== 0 ?
                   context.cartData?.map(item => parseInt(item.price) * item.quantity)
                     .reduce((total, value) => total + value, 0) : 0)
-                  ?.toLocaleString('en-US', { style: 'currency', currency: 'INR' })
-              }
+              )}
             </span>
           </div>
 
@@ -84,12 +84,11 @@ const CartPanel = (props) => {
           <div className="flex items-center justify-between w-full">
             <span className="text-[14px] font-[600]">Total (tax excl.)</span>
             <span className="text-primary font-bold">
-              {
+              {formatCurrency(
                 (context.cartData?.length !== 0 ?
                   context.cartData?.map(item => parseInt(item.price) * item.quantity)
                     .reduce((total, value) => total + value, 0) : 0)
-                  ?.toLocaleString('en-US', { style: 'currency', currency: 'INR' })
-              }
+              )}
             </span>
           </div>
 

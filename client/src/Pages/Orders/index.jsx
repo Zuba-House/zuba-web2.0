@@ -6,6 +6,7 @@ import Badge from "../../components/Badge";
 import { FaAngleUp } from "react-icons/fa6";
 import { fetchDataFromApi } from "../../utils/api";
 import Pagination from "@mui/material/Pagination";
+import { formatCurrency } from "../../utils/currency";
 
 const Orders = () => {
   const [isOpenOrderdProduct, setIsOpenOrderdProduct] = useState(null);
@@ -151,7 +152,8 @@ const Orders = () => {
                               </td>
 
                               <td className="px-6 py-4 font-[500]">
-                                <Badge status={order?.order_status} />
+                                {/* Prefer payment_status when present (shows FAILED/COMPLETED), fallback to order_status */}
+                                <Badge status={order?.payment_status || order?.order_status} />
                               </td>
                               <td className="px-6 py-4 font-[500] whitespace-nowrap">
                                 {order?.createdAt?.split("T")[0]}
@@ -230,9 +232,9 @@ const Orders = () => {
                                                   {item?.quantity}
                                                 </td>
 
-                                                <td className="px-6 py-4 font-[500]">{item?.price?.toLocaleString('en-US', { style: 'currency', currency: 'INR' })}</td>
+                                                <td className="px-6 py-4 font-[500]">{formatCurrency(item?.price)}</td>
 
-                                                <td className="px-6 py-4 font-[500]">{(item?.price * item?.quantity)?.toLocaleString('en-US', { style: 'currency', currency: 'INR' })}</td>
+                                                <td className="px-6 py-4 font-[500]">{formatCurrency(item?.price * item?.quantity)}</td>
                                               </tr>
                                             )
                                           })

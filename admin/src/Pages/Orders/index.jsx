@@ -199,7 +199,13 @@ export const Orders = () => {
                       </td>
 
                       <td className="px-6 py-4 font-[500]">
-                        <span className="text-primary whitespace-nowrap text-[13px]">{order?.paymentId ? order?.paymentId : 'CASH ON DELIVERY'}</span>
+        <span className="text-primary whitespace-nowrap text-[13px]">
+          {
+            order?.payment_status === 'FAILED'
+              ? 'FAILED'
+              : (order?.paymentId ? order?.paymentId : 'CASH ON DELIVERY')
+          }
+        </span>
                       </td>
 
                       <td className="px-6 py-4 font-[500] whitespace-nowrap">
@@ -236,7 +242,11 @@ export const Orders = () => {
                       </td>
 
                       <td className="px-6 py-4 font-[500]">
-                        <Select
+                        {/* show payment_status badge when available, otherwise the editable order_status select */}
+                        {order?.payment_status ? (
+                          <Badge status={order?.payment_status || order?.order_status} />
+                        ) : (
+                          <Select
                           labelId="demo-simple-select-helper-label"
                           id="demo-simple-select-helper"
                           value={order?.order_status !== null ? order?.order_status : orderStatus}
@@ -250,6 +260,7 @@ export const Orders = () => {
                           <MenuItem value={'confirm'}>Confirm</MenuItem>
                           <MenuItem value={'delivered'}>Delivered</MenuItem>
                         </Select>
+                        )}
                       </td>
                       <td className="px-6 py-4 font-[500] whitespace-nowrap">
                         {order?.createdAt?.split("T")[0]}
@@ -331,9 +342,9 @@ export const Orders = () => {
                                           {item?.quantity}
                                         </td>
 
-                                        <td className="px-6 py-4 font-[500]">{item?.price?.toLocaleString('en-US', { style: 'currency', currency: 'INR' })}</td>
+                                        <td className="px-6 py-4 font-[500]">{item?.price?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
 
-                                        <td className="px-6 py-4 font-[500]">{(item?.price * item?.quantity)?.toLocaleString('en-US', { style: 'currency', currency: 'INR' })}</td>
+                                        <td className="px-6 py-4 font-[500]">{(item?.price * item?.quantity)?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
                                       </tr>
                                     )
                                   })
@@ -385,3 +396,4 @@ export const Orders = () => {
 
 
 export default Orders;
+

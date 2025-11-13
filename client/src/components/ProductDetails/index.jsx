@@ -10,6 +10,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { postData } from "../../utils/api";
 import { FaCheckDouble } from "react-icons/fa";
 import { IoMdHeart } from "react-icons/io";
+import { formatCurrency } from "../../utils/currency";
 
 
 
@@ -197,10 +198,10 @@ export const ProductDetailsComponent = (props) => {
       <div className="flex flex-col sm:flex-row md:flex-row lg:flex-row items-start sm:items-center gap-4 mt-4">
         <div className="flex items-center gap-4">
           <span className="oldPrice line-through text-gray-500 text-[20px] font-[500]">
-            &#x20b9;{props?.item?.price}
+            {formatCurrency(props?.item?.price)}
           </span>
           <span className="price text-primary text-[20px]  font-[600]">
-            &#x20b9;{props?.item?.oldPrice}
+            {formatCurrency(props?.item?.oldPrice)}
           </span>
         </div>
 

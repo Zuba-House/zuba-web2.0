@@ -14,6 +14,7 @@ import { deleteData, editData, postData } from "../../utils/api";
 import CircularProgress from '@mui/material/CircularProgress';
 import { MdClose } from "react-icons/md";
 import { IoMdHeart } from "react-icons/io";
+import { formatCurrency } from "../../utils/currency";
 
 
 
@@ -320,10 +321,10 @@ const ProductItem = (props) => {
 
         <div className="flex items-center gap-4 justify-between">
           <span className="oldPrice line-through text-gray-500 text-[12px] lg:text-[14px] font-[500]">
-            {props?.item?.oldPrice?.toLocaleString('en-US', { style: 'currency', currency: 'INR' })}
+            {formatCurrency(props?.item?.oldPrice)}
           </span>
           <span className="price text-primary text-[12px] lg:text-[14px]  font-[600]">
-            {props?.item?.price?.toLocaleString('en-US', { style: 'currency', currency: 'INR' })}
+            {formatCurrency(props?.item?.price)}
           </span>
         </div>
 

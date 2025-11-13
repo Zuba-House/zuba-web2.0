@@ -291,7 +291,9 @@ const Dashboard = () => {
                         </td>
 
                         <td className="px-6 py-4 font-[500]">
-                          <span className="text-primary whitespace-nowrap text-[13px]">{order?.paymentId ? order?.paymentId : 'CASH ON DELIVERY'}</span>
+                        <span className="text-primary whitespace-nowrap text-[13px]">
+                          {order?.payment_status === 'FAILED' ? 'FAILED' : (order?.paymentId ? order?.paymentId : 'CASH ON DELIVERY')}
+                        </span>
                         </td>
 
                         <td className="px-6 py-4 font-[500] whitespace-nowrap">
@@ -328,7 +330,7 @@ const Dashboard = () => {
                         </td>
 
                         <td className="px-6 py-4 font-[500]">
-                          <Badge status={order?.order_status} />
+                          <Badge status={order?.payment_status || order?.order_status} />
                         </td>
                         <td className="px-6 py-4 font-[500] whitespace-nowrap">
                           {order?.createdAt?.split("T")[0]}
@@ -407,9 +409,9 @@ const Dashboard = () => {
                                             {item?.quantity}
                                           </td>
 
-                                          <td className="px-6 py-4 font-[500]">{item?.price?.toLocaleString('en-US', { style: 'currency', currency: 'INR' })}</td>
+                                          <td className="px-6 py-4 font-[500]">{item?.price?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
 
-                                          <td className="px-6 py-4 font-[500]">{(item?.price * item?.quantity)?.toLocaleString('en-US', { style: 'currency', currency: 'INR' })}</td>
+                                          <td className="px-6 py-4 font-[500]">{(item?.price * item?.quantity)?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
                                         </tr>
                                       )
                                     })
@@ -528,3 +530,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+

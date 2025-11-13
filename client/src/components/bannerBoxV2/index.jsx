@@ -1,6 +1,7 @@
 import React from "react";
 import "../bannerBoxV2/style.css";
 import { Link } from "react-router-dom";
+import { formatCurrency } from "../../utils/currency";
 
 const BannerBoxV2 = (props) => {
   return (
@@ -18,7 +19,7 @@ const BannerBoxV2 = (props) => {
         <h2 className="text-[14px] md:text-[18px] font-[600]">{props?.item?.bannerTitle}</h2>
 
         <span className="text-[20px] text-primary font-[600] w-full">
-          &#x20b9;{props?.item?.price}
+          {formatCurrency(props?.item?.price)}
         </span>
 
         <div className="w-full">

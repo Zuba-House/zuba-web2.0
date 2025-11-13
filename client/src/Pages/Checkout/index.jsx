@@ -11,6 +11,7 @@ import axios from 'axios';
 import { useNavigate } from "react-router-dom";
 import CircularProgress from '@mui/material/CircularProgress';
 import StripeCheckout from "../../components/StripeCheckout.jsx";
+import { formatCurrency } from "../../utils/currency";
 
 const VITE_API_URL = import.meta.env.VITE_API_URL;
 
@@ -19,7 +20,8 @@ const Checkout = () => {
   const [userData, setUserData] = useState(null);
   const [isChecked, setIsChecked] = useState(0);
   const [selectedAddress, setSelectedAddress] = useState("");
-  const [totalAmount, setTotalAmount] = useState();
+  // numeric total for server payloads
+  const [totalAmount, setTotalAmount] = useState(0);
   const [isLoading, setIsloading] = useState(false);
   const [showStripeForm, setShowStripeForm] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
@@ -36,12 +38,11 @@ const Checkout = () => {
 
 
   useEffect(() => {
-    setTotalAmount(
-      context.cartData?.length !== 0 ?
-        context.cartData?.map(item => parseInt(item.price) * item.quantity)
-          .reduce((total, value) => total + value, 0) : 0)
-      ?.toLocaleString('en-US', { style: 'currency', currency: 'USD' }
-      );
+    const total = context.cartData?.length !== 0 ?
+      context.cartData?.map(item => parseInt(item.price) * item.quantity)
+        .reduce((sum, value) => sum + value, 0) : 0;
+    // keep numeric for backend; format only when rendering
+    setTotalAmount(total);
 
     // localStorage.setItem("totalAmount", context.cartData?.length !== 0 ?
     //   context.cartData?.map(item => parseInt(item.price) * item.quantity)
@@ -119,12 +120,13 @@ const Checkout = () => {
 
   }
 
-  const handleStripeSuccess = (paymentIntent) => {
+  const handleStripeSuccess = async (paymentIntent) => {
     const user = context?.userData;
     if (userData?.address_details?.length === 0) {
       context.alertBox("error", "Please add address");
       return;
     }
+
     const payLoad = {
       userId: user?._id,
       products: context?.cartData,
@@ -139,22 +141,58 @@ const Checkout = () => {
       }),
     };
 
-    postData(`/api/order/create`, payLoad)
-      .then((res) => {
-        context.alertBox("success", res?.message);
-        if (res?.error === false) {
-          deleteData(`/api/cart/emptyCart/${user?._id}`).then(() => {
-            context?.getCartItems();
-          });
-          history("/order/success");
-        } else {
-          history("/order/failed");
-          context.alertBox("error", res?.message);
+    try {
+      const res = await postData(`/api/order/create`, payLoad);
+      context.alertBox("success", res?.message);
+      if (res?.error === false) {
+        try {
+          await deleteData(`/api/cart/emptyCart/${user?._id}`);
+        } catch {
+          // ignore cart empty errors but still proceed
         }
-      })
-      .catch(() => {
+        context?.getCartItems();
+        history("/order/success");
+      } else {
+        context.alertBox("error", res?.message);
         history("/order/failed");
-      });
+      }
+    } catch {
+      context.alertBox("error", "Failed to record order");
+      history("/order/failed");
+    }
+  }
+
+  const handleStripeFailed = async (error) => {
+    const user = context?.userData;
+    if (userData?.address_details?.length === 0) {
+      return;
+    }
+    const fail = error || {};
+    const pi = fail?.payment_intent || fail?.paymentIntent || {};
+    const lastErr = pi?.last_payment_error || {};
+    const payLoad = {
+      userId: user?._id,
+      products: context?.cartData,
+      paymentId: pi?.id || '',
+      payment_status: "FAILED",
+      delivery_address: selectedAddress,
+      totalAmt: totalAmount,
+      date: new Date().toLocaleString("en-US", {
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+      }),
+      failReason: lastErr?.message || fail?.message || 'Stripe payment failed',
+      failCode: fail?.code || lastErr?.code || '',
+      failType: fail?.type || lastErr?.type || '',
+      failDeclineCode: fail?.decline_code || lastErr?.decline_code || ''
+    };
+
+    try {
+      await postData(`/api/order/create`, payLoad);
+    } catch {
+      /* ignore */
+    }
   }
 
   return (
@@ -265,7 +303,7 @@ const Checkout = () => {
                           </div>
                         </div>
 
-                        <span className="text-[14px] font-[500]">{(item?.quantity * item?.price)?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
+                        <span className="text-[14px] font-[500]">{formatCurrency(item?.quantity * item?.price)}</span>
                       </div>
                     )
                   })
@@ -288,7 +326,7 @@ const Checkout = () => {
                     }}
                     disabled={isPaying}
                   >
-                    {showStripeForm ? "Hide Card Form" : "Pay with Card"}
+                    {showStripeForm ? "Hide Card Form" : "Place Order (Card)"}
                   </Button>
 
                   {showStripeForm && (
@@ -314,6 +352,7 @@ const Checkout = () => {
                           })()
                         }
                         onPaid={(paymentIntent) => handleStripeSuccess(paymentIntent)}
+                        onFailed={(err) => handleStripeFailed(err)}
                         onProcessingChange={setIsPaying}
                         onReady={() => {
                           const el = document.getElementById("stripe-payment-box");

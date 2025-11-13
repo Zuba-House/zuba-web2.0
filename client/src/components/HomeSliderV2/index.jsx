@@ -11,6 +11,7 @@ import { EffectFade, Navigation, Pagination, Autoplay } from "swiper/modules";
 import Button from "@mui/material/Button";
 import { Link } from "react-router-dom";
 import { MyContext } from "../../App";
+import { formatCurrency } from "../../utils/currency";
 
 const HomeBannerV2 = (props) => {
 
@@ -67,7 +68,7 @@ const HomeBannerV2 = (props) => {
                         className="text-primary text-[16px] lg:text-[30px] 
                         font-[700] block lg:inline w-full lg:w-max"
                       >
-                        {item?.price?.toLocaleString('en-US', { style: 'currency', currency: 'INR' })}
+                        {formatCurrency(item?.price)}
                       </span>
                     </h3>
 

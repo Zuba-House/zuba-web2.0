@@ -12,11 +12,12 @@ import {
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
-function StripeForm({ amount, onPaid, onProcessingChange, onReady }) {
+function StripeForm({ amount, onPaid, onFailed, onProcessingChange, onReady }) {
   const stripe = useStripe();
   const elements = useElements();
   const [clientSecret, setClientSecret] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [creatingIntent, setCreatingIntent] = useState(false);
 
   useEffect(() => {
     const api = import.meta.env.VITE_API_URL;
@@ -73,21 +74,76 @@ function StripeForm({ amount, onPaid, onProcessingChange, onReady }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!stripe || !elements || !clientSecret) return;
+    if (!stripe || !elements) return;
     setProcessing(true);
+
+    let secret = clientSecret;
+    try {
+      if (!secret) {
+        setCreatingIntent(true);
+        const api = import.meta.env.VITE_API_URL;
+        const res = await axios.post(`${api}/api/stripe/create-payment-intent`, { amount });
+        secret = res?.data?.clientSecret || "";
+        setClientSecret(secret);
+      }
+    } catch (err) {
+      console.error("Failed to create payment intent on submit:", err.response?.data || err.message);
+      setCreatingIntent(false);
+      setProcessing(false);
+      window.location.href = "/order/failed";
+      return;
+    } finally {
+      setCreatingIntent(false);
+    }
+
     const card = elements.getElement(CardElement);
-    const { error, paymentIntent } = await stripe.confirmCardPayment(
-      clientSecret,
-      { payment_method: { card } }
-    );
+    const result = await stripe.confirmCardPayment(secret, { payment_method: { card } });
     setProcessing(false);
+
+    const { error, paymentIntent } = result || {};
+
     if (error) {
       console.error("Stripe payment failed:", error);
+      try {
+        const maybePromise = onFailed?.(error);
+        if (maybePromise && typeof maybePromise.then === 'function') {
+          await maybePromise;
+        }
+      } catch (e) {
+        console.error('Error in onFailed handler:', e);
+      }
       window.location.href = "/order/failed";
       return;
     }
-    if (paymentIntent?.status === "succeeded") {
-      onPaid?.(paymentIntent);
+
+    if (paymentIntent) {
+      console.log('Stripe paymentIntent status:', paymentIntent.status);
+      if (paymentIntent.status === 'succeeded') {
+        try {
+          const maybePromise = onPaid?.(paymentIntent);
+          if (maybePromise && typeof maybePromise.then === 'function') {
+            await maybePromise;
+          }
+        } catch (e) {
+          console.error('Error in onPaid handler:', e);
+        }
+        // onPaid handler will redirect to success when it finishes
+        return;
+      }
+
+      // Any other status treat as failure (e.g., requires_action not completed)
+      console.warn('PaymentIntent not succeeded:', paymentIntent.status);
+      const pseudoError = { message: 'Payment not completed', payment_intent: paymentIntent };
+      try {
+        const maybePromise = onFailed?.(pseudoError);
+        if (maybePromise && typeof maybePromise.then === 'function') {
+          await maybePromise;
+        }
+      } catch (e) {
+        console.error('Error in onFailed handler:', e);
+      }
+      window.location.href = "/order/failed";
+      return;
     }
   };
 
@@ -96,21 +152,44 @@ function StripeForm({ amount, onPaid, onProcessingChange, onReady }) {
       <CardElement className="p-3 border rounded" />
       <button
         type="submit"
-        disabled={!stripe || !clientSecret || processing}
+        disabled={!stripe || processing || !amount || amount <= 0}
         className="btn-org btn-lg w-full"
       >
-        {processing ? "Processing..." : "Pay with Card"}
+        {processing || creatingIntent ? "Processing..." : "Place Order"}
       </button>
     </form>
   );
 }
 
-export default function StripeCheckout({ amount, onPaid, onProcessingChange, onReady }) {
+export default function StripeCheckout({ amount, onPaid, onFailed, onProcessingChange, onReady }) {
+  // Quick debug: fetch server Stripe account info and compare key prefixes
+  useEffect(() => {
+    const publishable = import.meta.env.VITE_STRIPE_PUBLIC_KEY || '';
+    const pubPrefix = publishable.substring(0, 6);
+    console.log('[Stripe Debug] Publishable key prefix:', pubPrefix, '| masked:', publishable ? publishable.replace(/.(?=.{4})/g, '*') : '(none)');
+
+    const api = import.meta.env.VITE_API_URL;
+    if (!api) return;
+    (async () => {
+      try {
+        const res = await axios.get(`${api}/api/stripe/account-info`);
+        console.log('[Stripe Debug] Server account info:', res.data.account || res.data);
+        console.log('[Stripe Debug] Server key prefix:', res.data.keyPrefix);
+        if (res.data.keyPrefix && pubPrefix && res.data.keyPrefix !== pubPrefix) {
+          console.warn('[Stripe Debug] KEY MISMATCH: client publishable key prefix does not match server secret key prefix. Ensure both keys come from the same Stripe account and same mode (test/live).');
+        }
+      } catch (err) {
+        console.warn('[Stripe Debug] Failed to fetch server Stripe account info:', err.response?.data || err.message);
+      }
+    })();
+  }, []);
+
   return (
     <Elements stripe={stripePromise}>
       <StripeForm
         amount={amount}
         onPaid={onPaid}
+        onFailed={onFailed}
         onProcessingChange={onProcessingChange}
         onReady={onReady}
       />

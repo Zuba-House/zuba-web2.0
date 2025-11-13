@@ -548,10 +548,10 @@ export const Products = () => {
                                             <TableCell style={{ minWidth: columns.minWidth }}>
                                                 <div className="flex gap-1 flex-col">
                                                     <span className="oldPrice line-through leading-3 text-gray-500 text-[14px] font-[500]">
-                                                        {product?.price?.toLocaleString('en-US', { style: 'currency', currency: 'INR' })}
+                                                        {product?.price?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                                                     </span>
                                                     <span className="price text-primary text-[14px]  font-[600]">
-                                                        {product?.oldPrice?.toLocaleString('en-US', { style: 'currency', currency: 'INR' })}
+                                                        {product?.oldPrice?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
                                                     </span>
                                                 </div>
                                             </TableCell>
@@ -653,3 +653,4 @@ export const Products = () => {
 }
 
 export default Products;
+

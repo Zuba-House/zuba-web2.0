@@ -14,6 +14,7 @@ import { deleteData, editData, postData } from "../../utils/api";
 import CircularProgress from '@mui/material/CircularProgress';
 import { MdClose } from "react-icons/md";
 import { IoMdHeart } from "react-icons/io";
+import { formatCurrency } from "../../utils/currency";
 
 const ProductItem = (props) => {
 
@@ -318,10 +319,10 @@ const ProductItem = (props) => {
 
         <div className="flex items-center gap-4">
           <span className="oldPrice line-through text-gray-500 text-[15px] font-[500]">
-          &#x20b9;{props?.item?.oldPrice}
+           {formatCurrency(props?.item?.oldPrice)}
           </span>
           <span className="price text-primary text-[15px]  font-[600]">
-            &#x20b9;{props?.item?.price}
+            {formatCurrency(props?.item?.price)}
           </span>
         </div>
 

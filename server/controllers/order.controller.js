@@ -27,33 +27,36 @@ export const createOrderController = async (request, response) => {
 
         order = await order.save();
 
-        for (let i = 0; i < request.body.products.length; i++) {
-
-            const product = await ProductModel.findOne({ _id: request.body.products[i].productId })
-            console.log(product)
-
-            await ProductModel.findByIdAndUpdate(
-                request.body.products[i].productId,
-                {
-                    countInStock: parseInt(request.body.products[i].countInStock - request.body.products[i].quantity),
-                    sale: parseInt(product?.sale + request.body.products[i].quantity)
-                },
-                { new: true }
-            );
+        // Update inventory only for successful or COD orders
+        const paymentStatus = (request.body.payment_status || '').toUpperCase();
+        const shouldAffectInventory = paymentStatus !== 'FAILED';
+        if (shouldAffectInventory) {
+            for (let i = 0; i < request.body.products.length; i++) {
+                const product = await ProductModel.findOne({ _id: request.body.products[i].productId })
+                await ProductModel.findByIdAndUpdate(
+                    request.body.products[i].productId,
+                    {
+                        countInStock: parseInt(request.body.products[i].countInStock - request.body.products[i].quantity),
+                        sale: parseInt((product?.sale || 0) + request.body.products[i].quantity)
+                    },
+                    { new: true }
+                );
+            }
         }
 
-        const user = await UserModel.findOne({ _id: request.body.userId })
+        // Send email only for non-failed orders
+        if (shouldAffectInventory) {
+            const user = await UserModel.findOne({ _id: request.body.userId })
+            const recipients = [];
+            if (user?.email) recipients.push(user.email);
 
-        const recipients = [];
-        recipients.push(user?.email);
-
-        // Send verification email
-        await sendEmailFun({
-            sendTo: recipients,
-            subject: "Order Confirmation",
-            text: "",
-            html: OrderConfirmationEmail(user?.name, order)
-        })
+            await sendEmailFun({
+                sendTo: recipients,
+                subject: "Order Confirmation",
+                text: "",
+                html: OrderConfirmationEmail(user?.name, order)
+            })
+        }
 
 
         return response.status(200).json({
@@ -178,11 +181,12 @@ export const createOrderPaypalController = async (request, response) => {
         const req = new paypal.orders.OrdersCreateRequest();
         req.prefer("return=representation");
 
+        const CURRENCY = (process.env.CURRENCY || 'USD').toUpperCase();
         req.requestBody({
             intent: "CAPTURE",
             purchase_units: [{
                 amount: {
-                    currency_code: 'USD',
+                    currency_code: CURRENCY,
                     value: request.query.totalAmount
                 }
             }]

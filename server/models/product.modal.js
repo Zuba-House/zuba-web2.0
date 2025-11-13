@@ -23,6 +23,15 @@ const productSchema = mongoose.Schema({
         type: Number,
         default: 0
     },
+
+    currency: {
+    type: String,
+    default: 'USD',
+    enum: ['USD', 'INR', 'EUR']
+   },
+
+
+
     oldPrice: {
         type: Number,
         default: 0
@@ -69,7 +78,7 @@ const productSchema = mongoose.Schema({
     },
     discount: {
         type: Number,
-        required: true,
+        required: false,
     },
     sale: {
         type: Number,
