@@ -142,9 +142,3 @@ npm run dev
 - Reach out to the project owner and maintainers in the repository for access to production credentials and Atlas configuration.
 
 ---
-
-If you want, I can:
-- Start a Docker Mongo container and run the `server` here to confirm everything connects (I can run the commands for you), or
-- Walk through whitelisting your IP in Atlas step-by-step.
-
-If you'd like the README tweaked (more detail on a specific folder/file), tell me what to expand and I'll update it.
