@@ -11,10 +11,10 @@ const AboutUs = () => {
   };
 
   const stats = [
-    { number: "8+", label: "Served Countries World Wide", icon: FaGlobe },
-    { number: "360+", label: "First Time Customers", icon: FaUsers },
-    { number: "95%", label: "Customer Satisfaction Rate", icon: FaHeart },
-    { number: "70%", label: "Sustainable Committed Products", icon: FaLeaf }
+    { number: "190+", label: "Served Countries World Wide", icon: FaGlobe },
+    { number: "20k+", label: "First Time Customers", icon: FaUsers },
+    { number: "97.8%", label: "Customer Satisfaction Rate", icon: FaHeart },
+    { number: "90%", label: "Sustainable Committed Products", icon: FaLeaf }
   ];
 
   return (
@@ -70,7 +70,7 @@ const AboutUs = () => {
               variants={fadeIn}
             >
               <img
-                src="/images/about/mission.jpg"
+                src="https://res.cloudinary.com/dimtdehjp/image/upload/v1763072499/mission_k7faw5.jpg"
                 alt="African Artisan"
                 className="rounded-2xl shadow-2xl w-full h-[400px] object-cover"
               />
@@ -216,7 +216,7 @@ const AboutUs = () => {
               className="order-1 lg:order-2"
             >
               <img
-                src="/images/about/vision.jpg"
+                src="https://res.cloudinary.com/dimtdehjp/image/upload/v1763072498/hero-banner_t1zkuj.jpg"
                 alt="Our Mission"
                 className="rounded-2xl shadow-2xl w-full h-[400px] object-cover"
               />
@@ -236,7 +236,7 @@ const AboutUs = () => {
               variants={fadeIn}
             >
               <img
-                src="/images/about/africa-to-world.jpg"
+                src="https://res.cloudinary.com/dimtdehjp/image/upload/v1763072498/africa-to-world_hvfoyx.jpg"
                 alt="Our Vision"
                 className="rounded-2xl shadow-2xl w-full h-[400px] object-cover"
               />

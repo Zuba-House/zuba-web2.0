@@ -6,9 +6,7 @@ import { LiaGiftSolid } from "react-icons/lia";
 import { BiSupport } from "react-icons/bi";
 import { Link } from "react-router-dom";
 import { IoChatboxOutline } from "react-icons/io5";
-
-import FormControlLabel from "@mui/material/FormControlLabel";
-import Checkbox from "@mui/material/Checkbox";
+import Newsletter from "../Newsletter";
 import { FaFacebookF } from "react-icons/fa";
 import { AiOutlineYoutube } from "react-icons/ai";
 import { FaPinterestP } from "react-icons/fa";
@@ -95,8 +93,8 @@ const Footer = () => {
                   </Link>
                 </li>
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/affiliate-program" className="link text-[#e5e2db] hover:text-[#efb291]">
-                    Affiliate & Influencer Program
+                  <Link to="/faq" className="link text-[#e5e2db] hover:text-[#efb291]">
+                    FAQs
                   </Link>
                 </li>
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
@@ -105,9 +103,7 @@ const Footer = () => {
                   </Link>
                 </li>
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/ship-with-us" className="link text-[#e5e2db] hover:text-[#efb291]">
-                    Ship With Us
-                  </Link>
+                  
                 </li>
               </ul>
             </div>
@@ -192,48 +188,16 @@ const Footer = () => {
               
               {/* Start Selling Button */}
               <div className="mb-5">
-                <Link 
-                  to="/seller" 
+                <a 
+                  href="mailto:sales@zubahouse.com?cc=info@zubahouse.com&subject=Seller Application - Become a Seller on Zuba House&body=Hello Zuba House Sales Team,%0D%0A%0D%0AI am interested in becoming a seller on Zuba House.%0D%0A%0D%0ABusiness/Personal Information:%0D%0A- Full Name: [Your Name]%0D%0A- Email: [Your Email]%0D%0A- Phone: [Your Phone Number]%0D%0A- Business Name (if applicable): [Business Name]%0D%0A%0D%0AProduct Information:%0D%0A- Product Category: [e.g., Clothing, Art, Home Décor, etc.]%0D%0A- Number of Products: [Estimated number]%0D%0A- Product Type: [Handmade/Manufactured/Both]%0D%0A%0D%0AAdditional Information:%0D%0A- Why I want to sell on Zuba House: [Your reason]%0D%0A- Experience with e-commerce: [Your experience level]%0D%0A%0D%0AThank you for considering my application.%0D%0A%0D%0ABest regards"
                   className="inline-block bg-[#efb291] text-[#0b2735] px-6 py-3 rounded-lg font-[600] transition-all hover:bg-[#e5a67d] hover:shadow-lg"
                 >
                   Start Selling to Millions
-                </Link>
+                </a>
               </div>
 
               {/* Newsletter Section */}
-              <h3 className="text-[14px] sm:text-[15px] lg:text-[16px] font-[600] mb-2 text-[#e5e2db]">
-                Subscribe to newsletter
-              </h3>
-              <p className="text-[12px] sm:text-[13px] text-[#e5e2db] mb-3">
-                Get news about special discounts and exclusive offers.
-              </p>
-
-              <form className="mt-2">
-                <input
-                  type="email"
-                  className="w-full h-[42px] sm:h-[45px] border outline-none pl-3 pr-3 sm:pl-4 sm:pr-4 rounded-sm mb-3 focus:border-[rgba(229,226,219,0.5)] text-[14px]"
-                  placeholder="Your Email Address"
-                />
-
-                <Button className="btn-org w-full sm:w-auto mb-3">SUBSCRIBE</Button>
-
-                <FormControlLabel
-                  className="mt-0 block w-full"
-                  control={<Checkbox sx={{
-                    color: '#e5e2db',
-                    '&.Mui-checked': {
-                      color: '#efb291',
-                    },
-                  }} />}
-                  label="I agree to the terms and privacy policy"
-                  sx={{
-                    '& .MuiFormControlLabel-label': {
-                      color: '#e5e2db',
-                      fontSize: { xs: '11px', sm: '12px' }
-                    }
-                  }}
-                />
-              </form>
+              <Newsletter />
             </div>
           </div>
 
@@ -260,13 +224,10 @@ const Footer = () => {
               </span>
             </div>
           </div>
-        </div>
-      </footer>
 
-      {/* ZeroX Intelligence: Bottom strip - Social Media, Security, Payment */}
-      <div className="bottomStrip border-t border-[rgba(0,0,0,0.1)] pt-6 pb-[100px] lg:pb-6 bg-white">
-        <div className="container px-3 lg:px-0">
-          
+          {/* ZeroX Intelligence: UPDATED - Bottom strip now matches footer background #0b2735 */}
+          <hr className="border-[rgba(229,226,219,0.2)] mb-8" />
+
           {/* Social Media & Trust Section */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             
@@ -279,9 +240,9 @@ const Footer = () => {
                     href="https://www.instagram.com/zuba_house/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-[35px] h-[35px] rounded-full border border-[rgba(0,0,0,0.1)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
+                    className="w-[35px] h-[35px] rounded-full border border-[rgba(229,226,219,0.3)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
                   >
-                    <FaInstagram className="text-[17px] text-[#0b2735] group-hover:text-white" />
+                    <FaInstagram className="text-[17px] text-[#e5e2db] group-hover:text-[#0b2735]" />
                   </a>
                 </li>
                 <li className="list-none">
@@ -289,9 +250,9 @@ const Footer = () => {
                     href="https://www.facebook.com/p/Zuba-House-61559578310001/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-[35px] h-[35px] rounded-full border border-[rgba(0,0,0,0.1)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
+                    className="w-[35px] h-[35px] rounded-full border border-[rgba(229,226,219,0.3)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
                   >
-                    <FaFacebookF className="text-[17px] text-[#0b2735] group-hover:text-white" />
+                    <FaFacebookF className="text-[17px] text-[#e5e2db] group-hover:text-[#0b2735]" />
                   </a>
                 </li>
                 <li className="list-none">
@@ -299,9 +260,9 @@ const Footer = () => {
                     href="https://x.com/ZubaInfo"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-[35px] h-[35px] rounded-full border border-[rgba(0,0,0,0.1)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
+                    className="w-[35px] h-[35px] rounded-full border border-[rgba(229,226,219,0.3)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
                   >
-                    <FaXTwitter className="text-[17px] text-[#0b2735] group-hover:text-white" />
+                    <FaXTwitter className="text-[17px] text-[#e5e2db] group-hover:text-[#0b2735]" />
                   </a>
                 </li>
                 <li className="list-none">
@@ -309,9 +270,9 @@ const Footer = () => {
                     href="https://www.tiktok.com/@zubahouse"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-[35px] h-[35px] rounded-full border border-[rgba(0,0,0,0.1)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
+                    className="w-[35px] h-[35px] rounded-full border border-[rgba(229,226,219,0.3)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
                   >
-                    <FaTiktok className="text-[17px] text-[#0b2735] group-hover:text-white" />
+                    <FaTiktok className="text-[17px] text-[#e5e2db] group-hover:text-[#0b2735]" />
                   </a>
                 </li>
                 <li className="list-none">
@@ -319,9 +280,9 @@ const Footer = () => {
                     href="https://ca.linkedin.com/company/zuba-house"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-[35px] h-[35px] rounded-full border border-[rgba(0,0,0,0.1)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
+                    className="w-[35px] h-[35px] rounded-full border border-[rgba(229,226,219,0.3)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
                   >
-                    <FaLinkedin className="text-[17px] text-[#0b2735] group-hover:text-white" />
+                    <FaLinkedin className="text-[17px] text-[#e5e2db] group-hover:text-[#0b2735]" />
                   </a>
                 </li>
                 <li className="list-none">
@@ -329,9 +290,9 @@ const Footer = () => {
                     href="https://ca.pinterest.com/zubahouse2010/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-[35px] h-[35px] rounded-full border border-[rgba(0,0,0,0.1)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
+                    className="w-[35px] h-[35px] rounded-full border border-[rgba(229,226,219,0.3)] flex items-center justify-center group hover:bg-[#efb291] transition-all"
                   >
-                    <FaPinterestP className="text-[17px] text-[#0b2735] group-hover:text-white" />
+                    <FaPinterestP className="text-[17px] text-[#e5e2db] group-hover:text-[#0b2735]" />
                   </a>
                 </li>
               </ul>
@@ -363,27 +324,34 @@ const Footer = () => {
           </div>
 
           {/* Copyright and Legal Links */}
-          <div className="border-t border-[rgba(0,0,0,0.1)] pt-6 text-center">
-            <p className="text-[11px] sm:text-[12px] lg:text-[13px] mb-4">
-              © 2024－2025 Zuba House Inc. All Rights Reserved. <strong>Secured by ZeroX Intelligence</strong>
+          <div className="border-t border-[rgba(229,226,219,0.2)] pt-6 text-center pb-[100px] lg:pb-0">
+            <p className="text-[11px] sm:text-[12px] lg:text-[13px] mb-4 text-[#e5e2db]">
+              © 2024－2025 Zuba House Inc. All Rights Reserved. <strong className="text-[#efb291]">Secured by ZeroX Intelligence</strong>
             </p>
             <div className="flex flex-wrap justify-center gap-4 text-[12px]">
-              <Link to="/terms-of-use" className="text-[#efb291] hover:text-[#e5a67d] transition-colors">
+              <Link to="/terms-of-use" className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
                 Terms of Use
               </Link>
-              <Link to="/privacy-policy" className="text-[#efb291] hover:text-[#e5a67d] transition-colors">
+              <Link to="/faq" className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
+                FAQs
+              </Link>
+              <Link to="/return-refund-policy" className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
+                Return & Refund Policy
+              </Link>
+              <Link to="/privacy-policy" className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
                 Privacy Policy
               </Link>
-              <Link to="/consumer-health-data-privacy" className="text-[#efb291] hover:text-[#e5a67d] transition-colors">
+              <Link to="/consumer-health-data-privacy" className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
                 Consumer Health Data Privacy
               </Link>
-              <Link to="/privacy-choices" className="text-[#efb291] hover:text-[#e5a67d] transition-colors">
+              <Link to="/privacy-choices" className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
                 Your Privacy Choices
               </Link>
             </div>
           </div>
+
         </div>
-      </div>
+      </footer>
 
       {/* Cart Panel */}
       <Drawer

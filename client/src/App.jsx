@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import emailjs from '@emailjs/browser';
 import "./App.css";
 import "./responsive.css";
 import Header from "./components/Header";
@@ -19,6 +20,24 @@ import MyAccount from "./Pages/MyAccount";
 import MyList from "./Pages/MyList";
 import Orders from "./Pages/Orders";
 import AboutUs from "./Pages/About";
+import FAQ from "./Pages/FAQ";
+import Career from "./Pages/Career";
+import ReturnRefundPolicy from "./Pages/ReturnRefundPolicy";
+import OrderTracking from "./Pages/OrderTracking";
+import ShippingInfo from "./Pages/ShippingInfo";
+import DownloadApp from "./Pages/DownloadApp";
+import ReportSuspiciousActivity from "./Pages/ReportSuspiciousActivity";
+import Investors from "./Pages/Investors";
+import SupportCenter from "./Pages/SupportCenter";
+import Sitemap from "./Pages/Sitemap";
+import HowToOrder from "./Pages/HowToOrder";
+import HowToTrack from "./Pages/HowToTrack";
+import PartnerWithUs from "./Pages/PartnerWithUs";
+import DeleteAccount from "./Pages/DeleteAccount";
+import TermsOfUse from "./Pages/TermsOfUse";
+import PrivacyPolicy from "./Pages/PrivacyPolicy";
+import ConsumerHealthData from "./Pages/ConsumerHealthData";
+import PrivacyChoices from "./Pages/PrivacyChoices";
 
 import toast, { Toaster } from 'react-hot-toast';
 import { fetchDataFromApi, postData } from "./utils/api";
@@ -82,6 +101,12 @@ function App() {
 
 
 
+
+  // Initialize EmailJS
+  useEffect(() => {
+    emailjs.init('BEDoJ4iqpx2e53MtC');
+    console.log('✅ EmailJS initialized');
+  }, []);
 
   useEffect(() => {
     localStorage.removeItem("userEmail")
@@ -281,6 +306,27 @@ function App() {
             <Route path={"/my-list"} exact={true} element={<MyList />} />
             <Route path={"/my-orders"} exact={true} element={<Orders />} />
             <Route path={"/about"} exact={true} element={<AboutUs />} />
+            <Route path={"/faq"} exact={true} element={<FAQ />} />
+            <Route path={"/careers"} exact={true} element={<Career />} />
+            <Route path={"/return-refund-policy"} exact={true} element={<ReturnRefundPolicy />} />
+            <Route path={"/order-tracking"} exact={true} element={<OrderTracking />} />
+            <Route path={"/shipping-info"} exact={true} element={<ShippingInfo />} />
+            <Route path={"/download-app"} exact={true} element={<DownloadApp />} />
+            <Route path={"/report-suspicious-activity"} exact={true} element={<ReportSuspiciousActivity />} />
+            <Route path={"/investors"} exact={true} element={<Investors />} />
+            <Route path={"/help-center"} exact={true} element={<SupportCenter />} />
+            <Route path={"/support-center"} exact={true} element={<SupportCenter />} />
+            <Route path={"/contact"} exact={true} element={<SupportCenter />} />
+            <Route path={"/sitemap"} exact={true} element={<Sitemap />} />
+            <Route path={"/how-to-order"} exact={true} element={<HowToOrder />} />
+            <Route path={"/how-to-track"} exact={true} element={<HowToTrack />} />
+            <Route path={"/partner-with-us"} exact={true} element={<PartnerWithUs />} />
+            <Route path={"/delete-account"} exact={true} element={<DeleteAccount />} />
+            <Route path={"/terms"} exact={true} element={<TermsOfUse />} />
+            <Route path={"/terms-of-use"} exact={true} element={<TermsOfUse />} />
+            <Route path={"/privacy-policy"} exact={true} element={<PrivacyPolicy />} />
+            <Route path={"/consumer-health-data-privacy"} exact={true} element={<ConsumerHealthData />} />
+            <Route path={"/privacy-choices"} exact={true} element={<PrivacyChoices />} />
             <Route path={"/order/success"} exact={true} element={<OrderSuccess />} />
             <Route path={"/order/failed"} exact={true} element={<OrderFailed />} />
             <Route path={"/address"} exact={true} element={<Address />} />

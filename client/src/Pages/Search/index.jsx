@@ -12,6 +12,7 @@ import Pagination from "@mui/material/Pagination";
 import ProductLoadingGrid from "../../components/ProductLoading/productLoadingGrid";
 import { postData } from "../../utils/api";
 import { MyContext } from "../../App";
+import AlgoliaSearch from "../../components/SearchBar/AlgoliaSearch";
 
 const SearchPage = () => {
   const [itemView, setItemView] = useState("grid");
@@ -24,8 +25,24 @@ const SearchPage = () => {
   const [totalPages, setTotalPages] = useState(1);
 
   const [selectedSortVal, setSelectedSortVal] = useState("Name, A to Z");
+  const [useAlgolia, setUseAlgolia] = useState(false);
 
   const context = useContext(MyContext);
+
+  // Check if Algolia is configured
+  useEffect(() => {
+    const isAlgoliaConfigured = 
+      import.meta.env.VITE_ALGOLIA_APP_ID && 
+      import.meta.env.VITE_ALGOLIA_APP_ID !== 'YOUR_APP_ID' &&
+      import.meta.env.VITE_ALGOLIA_SEARCH_API_KEY &&
+      import.meta.env.VITE_ALGOLIA_SEARCH_API_KEY !== 'YOUR_SEARCH_API_KEY';
+    
+    // Check URL parameter to force Algolia mode
+    const urlParams = new URLSearchParams(window.location.search);
+    const algoliaParam = urlParams.get('algolia');
+    
+    setUseAlgolia(isAlgoliaConfigured && (algoliaParam === 'true' || algoliaParam === null));
+  }, []);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -54,6 +71,12 @@ const SearchPage = () => {
     })
   }
 
+  // If Algolia is configured and enabled, show Algolia search
+  if (useAlgolia) {
+    return <AlgoliaSearch />;
+  }
+
+  // Otherwise, use the existing search
   return (
     <section className=" pb-0">
 

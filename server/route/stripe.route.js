@@ -8,3 +8,5 @@ router.get("/health", stripeHealth);
 router.get("/account-info", getStripeAccountInfo);
 
 export default router;
+
+

@@ -2,11 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 dotenv.config();
-import cookieParser from 'cookie-parser'
+import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import helmet from 'helmet';
 import connectDB from './config/connectDb.js';
-import userRouter from './route/user.route.js'
+import { validateEnv } from './config/validateEnv.js';
+import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
+import userRouter from './route/user.route.js';
 import categoryRouter from './route/category.route.js';
 import productRouter from './route/product.route.js';
 import cartRouter from './route/cart.route.js';
@@ -17,50 +19,129 @@ import bannerV1Router from './route/bannerV1.route.js';
 import bannerList2Router from './route/bannerList2.route.js';
 import blogRouter from './route/blog.route.js';
 import orderRouter from './route/order.route.js';
+import orderTrackingRouter from './route/orderTracking.route.js';
 import logoRouter from './route/logo.route.js';
-import stripeRoute from "./routes/stripe.route.js";
+import stripeRoute from "./route/stripe.route.js";
 import attributeRouter from './route/attribute.route.js';
 import variationRouter from './route/variation.route.js';
 
+// Validate environment variables at startup
+try {
+    validateEnv();
+} catch (error) {
+    console.error(error.message);
+    process.exit(1);
+}
+
 const app = express();
-app.use(cors());
-app.options('*', cors())
 
+// CORS configuration
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(',')
+    : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
 
-app.use(express.json())
-app.use(cookieParser())
-// app.use(morgan())
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        // In development, allow all origins for easier testing
+        if (process.env.NODE_ENV !== 'production') {
+            return callback(null, true);
+        }
+        
+        // In production, only allow specified origins
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Body parser with size limit
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser());
+
+// Logging
+if (process.env.NODE_ENV === 'development') {
+    app.use(morgan('dev'));
+}
+
+// Security headers
 app.use(helmet({
-    crossOriginResourcePolicy: false
-}))
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 
-
+// Health check endpoint
 app.get("/", (request, response) => {
-    ///server to client
     response.json({
-        message: "Server is running " + process.env.PORT
+        message: "Server is running on port " + process.env.PORT,
+        status: "healthy",
+        timestamp: new Date().toISOString()
+    });
+});
+
+// Health check API endpoint
+app.get("/api/health", (request, response) => {
+    response.json({
+        status: "healthy",
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+    });
+});
+
+
+// API Routes
+app.use('/api/user', userRouter);
+app.use('/api/category', categoryRouter);
+app.use('/api/product', productRouter);
+app.use("/api/cart", cartRouter);
+app.use("/api/myList", myListRouter);
+app.use("/api/address", addressRouter);
+app.use("/api/homeSlides", homeSlidesRouter);
+app.use("/api/bannerV1", bannerV1Router);
+app.use("/api/bannerList2", bannerList2Router);
+app.use("/api/blog", blogRouter);
+app.use("/api/order", orderRouter);
+app.use("/api/orders", orderTrackingRouter);
+app.use("/api/logo", logoRouter);
+app.use("/api/stripe", stripeRoute);
+app.use("/api/attributes", attributeRouter);
+app.use("/api/products/:id/variations", variationRouter);
+
+// 404 handler (must be after all routes)
+app.use(notFoundHandler);
+
+// Global error handler (must be last)
+app.use(errorHandler);
+
+// Start server
+const PORT = process.env.PORT || 5000;
+
+connectDB()
+    .then(() => {
+        app.listen(PORT, () => {
+            console.log(`✅ Server is running on port ${PORT}`);
+            console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+        });
     })
-})
+    .catch((error) => {
+        console.error('❌ Failed to start server:', error);
+        process.exit(1);
+    });
 
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    process.exit(0);
+});
 
-app.use('/api/user',userRouter)
-app.use('/api/category',categoryRouter)
-app.use('/api/product',productRouter);
-app.use("/api/cart",cartRouter)
-app.use("/api/myList",myListRouter)
-app.use("/api/address",addressRouter)
-app.use("/api/homeSlides",homeSlidesRouter)
-app.use("/api/bannerV1",bannerV1Router)
-app.use("/api/bannerList2",bannerList2Router)
-app.use("/api/blog",blogRouter)
-app.use("/api/order",orderRouter)
-app.use("/api/logo",logoRouter)
-app.use("/api/stripe", stripeRoute)
-app.use("/api/attributes", attributeRouter)
-app.use("/api/products/:id/variations", variationRouter)
-
-connectDB().then(() => {
-    app.listen(process.env.PORT, () => {
-        console.log("Server is running", process.env.PORT);
-    })
-})
+process.on('SIGINT', () => {
+    console.log('SIGINT signal received: closing HTTP server');
+    process.exit(0);
+});
