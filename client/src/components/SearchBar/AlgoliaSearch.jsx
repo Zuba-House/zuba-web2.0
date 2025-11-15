@@ -1,229 +1,137 @@
-import React from 'react';
-import algoliasearch from 'algoliasearch/lite';
-import {
-  InstantSearch,
-  SearchBox,
-  Hits,
-  RefinementList,
-  Configure,
-  Pagination,
-  ClearRefinements,
-  CurrentRefinements,
-  useInstantSearch
-} from 'react-instantsearch';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { fetchDataFromApi, postData } from '../../utils/api';
 import './AlgoliaSearch.css';
 
-// Initialize Algolia - Replace with your actual credentials
-// For now, using placeholder values - user needs to add their Algolia credentials
-const getSearchClient = () => {
-  const appId = import.meta.env.VITE_ALGOLIA_APP_ID || 'YOUR_APP_ID';
-  const apiKey = import.meta.env.VITE_ALGOLIA_SEARCH_API_KEY || 'YOUR_SEARCH_API_KEY';
-  
-  // Return a mock client if not configured to prevent errors
-  if (appId === 'YOUR_APP_ID' || apiKey === 'YOUR_SEARCH_API_KEY') {
-    return {
-      search: () => Promise.resolve({ results: [] }),
-      searchForFacetValues: () => Promise.resolve([]),
-      multipleQueries: () => Promise.resolve({ results: [] })
-    };
-  }
-  
-  return algoliasearch(appId, apiKey);
-};
+const CustomSearch = ({ placeholder = "Search for products..." }) => {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const navigate = useNavigate();
 
-const searchClient = getSearchClient();
+  useEffect(() => {
+    if (query.length < 2) {
+      setResults([]);
+      setShowResults(false);
+      return;
+    }
 
-// Product Hit Component (each search result)
-const ProductHit = ({ hit }) => (
-  <Link 
-    to={`/product/${hit.objectID || hit._id}`}
-    className="search-result-item"
-  >
-    <img 
-      src={hit.image || hit.images?.[0] || '/placeholder.png'} 
-      alt={hit.name}
-      className="search-result-image"
-    />
-    <div className="search-result-content">
-      <h3 className="search-result-title">{hit.name}</h3>
-      <p className="search-result-price">${hit.price || hit.oldPrice || '0.00'}</p>
-      {hit.catName && (
-        <p className="search-result-category">{hit.catName}</p>
-      )}
-      {hit.brand && (
-        <p className="search-result-brand">{hit.brand}</p>
-      )}
-    </div>
-  </Link>
-);
+    const delayDebounceFn = setTimeout(() => {
+      handleSearch();
+    }, 300);
 
-// Custom SearchBox Component
-const CustomSearchBox = () => (
-  <div className="search-box-wrapper">
-    <SearchBox
-      placeholder="Search for African fashion, art, home décor..."
-    />
-  </div>
-);
+    return () => clearTimeout(delayDebounceFn);
+  }, [query]);
 
-// Results component with empty state
-const Results = ({ children }) => {
-  const { results, indexUiState } = useInstantSearch();
-  
-  if (!results || results.nbHits === 0) {
-    return (
-      <div className="search-no-results">
-        <p>No products found for "{indexUiState.query || ''}".</p>
-        <p>Try adjusting your search or filters.</p>
-      </div>
-    );
-  }
-  return <>{children}</>;
-};
+  const handleSearch = async () => {
+    setIsLoading(true);
+    try {
+      const response = await postData('/api/product/search/get', {
+        query: query,
+        page: 1,
+        limit: 10
+      });
+      
+      if (response?.error === false && response?.products) {
+        setResults(response.products);
+        setShowResults(true);
+      } else {
+        setResults([]);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      setResults([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-const AlgoliaSearch = () => {
-  // Check if Algolia is configured
-  const isConfigured = 
-    import.meta.env.VITE_ALGOLIA_APP_ID && 
-    import.meta.env.VITE_ALGOLIA_APP_ID !== 'YOUR_APP_ID' &&
-    import.meta.env.VITE_ALGOLIA_SEARCH_API_KEY &&
-    import.meta.env.VITE_ALGOLIA_SEARCH_API_KEY !== 'YOUR_SEARCH_API_KEY';
+  const handleResultClick = (productId) => {
+    navigate(`/product/${productId}`);
+    setQuery('');
+    setShowResults(false);
+  };
 
-  if (!isConfigured) {
-    return (
-      <div style={{ 
-        backgroundColor: '#0b2735', 
-        minHeight: '100vh', 
-        padding: '40px 20px',
-        color: '#e5e2db',
-        textAlign: 'center'
-      }}>
-        <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-          <h2 style={{ color: '#efb291', marginBottom: '20px' }}>Algolia Search Not Configured</h2>
-          <p style={{ marginBottom: '20px', opacity: 0.9 }}>
-            To enable advanced search, please configure Algolia credentials:
-          </p>
-          <ol style={{ textAlign: 'left', marginBottom: '20px', lineHeight: '2' }}>
-            <li>Create a free Algolia account at <a href="https://www.algolia.com" target="_blank" rel="noopener noreferrer" style={{ color: '#efb291' }}>algolia.com</a></li>
-            <li>Create a new application</li>
-            <li>Get your Application ID and Search-Only API Key</li>
-            <li>Add them to your <code style={{ backgroundColor: '#1a3d52', padding: '2px 6px', borderRadius: '4px' }}>.env</code> file:</li>
-          </ol>
-          <div style={{ 
-            backgroundColor: '#1a3d52', 
-            padding: '20px', 
-            borderRadius: '8px',
-            textAlign: 'left',
-            marginBottom: '20px'
-          }}>
-            <code style={{ color: '#efb291' }}>
-              REACT_APP_ALGOLIA_APP_ID=your_app_id<br/>
-              REACT_APP_ALGOLIA_SEARCH_API_KEY=your_search_key
-            </code>
-          </div>
-          <p style={{ opacity: 0.8, fontSize: '14px' }}>
-            The search will fall back to the standard search until Algolia is configured.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (query.trim()) {
+      navigate(`/search?q=${encodeURIComponent(query)}`);
+      setShowResults(false);
+    }
+  };
+
+  // Get image URL helper
+  const getImageUrl = (images) => {
+    if (!images || images.length === 0) return '/placeholder.png';
+    const firstImage = images[0];
+    if (typeof firstImage === 'string') return firstImage;
+    if (typeof firstImage === 'object' && firstImage.url) return firstImage.url;
+    if (typeof firstImage === 'object' && firstImage.secureUrl) return firstImage.secureUrl;
+    return '/placeholder.png';
+  };
+
+  // Get price helper
+  const getPrice = (product) => {
+    if (product?.pricing?.salePrice) return product.pricing.salePrice;
+    if (product?.pricing?.regularPrice) return product.pricing.regularPrice;
+    if (product?.salePrice) return product.salePrice;
+    if (product?.price) return product.price;
+    return 0;
+  };
 
   return (
-    <InstantSearch 
-      indexName={import.meta.env.VITE_ALGOLIA_INDEX_NAME || "products"} 
-      searchClient={searchClient}
-    >
-      <Configure hitsPerPage={20} />
+    <div className="custom-search relative">
+      <form onSubmit={handleSearchSubmit}>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => query.length >= 2 && setShowResults(true)}
+          onBlur={() => {
+            // Delay hiding to allow clicks
+            setTimeout(() => setShowResults(false), 200);
+          }}
+          placeholder={placeholder}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#efb291] text-[#0b2735]"
+        />
+      </form>
       
-      <div style={{ backgroundColor: '#0b2735', minHeight: '100vh', padding: '20px' }}>
-        <div className="max-w-7xl mx-auto">
-          {/* Search Header */}
-          <div className="mb-8">
-            <CustomSearchBox />
-          </div>
-
-          {/* Current Filters */}
-          <div className="mb-4">
-            <CurrentRefinements />
-          </div>
-
-          {/* Main Layout: Filters + Results */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Left Sidebar - Filters */}
-            <div className="lg:col-span-1">
-              <div 
-                className="p-6 rounded-xl sticky top-20"
-                style={{ backgroundColor: '#1a3d52', border: '1px solid rgba(239, 178, 145, 0.2)' }}
-              >
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold" style={{ color: '#e5e2db' }}>
-                    Filters
-                  </h3>
-                  <ClearRefinements />
-                </div>
-
-                {/* Category Filter */}
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold mb-3" style={{ color: '#efb291' }}>
-                    Category
-                  </h4>
-                  <RefinementList
-                    attribute="catName"
-                    limit={10}
-                    showMore={true}
-                    showMoreLimit={20}
+      {showResults && (
+        <div className="search-results absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-[400px] overflow-y-auto z-50">
+          {isLoading ? (
+            <div className="p-4 text-center text-gray-500">Searching...</div>
+          ) : results.length > 0 ? (
+            <div className="divide-y">
+              {results.map((product) => (
+                <div
+                  key={product._id}
+                  onClick={() => handleResultClick(product._id)}
+                  className="p-3 hover:bg-gray-50 cursor-pointer flex items-center gap-3"
+                >
+                  <img
+                    src={getImageUrl(product.images || product.bannerimages)}
+                    alt={product.name}
+                    className="w-12 h-12 object-cover rounded"
                   />
+                  <div className="flex-1">
+                    <div className="font-medium text-[#0b2735]">{product.name}</div>
+                    <div className="text-sm text-gray-500">
+                      ${getPrice(product).toFixed(2)}
+                    </div>
+                  </div>
                 </div>
-
-                {/* Subcategory Filter */}
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold mb-3" style={{ color: '#efb291' }}>
-                    Subcategory
-                  </h4>
-                  <RefinementList
-                    attribute="subCat"
-                    limit={8}
-                    showMore={true}
-                  />
-                </div>
-
-                {/* Brand Filter */}
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold mb-3" style={{ color: '#efb291' }}>
-                    Brand
-                  </h4>
-                  <RefinementList
-                    attribute="brand"
-                    limit={5}
-                    showMore={true}
-                  />
-                </div>
-              </div>
+              ))}
             </div>
-
-            {/* Right Side - Search Results */}
-            <div className="lg:col-span-3">
-              <Results>
-                <Hits hitComponent={ProductHit} />
-              </Results>
-              
-              {/* Pagination */}
-              <div className="mt-8">
-                <Pagination
-                  showFirst={false}
-                  showLast={false}
-                  padding={2}
-                />
-              </div>
+          ) : query.length >= 2 ? (
+            <div className="p-4 text-center text-gray-500">
+              No products found for "{query}"
             </div>
-          </div>
+          ) : null}
         </div>
-      </div>
-    </InstantSearch>
+      )}
+    </div>
   );
 };
 
-export default AlgoliaSearch;
-
+export default CustomSearch;

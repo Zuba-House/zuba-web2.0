@@ -26,14 +26,14 @@ const BlogItem = (props) => {
 
       <div className="info py-4">
         <h2 className="text-[15px] font-[600] text-black mb-1  lg:mb-3">
-          <Link to="/" className="link">{props?.item?.title}</Link>
+          <Link to={`/blog/${props?.item?._id}`} className="link">{props?.item?.title}</Link>
         </h2>
 
         <div className="mb-3 text-[14px] lg:text-[16px]" dangerouslySetInnerHTML={{ __html: props?.item?.description?.substr(0, 100) + '...' }} />
 
 
 
-        <Link className="link font-[500] text-[14px] flex items-center gap-1">Read More <IoIosArrowForward /></Link>
+        <Link to={`/blog/${props?.item?._id}`} className="link font-[500] text-[14px] flex items-center gap-1">Read More <IoIosArrowForward /></Link>
 
       </div>
     </div>

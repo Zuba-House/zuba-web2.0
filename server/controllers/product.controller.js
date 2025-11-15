@@ -396,7 +396,8 @@ export async function createProduct(request, response) {
             description: request.body.description,
             shortDescription: request.body.shortDescription || '',
             brand: request.body.brand || '',
-            category: request.body.category || request.body.catId,
+            category: request.body.category || request.body.catId || (request.body.categories && request.body.categories.length > 0 ? request.body.categories[0] : null),
+            categories: request.body.categories || (request.body.category || request.body.catId ? [request.body.category || request.body.catId] : []),
             catName: request.body.catName || '',
             catId: request.body.catId || '',
             subCatId: request.body.subCatId || '',
@@ -599,9 +600,14 @@ export async function getAllProductsByCatId(request, response) {
             );
         }
 
+        // Support both single category and multiple categories
         const products = await ProductModel.find({
-            catId: request.params.id
-        }).populate("category")
+            $or: [
+                { catId: request.params.id },
+                { category: request.params.id },
+                { categories: request.params.id }
+            ]
+        }).populate("category").populate("categories")
             .skip((page - 1) * perPage)
             .limit(perPage)
             .exec();
@@ -1355,7 +1361,8 @@ export async function updateProduct(request, response) {
             catId: request.body.catId,
             catName: request.body.catName,
             subCatId: request.body.subCatId,
-            category: request.body.category,
+            category: request.body.category || request.body.catId || (request.body.categories && request.body.categories.length > 0 ? request.body.categories[0] : undefined),
+            categories: request.body.categories || (request.body.category || request.body.catId ? [request.body.category || request.body.catId] : undefined),
             thirdsubCat: request.body.thirdsubCat,
             thirdsubCatId: request.body.thirdsubCatId,
             countInStock: request.body.countInStock,
@@ -1957,7 +1964,12 @@ export async function filters(request, response) {
     const filters = {}
 
     if (catId?.length) {
-        filters.catId = { $in: catId }
+        // Support both single category and multiple categories
+        filters.$or = [
+            { catId: { $in: catId } },
+            { category: { $in: catId } },
+            { categories: { $in: catId } }
+        ];
     }
 
     if (subCatId?.length) {
@@ -2051,12 +2063,15 @@ export async function searchProductController(request, response) {
         const products = await ProductModel.find({
             $or: [
                 { name: { $regex: query, $options: "i" } },
+                { description: { $regex: query, $options: "i" } },
+                { shortDescription: { $regex: query, $options: "i" } },
                 { brand: { $regex: query, $options: "i" } },
                 { catName: { $regex: query, $options: "i" } },
                 { subCat: { $regex: query, $options: "i" } },
                 { thirdsubCat: { $regex: query, $options: "i" } },
+                { tags: { $regex: query, $options: "i" } },
             ],
-        }).populate("category")
+        }).populate("category").populate("categories")
 
         const total = await products?.length
 

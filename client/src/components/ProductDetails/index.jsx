@@ -4,7 +4,6 @@ import { QtyBox } from "../QtyBox";
 import Rating from "@mui/material/Rating";
 import { MdOutlineShoppingCart } from "react-icons/md";
 import { FaRegHeart } from "react-icons/fa";
-import { IoGitCompareOutline } from "react-icons/io5";
 import { MyContext } from "../../App";
 import CircularProgress from '@mui/material/CircularProgress';
 import { postData } from "../../utils/api";
@@ -402,9 +401,6 @@ export const ProductDetailsComponent = (props) => {
           Add to Wishlist
         </span>
 
-        <span className="flex items-center gap-2 text-[14px] text-gray-700 cursor-pointer font-[500] hover:text-primary transition-colors">
-          <IoGitCompareOutline className="text-[20px]" /> Add to Compare
-        </span>
       </div>
     </div>
   );

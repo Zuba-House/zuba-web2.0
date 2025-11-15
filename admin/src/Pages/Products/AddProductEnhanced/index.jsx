@@ -161,7 +161,9 @@ const AddProductEnhanced = () => {
     setFormData(prev => ({
       ...prev,
       category: categoryId,
-      categories: [categoryId],
+      categories: prev.categories.includes(categoryId) 
+        ? prev.categories.filter(id => id !== categoryId) 
+        : [...prev.categories, categoryId],
       catId: categoryId,
       catName: selectedCategory?.name || '',
       subCat: '',
@@ -175,6 +177,24 @@ const AddProductEnhanced = () => {
       setSubCategories([]);
     }
     setThirdLevelCategories([]);
+  };
+
+  // Handle multiple category toggle
+  const handleCategoryToggle = (categoryId) => {
+    const selectedCategory = categories.find(cat => cat._id === categoryId);
+    setFormData(prev => {
+      const newCategories = prev.categories.includes(categoryId)
+        ? prev.categories.filter(id => id !== categoryId)
+        : [...prev.categories, categoryId];
+      
+      return {
+        ...prev,
+        categories: newCategories,
+        category: newCategories.length > 0 ? newCategories[0] : prev.category,
+        catId: newCategories.length > 0 ? newCategories[0] : prev.catId,
+        catName: newCategories.length > 0 ? selectedCategory?.name || prev.catName : prev.catName
+      };
+    });
   };
 
   // Handle subcategory change
@@ -679,10 +699,10 @@ const AddProductEnhanced = () => {
                   Categories
                 </h2>
 
-                {/* Product Category */}
+                {/* Product Category - Primary */}
                 <div className="mb-4">
                   <label className="block mb-2 font-semibold" style={{ color: '#e5e2db' }}>
-                    Product Category <span style={{ color: '#ef4444' }}>*</span>
+                    Primary Category <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <select
                     name="category"
@@ -692,13 +712,39 @@ const AddProductEnhanced = () => {
                     style={{ backgroundColor: '#0b2735', color: '#e5e2db', border: '1px solid rgba(239, 178, 145, 0.2)' }}
                     required
                   >
-                    <option value="">Select Category</option>
+                    <option value="">Select Primary Category</option>
                     {categories.map(cat => (
                       <option key={cat._id} value={cat._id}>{cat.name}</option>
                     ))}
                   </select>
                   {errors.category && (
                     <p className="text-red-500 text-sm mt-1">{errors.category}</p>
+                  )}
+                </div>
+
+                {/* Additional Categories (Multiple) */}
+                <div className="mb-4">
+                  <label className="block mb-2 font-semibold" style={{ color: '#e5e2db' }}>
+                    Additional Categories (Optional)
+                  </label>
+                  <div className="max-h-[200px] overflow-y-auto border rounded-lg p-3" style={{ backgroundColor: '#0b2735', borderColor: 'rgba(239, 178, 145, 0.2)' }}>
+                    {categories.map(cat => (
+                      <label key={cat._id} className="flex items-center gap-2 mb-2 cursor-pointer" style={{ color: '#e5e2db' }}>
+                        <input
+                          type="checkbox"
+                          checked={formData.categories.includes(cat._id)}
+                          onChange={() => handleCategoryToggle(cat._id)}
+                          className="w-4 h-4"
+                          style={{ accentColor: '#efb291' }}
+                        />
+                        <span>{cat.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {formData.categories.length > 0 && (
+                    <p className="text-sm mt-2" style={{ color: '#efb291' }}>
+                      Selected: {formData.categories.length} categor{formData.categories.length === 1 ? 'y' : 'ies'}
+                    </p>
                   )}
                 </div>
 
