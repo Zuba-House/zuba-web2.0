@@ -24,6 +24,7 @@ import logoRouter from './route/logo.route.js';
 import stripeRoute from "./route/stripe.route.js";
 import attributeRouter from './route/attribute.route.js';
 import variationRouter from './route/variation.route.js';
+import mediaRouter from './route/media.route.js';
 
 // Validate environment variables at startup
 try {
@@ -113,6 +114,7 @@ app.use("/api/logo", logoRouter);
 app.use("/api/stripe", stripeRoute);
 app.use("/api/attributes", attributeRouter);
 app.use("/api/products/:id/variations", variationRouter);
+app.use("/api/media", mediaRouter);
 
 // 404 handler (must be after all routes)
 app.use(notFoundHandler);

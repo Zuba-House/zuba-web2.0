@@ -39,7 +39,7 @@ const Checkout = () => {
 
   useEffect(() => {
     const total = context.cartData?.length !== 0 ?
-      context.cartData?.map(item => parseInt(item.price) * item.quantity)
+      context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
         .reduce((sum, value) => sum + value, 0) : 0;
     // keep numeric for backend; format only when rendering
     setTotalAmount(total);
@@ -75,9 +75,43 @@ const Checkout = () => {
 
   // Removed Razorpay integration
 
-
+  // Validate cart before checkout
+  const validateCartStock = () => {
+    // Check if cart is empty
+    if (!context.cartData || context.cartData.length === 0) {
+      context?.alertBox("error", "Your cart is empty");
+      return false;
+    }
+    
+    // Check for out-of-stock items
+    const outOfStockItems = context.cartData.filter(item => item.isOutOfStock);
+    if (outOfStockItems.length > 0) {
+      const itemNames = outOfStockItems.map(item => item.productTitle).join(', ');
+      context?.alertBox(
+        "error",
+        `Cannot proceed. The following items are out of stock: ${itemNames}. Please remove them from your cart.`
+      );
+      return false;
+    }
+    
+    // Check if quantities exceed stock
+    const exceededStock = context.cartData.filter(item => item.quantity > (item.currentStock || item.countInStock));
+    if (exceededStock.length > 0) {
+      context?.alertBox(
+        "error",
+        "Some items in your cart exceed available stock. Please adjust quantities."
+      );
+      return false;
+    }
+    
+    return true;
+  };
 
   const cashOnDelivery = () => {
+    // Validate cart before proceeding
+    if (!validateCartStock()) {
+      return;
+    }
 
     const user = context?.userData
     setIsloading(true);
@@ -121,6 +155,11 @@ const Checkout = () => {
   }
 
   const handleStripeSuccess = async (paymentIntent) => {
+    // Validate cart before proceeding
+    if (!validateCartStock()) {
+      return;
+    }
+
     const user = context?.userData;
     if (userData?.address_details?.length === 0) {
       context.alertBox("error", "Please add address");
@@ -231,15 +270,28 @@ const Checkout = () => {
                           <Radio size="small" onChange={(e) => handleChange(e, index)}
                             checked={isChecked === index} value={address?._id} />
                         </div>
-                        <div className="info">
-                          <span className="inline-block text-[13px] font-[500] p-1 bg-[#f1f1f1] rounded-md">{address?.addressType}</span>
-                          <h3>{userData?.name}</h3>
-                          <p className="mt-0 mb-0">
-                            {address?.address_line1 + " " + address?.city + " " + address?.country + " " + address?.state + " " + address?.landmark + ' ' + '+ ' + address?.mobile}
+                        <div className="info flex-1">
+                          <span className="inline-block text-[13px] font-[500] p-1 bg-[#f1f1f1] rounded-md mb-2">
+                            {address?.label || address?.addressType || 'Home'}
+                          </span>
+                          <h3 className="font-[600] mb-1">
+                            {address?.contactInfo?.firstName 
+                              ? `${address.contactInfo.firstName} ${address.contactInfo.lastName || ''}`.trim()
+                              : userData?.name
+                            }
+                          </h3>
+                          <p className="mt-0 mb-1 text-[14px] text-gray-700">
+                            {address?.address?.addressLine1 
+                              ? `${address.address.addressLine1}${address.address.addressLine2 ? ', ' + address.address.addressLine2 : ''}, ${address.address.city}, ${address.address.provinceCode} ${address.address.postalCode}, ${address.address.country}`
+                              : `${address?.address_line1 || ''} ${address?.city || ''} ${address?.country || ''} ${address?.state || ''} ${address?.landmark || ''}`.trim()
+                            }
                           </p>
-
-   
-                          <p className="mb-0 font-[500]">{userData?.mobile !== null ? '+'+userData?.mobile : '+'+address?.mobile}</p>
+                          <p className="mb-0 font-[500] text-[14px]">
+                            {address?.contactInfo?.phone 
+                              ? address.contactInfo.phone 
+                              : (address?.mobile ? `+${address.mobile}` : (userData?.mobile ? `+${userData.mobile}` : ''))
+                            }
+                          </p>
                         </div>
 
                         <Button variant="text" className="!absolute top-[15px] right-[15px]" size="small"

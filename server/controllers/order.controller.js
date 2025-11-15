@@ -30,17 +30,80 @@ export const createOrderController = async (request, response) => {
         // Update inventory only for successful or COD orders
         const paymentStatus = (request.body.payment_status || '').toUpperCase();
         const shouldAffectInventory = paymentStatus !== 'FAILED';
+        
         if (shouldAffectInventory) {
             for (let i = 0; i < request.body.products.length; i++) {
-                const product = await ProductModel.findOne({ _id: request.body.products[i].productId })
-                await ProductModel.findByIdAndUpdate(
-                    request.body.products[i].productId,
-                    {
-                        countInStock: parseInt(request.body.products[i].countInStock - request.body.products[i].quantity),
-                        sale: parseInt((product?.sale || 0) + request.body.products[i].quantity)
-                    },
-                    { new: true }
-                );
+                const orderProduct = request.body.products[i];
+                
+                // Get product from database
+                const product = await ProductModel.findById(orderProduct.productId);
+                
+                if (!product) {
+                    console.error(`Product not found: ${orderProduct.productId}`);
+                    continue;
+                }
+                
+                // ========================================
+                // HANDLE VARIABLE PRODUCTS
+                // ========================================
+                if (orderProduct.productType === 'variable' && orderProduct.variationId) {
+                    // Find the specific variation
+                    const variationIndex = product.variations?.findIndex(
+                        v => v._id && v._id.toString() === orderProduct.variationId
+                    );
+                    
+                    if (variationIndex !== -1 && product.variations) {
+                        // Update variation stock
+                        const currentVariationStock = product.variations[variationIndex].stock || 0;
+                        const newVariationStock = Math.max(0, currentVariationStock - orderProduct.quantity);
+                        
+                        product.variations[variationIndex].stock = newVariationStock;
+                        
+                        // Update variation stock status
+                        if (newVariationStock <= 0) {
+                            product.variations[variationIndex].stockStatus = 'out_of_stock';
+                        }
+                        
+                        // Also update total product stock (sum of all variations)
+                        const totalStock = product.variations.reduce((sum, v) => sum + (v.stock || 0), 0);
+                        product.countInStock = totalStock;
+                        
+                        // Update product stock status
+                        if (totalStock <= 0) {
+                            product.stockStatus = 'out_of_stock';
+                        }
+                        
+                        console.log(`Updated variation stock: Product ${orderProduct.productId}, Variation ${orderProduct.variationId}, New stock: ${newVariationStock}`);
+                    } else {
+                        console.error(`Variation not found: ${orderProduct.variationId}`);
+                    }
+                }
+                // ========================================
+                // HANDLE SIMPLE PRODUCTS
+                // ========================================
+                else {
+                    // Update product stock directly
+                    const currentStock = product.countInStock || 0;
+                    const newStock = Math.max(0, currentStock - orderProduct.quantity);
+                    
+                    product.countInStock = newStock;
+                    
+                    // Update stock status
+                    if (newStock <= 0) {
+                        product.stockStatus = 'out_of_stock';
+                    }
+                    
+                    console.log(`Updated product stock: Product ${orderProduct.productId}, New stock: ${newStock}`);
+                }
+                
+                // ========================================
+                // UPDATE SALES COUNT
+                // ========================================
+                product.sale = (product.sale || 0) + orderProduct.quantity;
+                product.totalSales = (product.totalSales || 0) + orderProduct.quantity;
+                
+                // Save product with updated stock
+                await product.save();
             }
         }
 

@@ -2,6 +2,7 @@ import ProductModel from '../models/product.model.js';
 import ProductRAMSModel from '../models/productRAMS.js';
 import ProductWEIGHTModel from '../models/productWEIGHT.js';
 import ProductSIZEModel from '../models/productSIZE.js';
+import Media from '../models/media.model.js';
 
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
@@ -15,6 +16,58 @@ cloudinary.config({
     secure: true,
 });
 
+
+/**
+ * Helper: Ensure product.attributes is populated from variations
+ * This fixes the issue where attributes array might be empty
+ */
+const ensureAttributesFromVariations = (productData) => {
+    // If attributes already exist and are populated, return as-is
+    if (Array.isArray(productData.attributes) && productData.attributes.length > 0) {
+        return productData;
+    }
+
+    // Extract attributes from variations
+    if (Array.isArray(productData.variations) && productData.variations.length > 0) {
+        const attributesMap = new Map();
+
+        productData.variations.forEach(variation => {
+            if (Array.isArray(variation.attributes)) {
+                variation.attributes.forEach(attr => {
+                    if (attr && attr.name) {
+                        if (!attributesMap.has(attr.name)) {
+                            attributesMap.set(attr.name, {
+                                name: attr.name,
+                                slug: attr.slug || attr.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                                values: new Set()
+                            });
+                        }
+
+                        // Add value to this attribute
+                        if (attr.value) {
+                            const attrData = attributesMap.get(attr.name);
+                            attrData.values.add(JSON.stringify({
+                                label: attr.value,
+                                slug: attr.valueSlug || attr.value.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+                            }));
+                        }
+                    }
+                });
+            }
+        });
+
+        // Convert Map to array
+        productData.attributes = Array.from(attributesMap.values()).map(attr => ({
+            name: attr.name,
+            slug: attr.slug,
+            values: Array.from(attr.values).map(v => JSON.parse(v)),
+            visible: true,
+            variation: true
+        }));
+    }
+
+    return productData;
+};
 
 //image upload
 var imagesArr = [];
@@ -40,16 +93,53 @@ export async function uploadImages(request, response) {
 
         // Use Promise.all to wait for all uploads to complete
         const uploadPromises = [];
+        const uploadedBy = response.locals.user?.id || request.user?.id || null;
+        
         for (let i = 0; i < image.length; i++) {
             uploadPromises.push(
                 cloudinary.uploader.upload(image[i].path, options)
-                    .then((result) => {
+                    .then(async (result) => {
                         // Delete the temporary file
                         try {
                             fs.unlinkSync(`uploads/${image[i].filename}`);
                         } catch (unlinkError) {
                             console.error('Error deleting temp file:', unlinkError);
                         }
+                        
+                        // Save to media library
+                        try {
+                            let media = await Media.findOne({ publicId: result.public_id });
+                            
+                            if (media) {
+                                // Update existing media
+                                media.url = result.url;
+                                media.secureUrl = result.secure_url;
+                                media.format = result.format;
+                                media.width = result.width;
+                                media.height = result.height;
+                                media.bytes = result.bytes;
+                                await media.save();
+                            } else {
+                                // Create new media entry
+                                await Media.create({
+                                    publicId: result.public_id,
+                                    url: result.url,
+                                    secureUrl: result.secure_url,
+                                    filename: result.original_filename || image[i].originalname,
+                                    originalName: image[i].originalname,
+                                    format: result.format,
+                                    width: result.width,
+                                    height: result.height,
+                                    bytes: result.bytes,
+                                    folder: result.folder || 'products',
+                                    uploadedBy: uploadedBy
+                                });
+                            }
+                        } catch (mediaError) {
+                            console.error('Error saving to media library:', mediaError);
+                            // Continue even if media library save fails
+                        }
+                        
                         return result.secure_url;
                     })
                     .catch((error) => {
@@ -301,7 +391,7 @@ export async function createProduct(request, response) {
         }
 
         // Build product data with backward compatibility
-        const productData = {
+        let productData = {
             name: request.body.name,
             description: request.body.description,
             shortDescription: request.body.shortDescription || '',
@@ -380,6 +470,29 @@ export async function createProduct(request, response) {
             sku: request.body.sku || null,
             barcode: request.body.barcode || null
         };
+
+        // NEW: Ensure attributes are populated for variable products
+        if (productData.productType === 'variable' || productData.type === 'variable') {
+            productData = ensureAttributesFromVariations(productData);
+
+            // Validate that we have attributes
+            if (!productData.attributes || productData.attributes.length === 0) {
+                return response.status(400).json({
+                    error: true,
+                    success: false,
+                    message: 'Variable products must have at least one attribute'
+                });
+            }
+
+            // Validate that we have variations
+            if (!productData.variations || productData.variations.length === 0) {
+                return response.status(400).json({
+                    error: true,
+                    success: false,
+                    message: 'Variable products must have at least one variation'
+                });
+            }
+        }
 
         // Validate that we have at least one image
         if (imagesFormatted.length === 0) {
@@ -1278,6 +1391,48 @@ export async function updateProduct(request, response) {
                 stockStatus: (request.body.countInStock || 0) > 0 ? 'in_stock' : 'out_of_stock',
                 manageStock: true
             };
+        }
+
+        // Handle attributes and variations for variable products
+        if (request.body.productType === 'variable' || request.body.type === 'variable') {
+            // Normalize attributes
+            if (request.body.attributes) {
+                updateData.attributes = (request.body.attributes || []).map(attr => ({
+                    attributeId: attr.attributeId || null,
+                    name: attr.name,
+                    slug: attr.slug || attr.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                    values: (attr.values || []).map(val => ({
+                        valueId: val.valueId || null,
+                        label: val.label || val,
+                        slug: val.slug || (val.label || val).toLowerCase().replace(/[^a-z0-9]+/g, '-')
+                    })),
+                    visible: attr.visible !== false,
+                    variation: attr.variation !== false
+                }));
+            }
+
+            // Normalize variations
+            if (request.body.variations) {
+                updateData.variations = (request.body.variations || []).map(variation => ({
+                    ...variation,
+                    regularPrice: variation.regularPrice || variation.price || 0,
+                    price: variation.price || variation.regularPrice || variation.salePrice || 0,
+                    stock: variation.stock || 0,
+                    stockStatus: variation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock'),
+                    manageStock: variation.manageStock !== false,
+                    isActive: variation.isActive !== false,
+                    isDefault: variation.isDefault || false,
+                    attributes: (variation.attributes || []).map(attr => ({
+                        name: attr.name || attr,
+                        slug: attr.slug || (attr.name || attr).toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                        value: attr.value || attr.label || attr,
+                        valueSlug: attr.valueSlug || (attr.value || attr.label || attr).toLowerCase().replace(/[^a-z0-9]+/g, '-')
+                    }))
+                }));
+            }
+
+            // Ensure attributes are populated
+            updateData = ensureAttributesFromVariations(updateData);
         }
 
         const product = await ProductModel.findByIdAndUpdate(

@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from "react";
 import "../ProductItem/style.css";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Rating from "@mui/material/Rating";
 import Button from "@mui/material/Button";
 import { FaRegHeart } from "react-icons/fa";
@@ -16,12 +16,14 @@ import { MdClose } from "react-icons/md";
 import { IoMdHeart } from "react-icons/io";
 import { formatCurrency } from "../../utils/currency";
 import { normalizeProduct } from "../../utils/productNormalizer";
+import { getPriceRange, isVariableProduct } from '../../utils/productUtils';
 
 
 
 const ProductItem = (props) => {
   // Normalize product data for backward compatibility
   const item = normalizeProduct(props?.item);
+  const navigate = useNavigate();
 
   const [quantity, setQuantity] = useState(1);
   const [isAdded, setIsAdded] = useState(false);
@@ -37,7 +39,36 @@ const ProductItem = (props) => {
   const context = useContext(MyContext);
 
   const addToCart = (product, userId, quantity) => {
+    // Check if user is logged in
+    if (userId === undefined) {
+      context?.alertBox("error", "You are not logged in. Please login first.");
+      return false;
+    }
+
     const normalizedProduct = normalizeProduct(product);
+    
+    // For variable products, redirect to product detail page to select variations
+    const isVariable = isVariableProduct(normalizedProduct);
+    
+    if (isVariable) {
+      // Development mode logging
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ Variable product detected - redirecting to product page');
+        console.log('Product:', normalizedProduct?.name);
+        console.log('ProductType:', normalizedProduct?.productType);
+      }
+      
+      context?.alertBox(
+        "info", 
+        "Please visit the product page to select your options (size, color, etc.) before adding to cart"
+      );
+      
+      // Redirect to product detail page using React Router
+      navigate(`/product/${normalizedProduct?._id}`);
+      return false;
+    }
+
+    // For simple products, proceed with adding to cart
     const firstImage = normalizedProduct.images && normalizedProduct.images.length > 0 
       ? (typeof normalizedProduct.images[0] === 'string' ? normalizedProduct.images[0] : normalizedProduct.images[0].url)
       : normalizedProduct.featuredImage || '';
@@ -61,9 +92,9 @@ const ProductItem = (props) => {
 
     }
 
-
     setIsLoading(true);
 
+    // Handle old-style variations (size, RAM, weight) - legacy support
     if (item?.size?.length !== 0 || item?.productRam?.length !== 0 || item?.productWeight
       ?.length !== 0) {
       setIsShowTabs(true)
@@ -78,8 +109,7 @@ const ProductItem = (props) => {
 
     }
 
-
-
+    // Handle old-style tab selection - legacy support
     if (activeTab !== null) {
       context?.addToCart(productItem, userId, quantity);
       setIsAdded(true);
@@ -88,8 +118,6 @@ const ProductItem = (props) => {
         setIsLoading(false);
       }, 500);
     }
-
-
   }
 
 
@@ -211,9 +239,43 @@ const ProductItem = (props) => {
   }
 
 
+  // Helper functions for stock status
+  const getProductStock = () => {
+    // For variable products, get min stock from variations
+    if (item?.productType === 'variable' || item?.type === 'variable') {
+      if (Array.isArray(item?.variations) && item.variations.length > 0) {
+        const stocks = item.variations.map(v => v.stock || 0);
+        return Math.min(...stocks);
+      }
+    }
+    // For simple products
+    return item?.countInStock || item?.stock || item?.inventory?.stock || 0;
+  };
+
+  const isOutOfStock = () => {
+    return getProductStock() <= 0;
+  };
+
+  const isLowStock = () => {
+    const stock = getProductStock();
+    return stock > 0 && stock <= 5;
+  };
+
   return (
     <div className="productItem shadow-lg rounded-md overflow-hidden border-1 border-[rgba(0,0,0,0.1)]">
       <div className="group imgWrapper w-[100%]  overflow-hidden  rounded-md rounded-bl-none rounded-br-none relative">
+        {/* Out of Stock Badge */}
+        {isOutOfStock() && (
+          <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded text-[10px] font-bold z-20">
+            OUT OF STOCK
+          </div>
+        )}
+        {isLowStock() && !isOutOfStock() && (
+          <div className="absolute top-2 left-2 bg-yellow-400 text-black px-2 py-1 rounded text-[10px] font-bold z-20">
+            Only {getProductStock()} left
+          </div>
+        )}
+
         <Link to={`/product/${item?._id}`}>
           <div className="img h-[200px] overflow-hidden">
             <img
@@ -331,14 +393,36 @@ const ProductItem = (props) => {
         <Rating name="size-small" defaultValue={item?.rating} size="small" readOnly />
 
         <div className="flex items-center gap-4 justify-between">
-          {item?.isOnSale && item?.oldPrice > item?.price && (
-            <span className="oldPrice line-through text-gray-500 text-[12px] lg:text-[14px] font-[500]">
-              {formatCurrency(item?.oldPrice)}
-            </span>
+          {isVariableProduct(item) ? (
+            // Variable product - show price range
+            (() => {
+              const priceRange = getPriceRange(item);
+              if (priceRange && priceRange.min !== priceRange.max) {
+                return (
+                  <span className="price text-primary text-[12px] lg:text-[14px] font-[600]">
+                    {formatCurrency(priceRange.min)} - {formatCurrency(priceRange.max)}
+                  </span>
+                );
+              }
+              return (
+                <span className="price text-primary text-[12px] lg:text-[14px] font-[600]">
+                  {formatCurrency(item?.price || priceRange?.min)}
+                </span>
+              );
+            })()
+          ) : (
+            // Simple product - show single price
+            <>
+              {item?.isOnSale && item?.oldPrice > item?.price && (
+                <span className="oldPrice line-through text-gray-500 text-[12px] lg:text-[14px] font-[500]">
+                  {formatCurrency(item?.oldPrice)}
+                </span>
+              )}
+              <span className="price text-primary text-[12px] lg:text-[14px] font-[600]">
+                {formatCurrency(item?.price)}
+              </span>
+            </>
           )}
-          <span className="price text-primary text-[12px] lg:text-[14px]  font-[600]">
-            {formatCurrency(item?.price)}
-          </span>
         </div>
 
 
@@ -347,9 +431,19 @@ const ProductItem = (props) => {
           {
             isAdded === false ?
 
-              <Button className="btn-org addToCartBtn btn-border flex w-full btn-sm gap-2 " size="small"
-                onClick={() => addToCart(item, context?.userData?._id, quantity)}>
-                <MdOutlineShoppingCart className="text-[18px]" /> Add to Cart
+              <Button 
+                className="btn-org addToCartBtn btn-border flex w-full btn-sm gap-2" 
+                size="small"
+                onClick={() => addToCart(item, context?.userData?._id, quantity)}
+                disabled={isOutOfStock()}
+                style={{
+                  opacity: isOutOfStock() ? 0.5 : 1,
+                  cursor: isOutOfStock() ? 'not-allowed' : 'pointer',
+                  backgroundColor: isOutOfStock() ? '#ccc' : undefined
+                }}
+              >
+                <MdOutlineShoppingCart className="text-[18px]" /> 
+                {isOutOfStock() ? 'Out of Stock' : 'Add to Cart'}
               </Button>
 
               :

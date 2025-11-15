@@ -1,64 +1,119 @@
 import mongoose from "mongoose";
 
 const cartProductSchema = new mongoose.Schema({
-    productTitle:{
-        type:String,
-        required:true
+    productTitle: {
+        type: String,
+        required: true
     },
-    image:{
-        type:String,
-        required:true
+    image: {
+        type: String,
+        required: true
     },
-    rating:{
-        type:Number,
-        required:true
+    rating: {
+        type: Number,
+        required: true
     },
-    price:{
-        type:Number,
-        required:true
+    price: {
+        type: Number,
+        required: true
     },
-    oldPrice:{
-        type:Number,
+    oldPrice: {
+        type: Number,
+        default: null
     },
-    discount:{
-        type:Number,
+    discount: {
+        type: Number,
+        default: 0
     },
-    size:{
-        type:String,
+    quantity: {
+        type: Number,
+        required: true,
+        default: 1,
+        min: 1
     },
-    weight:{
-        type:String,
+    subTotal: {
+        type: Number,
+        required: true
     },
-    ram:{
-        type:String,
+    productId: {
+        type: String,
+        required: true
     },
-    quantity:{
-        type:Number,
-        required:true
+    countInStock: {
+        type: Number,
+        required: true,
+        min: 0
     },
-    subTotal:{
-        type:Number,
-        required:true
+    userId: {
+        type: String,
+        required: true
     },
-    productId:{
-        type:String,
-        required:true
+    brand: {
+        type: String,
+        default: null
     },
-    countInStock:{
-        type:Number,
-        required:true
+    
+    // ========================================
+    // NEW VARIATION FIELDS
+    // ========================================
+    productType: {
+        type: String,
+        enum: ['simple', 'variable'],
+        default: 'simple'
     },
-    userId:{
-        type:String,
-        required:true
+    variationId: {
+        type: String,
+        default: null
     },
-    brand:{
-        type:String,
+    variation: {
+        attributes: [{
+            name: String,
+            value: String
+        }],
+        sku: String,
+        image: String
+    },
+    
+    // ========================================
+    // OLD FIELDS - Keep for backward compatibility
+    // ========================================
+    size: {
+        type: String,
+        default: null
+    },
+    weight: {
+        type: String,
+        default: null
+    },
+    ram: {
+        type: String,
+        default: null
     }
-},{
-    timestamps : true
+}, {
+    timestamps: true
 });
 
-const CartProductModel = mongoose.model('cart',cartProductSchema)
+// ========================================
+// INDEXES for better query performance
+// ========================================
+cartProductSchema.index({ userId: 1, productId: 1, variationId: 1 });
+cartProductSchema.index({ userId: 1 });
 
-export default CartProductModel
+// ========================================
+// MIDDLEWARE - Validate and calculate
+// ========================================
+cartProductSchema.pre('save', function(next) {
+    // Ensure quantity doesn't exceed stock
+    if (this.quantity > this.countInStock) {
+        return next(new Error(`Cannot add ${this.quantity} items. Only ${this.countInStock} in stock.`));
+    }
+    
+    // Recalculate subtotal with proper decimal handling
+    this.subTotal = parseFloat(this.price) * this.quantity;
+    
+    next();
+});
+
+const CartProductModel = mongoose.model('cart', cartProductSchema);
+
+export default CartProductModel;

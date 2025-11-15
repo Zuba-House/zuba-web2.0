@@ -1,204 +1,442 @@
 import CartProductModel from "../models/cartProduct.modal.js";
+import ProductModel from "../models/product.model.js";
 
+// ========================================
+// ADD TO CART - Enhanced with variations and stock validation
+// ========================================
 export const addToCartItemController = async (request, response) => {
     try {
-        const userId = request.userId //middleware
-        const { productTitle, image, rating, price, oldPrice, quantity, subTotal, productId, countInStock, discount,size, weight, ram, brand } = request.body
+        const userId = request.userId;
+        
+        // Extract all fields (old + new)
+        const {
+            productTitle,
+            image,
+            rating,
+            price,
+            oldPrice,
+            quantity,
+            subTotal,
+            productId,
+            countInStock,
+            discount,
+            brand,
+            // New variation fields
+            productType,
+            variationId,
+            variation,
+            // Old fields (backward compatibility)
+            size,
+            weight,
+            ram
+        } = request.body;
 
+        // Validate and normalize required fields
         if (!productId) {
-            return response.status(402).json({
-                message: "Provide productId",
+            return response.status(400).json({
+                message: "Product ID is required",
                 error: true,
                 success: false
-            })
+            });
         }
 
+        // Ensure quantity is at least 1
+        const normalizedQuantity = Math.max(1, parseInt(quantity) || 1);
+        
+        // Ensure price is a number
+        const normalizedPrice = parseFloat(price) || 0;
+        
+        // Ensure countInStock is a number
+        const normalizedStock = parseInt(countInStock) || 0;
+        
+        // Normalize image (handle both string and object)
+        const normalizedImage = typeof image === 'string' 
+            ? image 
+            : (image?.url || image?.secureUrl || image || '');
 
-        const checkItemCart = await CartProductModel.findOne({
+        // ========================================
+        // STEP 1: Validate stock availability
+        // ========================================
+        if (normalizedStock <= 0) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: "This product is out of stock"
+            });
+        }
+
+        if (normalizedQuantity > normalizedStock) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: `Only ${normalizedStock} items available in stock`
+            });
+        }
+
+        // ========================================
+        // STEP 2: Check if item already in cart
+        // ========================================
+        const query = {
             userId: userId,
             productId: productId
-        })
-
-        if (checkItemCart) {
-            return response.status(400).json({
-                message: "Item already in cart"
-            })
+        };
+        
+        // For variable products, also check variationId
+        if (productType === 'variable' && variationId) {
+            query.variationId = variationId;
+        }
+        // For old system, check size/weight/ram
+        else if (size || weight || ram) {
+            query.size = size || null;
+            query.weight = weight || null;
+            query.ram = ram || null;
         }
 
+        const existingCartItem = await CartProductModel.findOne(query);
 
+        // ========================================
+        // STEP 3: Update existing or create new
+        // ========================================
+        if (existingCartItem) {
+            // Item already in cart - update quantity
+            const newQuantity = existingCartItem.quantity + normalizedQuantity;
+            
+            // Validate new quantity doesn't exceed stock
+            if (newQuantity > normalizedStock) {
+                return response.status(400).json({
+                    error: true,
+                    success: false,
+                    message: `Cannot add ${normalizedQuantity} more. Only ${normalizedStock - existingCartItem.quantity} items remaining in stock.`
+                });
+            }
+            
+            // Update quantity and subtotal
+            existingCartItem.quantity = newQuantity;
+            existingCartItem.subTotal = normalizedPrice * newQuantity;
+            
+            await existingCartItem.save();
+            
+            return response.status(200).json({
+                error: false,
+                success: true,
+                message: "Cart updated successfully",
+                data: existingCartItem
+            });
+        }
+        
+        // Item not in cart - create new entry
         const cartItem = new CartProductModel({
-            productTitle:productTitle,
-            image:image,
-            rating:rating,
-            price:price,
-            oldPrice:oldPrice,
-            quantity:quantity,
-            subTotal:subTotal,
-            productId:productId,
-            countInStock:countInStock,
-            userId:userId,
-            brand:brand,
-            discount:discount,
-            size:size,
-            weight:weight,
-            ram:ram
-        })
+            productTitle: productTitle || '',
+            image: normalizedImage,
+            rating: parseFloat(rating) || 0,
+            price: normalizedPrice,
+            oldPrice: oldPrice ? parseFloat(oldPrice) : null,
+            quantity: normalizedQuantity,
+            subTotal: normalizedPrice * normalizedQuantity,
+            productId,
+            userId,
+            countInStock: normalizedStock,
+            discount: discount ? parseFloat(discount) : 0,
+            brand: brand || '',
+            // New fields
+            productType: productType || 'simple',
+            variationId: variationId || null,
+            variation: variation || null,
+            // Old fields (backward compatibility)
+            size: size || null,
+            weight: weight || null,
+            ram: ram || null
+        });
 
-        const save = await cartItem.save();
+        const savedCart = await cartItem.save();
 
-
-        return response.status(200).json({
-            data: save,
-            message: "Item add successfully",
+        return response.status(201).json({
             error: false,
-            success: true
-        })
-
+            success: true,
+            message: "Product added to cart successfully",
+            data: savedCart
+        });
 
     } catch (error) {
+        console.error("Add to cart error:", error);
         return response.status(500).json({
-            message: error.message || error,
             error: true,
-            success: false
-        })
+            success: false,
+            message: error.message || "Failed to add product to cart"
+        });
     }
-}
+};
 
-
+// ========================================
+// GET CART ITEMS - With stock validation
+// ========================================
 export const getCartItemController = async (request, response) => {
     try {
         const userId = request.userId;
 
         const cartItems = await CartProductModel.find({
             userId: userId
-        });
+        }).sort({ createdAt: -1 });
+
+        // ========================================
+        // VALIDATE STOCK FOR EACH ITEM
+        // ========================================
+        const cartWithStockStatus = await Promise.all(
+            cartItems.map(async (item) => {
+                try {
+                    // Get current product stock
+                    const product = await ProductModel.findById(item.productId);
+                    
+                    let currentStock = item.countInStock;
+                    let isOutOfStock = false;
+                    let isLowStock = false;
+                    let stockChanged = false;
+                    
+                    if (product) {
+                        // For variable products, check variation stock
+                        if (item.productType === 'variable' && item.variationId) {
+                            const variation = product.variations?.find(
+                                v => v._id && v._id.toString() === item.variationId
+                            );
+                            if (variation) {
+                                currentStock = variation.stock || 0;
+                            }
+                        } else {
+                            // For simple products, check product stock
+                            currentStock = product.countInStock || product.inventory?.stock || 0;
+                        }
+                        
+                        // Update cart item if stock changed
+                        if (currentStock !== item.countInStock) {
+                            stockChanged = true;
+                            item.countInStock = currentStock;
+                            
+                            // Adjust quantity if exceeds current stock
+                            if (item.quantity > currentStock) {
+                                // If stock is 0, remove item from cart
+                                if (currentStock <= 0) {
+                                    await CartProductModel.deleteOne({ _id: item._id });
+                                    return null; // Return null to filter out deleted items
+                                }
+                                
+                                // Adjust quantity to available stock (minimum 1)
+                                item.quantity = Math.max(1, currentStock);
+                                item.subTotal = parseFloat(item.price) * item.quantity;
+                            }
+                            
+                            // Only save if quantity is valid (>= 1)
+                            if (item.quantity >= 1) {
+                                await item.save();
+                            } else {
+                                // If quantity somehow became 0, delete the item
+                                await CartProductModel.deleteOne({ _id: item._id });
+                                return null;
+                            }
+                        }
+                    }
+                    
+                    isOutOfStock = currentStock <= 0;
+                    isLowStock = currentStock > 0 && currentStock <= 5;
+                    
+                    return {
+                        ...item.toObject(),
+                        isOutOfStock,
+                        isLowStock,
+                        stockChanged,
+                        currentStock
+                    };
+                } catch (error) {
+                    console.error(`Error processing cart item ${item._id}:`, error);
+                    // If there's an error, try to delete the problematic item
+                    try {
+                        await CartProductModel.deleteOne({ _id: item._id });
+                    } catch (deleteError) {
+                        console.error(`Error deleting cart item ${item._id}:`, deleteError);
+                    }
+                    return null; // Filter out items with errors
+                }
+            })
+        );
+        
+        // Filter out null values (deleted items)
+        const validCartItems = cartWithStockStatus.filter(item => item !== null);
 
         return response.json({
-            data: cartItems,
+            data: validCartItems,
             error: false,
             success: true
-        })
-
+        });
 
     } catch (error) {
+        console.error("Get cart error:", error);
         return response.status(500).json({
             message: error.message || error,
             error: true,
             success: false
-        })
+        });
     }
-}
+};
 
+// ========================================
+// UPDATE CART ITEM - With stock validation
+// ========================================
 export const updateCartItemQtyController = async (request, response) => {
     try {
-
-        const userId = request.userId
-        const { _id, qty , subTotal, size, weight, ram} = request.body
-
-
+        const userId = request.userId;
+        const { _id, qty, subTotal, size, weight, ram } = request.body;
 
         if (!_id || !qty) {
             return response.status(400).json({
-                message: "provide _id, qty"
-            })
+                message: "Cart item ID and quantity are required",
+                error: true,
+                success: false
+            });
         }
 
-        const updateCartitem = await CartProductModel.updateOne(
-            {
-                _id: _id,
-                userId: userId
-            },
-            {
-                quantity: qty,
-                subTotal:subTotal,
-                size:size,
-                ram:ram,
-                weight:weight
-            },
-            { new: true }
-        )
+        // Find cart item
+        const cartItem = await CartProductModel.findOne({
+            _id: _id,
+            userId: userId
+        });
 
+        if (!cartItem) {
+            return response.status(404).json({
+                message: "Cart item not found",
+                error: true,
+                success: false
+            });
+        }
+
+        // ========================================
+        // STOCK VALIDATION
+        // ========================================
+        if (qty > cartItem.countInStock) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: `Only ${cartItem.countInStock} items available in stock`
+            });
+        }
+
+        if (qty <= 0) {
+            // If quantity is 0 or negative, remove from cart
+            await CartProductModel.deleteOne({ _id: _id });
+            return response.status(200).json({
+                error: false,
+                success: true,
+                message: "Item removed from cart"
+            });
+        }
+
+        // Update quantity and subtotal
+        const updateData = {
+            quantity: qty,
+            subTotal: subTotal || parseFloat(cartItem.price) * qty
+        };
+
+        // Update old fields if provided (backward compatibility)
+        if (size !== undefined) updateData.size = size;
+        if (weight !== undefined) updateData.weight = weight;
+        if (ram !== undefined) updateData.ram = ram;
+
+        const updateCartitem = await CartProductModel.updateOne(
+            { _id: _id, userId: userId },
+            updateData,
+            { new: true }
+        );
 
         return response.json({
-            message: "Update cart item",
+            message: "Cart updated successfully",
             success: true,
             error: false,
             data: updateCartitem
-        })
-
-
+        });
 
     } catch (error) {
+        console.error("Update cart error:", error);
         return response.status(500).json({
             message: error.message || error,
             error: true,
             success: false
-        })
+        });
     }
-}
+};
 
-
+// ========================================
+// DELETE CART ITEM
+// ========================================
 export const deleteCartItemQtyController = async (request, response) => {
     try {
-        const userId = request.userId // middleware
-        const { id } = request.params
+        const userId = request.userId;
+        const { id } = request.params;
 
-
-        if(!id){
+        if (!id) {
             return response.status(400).json({
-                message : "Provide _id",
-                error : true,
-                success : false
-            })
-          }
+                message: "Cart item ID is required",
+                error: true,
+                success: false
+            });
+        }
 
+        const deleteCartItem = await CartProductModel.deleteOne({
+            _id: id,
+            userId: userId
+        });
 
-          const deleteCartItem  = await CartProductModel.deleteOne({_id : id, userId : userId })
-
-          if(!deleteCartItem){
+        if (!deleteCartItem || deleteCartItem.deletedCount === 0) {
             return response.status(404).json({
-                message:"The product in the cart is not found",
-                error:true,
-                success:false
-            })
-          }
-         
+                message: "Cart item not found",
+                error: true,
+                success: false
+            });
+        }
 
-          return response.status(200).json({
-            message : "Item remove",
-            error : false,
-            success : true,
-            data : deleteCartItem
-          })
-
+        return response.status(200).json({
+            message: "Item removed from cart successfully",
+            error: false,
+            success: true,
+            data: deleteCartItem
+        });
 
     } catch (error) {
+        console.error("Delete cart item error:", error);
         return response.status(500).json({
             message: error.message || error,
             error: true,
             success: false
-        })
+        });
     }
-}
+};
 
-
-
+// ========================================
+// EMPTY CART
+// ========================================
 export const emptyCartController = async (request, response) => {
     try {
-        const userId = request.params.id // middlewar
+        const userId = request.params.id;
 
-        await CartProductModel.deleteMany({userId:userId })
+        if (!userId) {
+            return response.status(400).json({
+                message: "User ID is required",
+                error: true,
+                success: false
+            });
+        }
 
-          return response.status(200).json({
-            error : false,
-            success : true,
-          })
+        await CartProductModel.deleteMany({ userId: userId });
+
+        return response.status(200).json({
+            error: false,
+            success: true,
+            message: "Cart emptied successfully"
+        });
 
     } catch (error) {
+        console.error("Empty cart error:", error);
         return response.status(500).json({
             message: error.message || error,
             error: true,
             success: false
-        })
+        });
     }
-}
+};

@@ -35,20 +35,29 @@ const AddressBox = (props) => {
     return (
         <div className='group relative border border-dashed border-[rgba(0,0,0,0.2)] addressBox w-full  bg-[#fafafa] p-4 rounded-md cursor-pointer'>
 
-            <span className="inline-block p-1 bg-[#e7e7e7] text-[12px] rounded-sm">{props?.address?.addressType}</span>
+            <span className="inline-block p-1 bg-[#e7e7e7] text-[12px] rounded-sm">
+                {props?.address?.label || props?.address?.addressType || 'Home'}
+            </span>
 
             <h4 className="pt-2 flex items-center gap-4 text-[14px]">
-                <span>{context?.userData?.name} </span>
-                <span>+{props?.address?.mobile}</span>
+                <span>
+                    {props?.address?.contactInfo?.firstName 
+                      ? `${props.address.contactInfo.firstName} ${props.address.contactInfo.lastName || ''}`.trim()
+                      : context?.userData?.name
+                    }
+                </span>
+                <span>
+                    {props?.address?.contactInfo?.phone 
+                      ? props.address.contactInfo.phone 
+                      : (props?.address?.mobile ? `+${props.address.mobile}` : '')
+                    }
+                </span>
             </h4>
 
             <span className="pt-0 text-[13px] block w-100">
-                {
-                    props?.address?.address_line1 + " " +
-                    props?.address?.city + " " +
-                    props?.address?.country + " " +
-                    props?.address?.state + " " +
-                    props?.address?.pincode
+                {props?.address?.address?.addressLine1 
+                  ? `${props.address.address.addressLine1}${props.address.address.addressLine2 ? ', ' + props.address.address.addressLine2 : ''}, ${props.address.address.city}, ${props.address.address.provinceCode} ${props.address.address.postalCode}, ${props.address.address.country}`
+                  : `${props?.address?.address_line1 || ''} ${props?.address?.city || ''} ${props?.address?.country || ''} ${props?.address?.state || ''} ${props?.address?.pincode || ''}`.trim()
                 }
             </span>
 

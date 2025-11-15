@@ -8,21 +8,60 @@ const orderSchema = new mongoose.Schema({
     products: [
         {
             productId: {
-                type: String
+                type: String,
+                required: true
             },
             productTitle: {
-                type: String
+                type: String,
+                required: true
             },
             quantity: {
-                type: Number
+                type: Number,
+                required: true
             },
             price: {
-                type: Number
+                type: Number,
+                required: true
             },
             image: {
                 type: String
             },
             subTotal: {
+                type: Number,
+                required: true
+            },
+            // New variation fields
+            productType: {
+                type: String,
+                enum: ['simple', 'variable'],
+                default: 'simple'
+            },
+            variationId: {
+                type: String,
+                default: null
+            },
+            variation: {
+                attributes: [{
+                    name: String,
+                    value: String
+                }],
+                sku: String,
+                image: String
+            },
+            // Old fields (backward compatibility)
+            size: {
+                type: String,
+                default: null
+            },
+            weight: {
+                type: String,
+                default: null
+            },
+            ram: {
+                type: String,
+                default: null
+            },
+            countInStock: {
                 type: Number
             }
         }

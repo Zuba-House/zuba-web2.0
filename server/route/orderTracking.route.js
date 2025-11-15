@@ -141,7 +141,7 @@ orderTrackingRouter.get("/track/:orderId", async (req, res) => {
         description: "Your package is on the way to your address",
         date: formatDate(outForDeliveryDate),
         time: "08:30 AM",
-        location: order.delivery_address?.city || "Your City"
+        location: order.delivery_address?.address?.city || order.delivery_address?.city || "Your City"
       });
     }
 
@@ -156,7 +156,7 @@ orderTrackingRouter.get("/track/:orderId", async (req, res) => {
           hour: "2-digit",
           minute: "2-digit"
         }),
-        location: order.delivery_address?.address_line1 || "Delivery Address"
+        location: order.delivery_address?.address?.addressLine1 || order.delivery_address?.address_line1 || "Delivery Address"
       });
     }
 
@@ -181,12 +181,14 @@ orderTrackingRouter.get("/track/:orderId", async (req, res) => {
       trackingNumber: order.trackingNumber || `ZH${order._id.toString().slice(-8).toUpperCase()}`,
       shippingMethod: order.shippingMethod || "Standard International Shipping",
       shippingAddress: {
-        name: user?.name || "Customer",
-        street: address.address_line1 || "",
-        city: address.city || "",
-        state: address.state || "",
-        zipCode: address.pincode || "",
-        country: address.country || ""
+        name: address?.contactInfo?.firstName 
+          ? `${address.contactInfo.firstName} ${address.contactInfo.lastName || ''}`.trim()
+          : (user?.name || "Customer"),
+        street: address?.address?.addressLine1 || address?.address_line1 || "",
+        city: address?.address?.city || address?.city || "",
+        state: address?.address?.province || address?.state || "",
+        zipCode: address?.address?.postalCode || address?.pincode || "",
+        country: address?.address?.country || address?.country || ""
       },
       items: order.products.map((item) => ({
         name: item.productTitle || "Product",

@@ -71,7 +71,7 @@ const CartPanel = (props) => {
             <span className="text-primary font-bold">
               {formatCurrency(
                 (context.cartData?.length !== 0 ?
-                  context.cartData?.map(item => parseInt(item.price) * item.quantity)
+                  context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
                     .reduce((total, value) => total + value, 0) : 0)
               )}
             </span>
@@ -86,7 +86,7 @@ const CartPanel = (props) => {
             <span className="text-primary font-bold">
               {formatCurrency(
                 (context.cartData?.length !== 0 ?
-                  context.cartData?.map(item => parseInt(item.price) * item.quantity)
+                  context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
                     .reduce((total, value) => total + value, 0) : 0)
               )}
             </span>

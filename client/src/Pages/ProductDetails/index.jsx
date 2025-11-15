@@ -17,6 +17,7 @@ export const ProductDetails = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [reviewsCount, setReviewsCount] = useState(0);
   const [relatedProductData, setRelatedProductData] = useState([]);
+  const [selectedVariation, setSelectedVariation] = useState(null);
 
   const { id } = useParams();
 
@@ -141,13 +142,39 @@ export const ProductDetails = () => {
 
 
             <>
-              <div className="container flex gap-8 flex-col lg:flex-row items-start lg:items-center">
-                <div className="productZoomContainer w-full lg:w-[40%]">
-                  <ProductZoom images={productData?.images} />
-                </div>
+              <div className="container">
+                <div className="flex gap-8 flex-col lg:flex-row items-start lg:items-start">
+                  {/* Product Images - Left Side */}
+                  <div className="productZoomContainer w-full lg:w-[45%] lg:sticky lg:top-20">
+                    <ProductZoom 
+                      images={(() => {
+                        // If variation has image, prioritize it
+                        if (selectedVariation?.image) {
+                          const variationImage = typeof selectedVariation.image === 'string' 
+                            ? selectedVariation.image 
+                            : selectedVariation.image.url || selectedVariation.image;
+                          // Put variation image first, then product images
+                          const productImages = (productData?.images || []).filter(img => {
+                            const imgUrl = typeof img === 'string' ? img : img.url || img;
+                            return imgUrl !== variationImage; // Remove duplicate
+                          });
+                          return [variationImage, ...productImages];
+                        }
+                        // Otherwise use product images
+                        return productData?.images || [];
+                      })()}
+                    />
+                  </div>
 
-                <div className="productContent w-full lg:w-[60%] pr-2 pl-2 lg:pr-10 lg:pl-10">
-                  <ProductDetailsComponent item={productData} reviewsCount={reviewsCount} gotoReviews={gotoReviews} />
+                  {/* Product Details - Right Side */}
+                  <div className="productContent w-full lg:w-[55%] pr-2 pl-2 lg:pr-8 lg:pl-8">
+                    <ProductDetailsComponent 
+                      item={productData} 
+                      reviewsCount={reviewsCount} 
+                      gotoReviews={gotoReviews}
+                      onVariationChange={setSelectedVariation}
+                    />
+                  </div>
                 </div>
               </div>
 

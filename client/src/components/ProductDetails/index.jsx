@@ -26,6 +26,15 @@ export const ProductDetailsComponent = (props) => {
   const [isAddedInMyList, setIsAddedInMyList] = useState(false);
   const [selectedVariation, setSelectedVariation] = useState(null);
 
+  // Handle variation change from ProductVariations component
+  const handleVariationChange = (variation) => {
+    setSelectedVariation(variation);
+    // Also notify parent if callback provided
+    if (props.onVariationChange) {
+      props.onVariationChange(variation);
+    }
+  };
+
   const context = useContext(MyContext);
 
   const handleSelecteQty = (qty) => {
@@ -65,14 +74,38 @@ export const ProductDetailsComponent = (props) => {
 
 
     if (userId === undefined) {
-      context?.alertBox("error", "you are not login please login first");
+      context?.alertBox("error", "You are not logged in. Please login first.");
       return false;
     }
 
-    // For variable products, check if variation is selected
-    if (product?.productType === 'variable' && !selectedVariation) {
-      context?.alertBox("error", "Please select a variation (size, color, etc.)");
+    // For variable products, require variation selection
+    // Simplified check - only look at productType
+    const isVariableProduct = product?.productType === 'variable' || product?.type === 'variable';
+    
+    if (isVariableProduct && !selectedVariation) {
+      // Development mode logging
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ Add to Cart blocked: Variable product requires variation selection');
+        console.log('Product:', product?.name);
+        console.log('ProductType:', product?.productType);
+        console.log('Selected Variation:', selectedVariation);
+      }
+      
+      context?.alertBox(
+        "error", 
+        "Please select all product options (size, color, etc.) before adding to cart"
+      );
       return false;
+    }
+
+    // Log successful add to cart in dev mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ Adding to cart:', {
+        product: product?.name,
+        isVariable: isVariableProduct,
+        variation: selectedVariation,
+        quantity: quantity
+      });
     }
 
     // Determine price: use selected variation price if available, otherwise use product price
@@ -86,26 +119,44 @@ export const ProductDetailsComponent = (props) => {
       : (product?.countInStock || product?.stock);
 
     // Check stock availability
+    if (stock <= 0) {
+      context?.alertBox("error", "This product is out of stock");
+      return false;
+    }
+    
     if (stock < quantity) {
       context?.alertBox("error", `Only ${stock} items available in stock`);
       return false;
     }
 
+    // Normalize image URL (handle both string and object formats)
+    const getImageUrl = (img) => {
+      if (!img) return '';
+      if (typeof img === 'string') return img;
+      if (typeof img === 'object' && img.url) return img.url;
+      if (typeof img === 'object' && img.secureUrl) return img.secureUrl;
+      return '';
+    };
+
     const productItem = {
       _id: selectedVariation?._id || product?._id,
       productId: product?._id,
       variationId: selectedVariation?._id || null,
-      productTitle: product?.name,
-      image: selectedVariation?.image || product?.images?.[0] || product?.featuredImage || '',
-      rating: product?.rating,
-      price: displayPrice,
-      quantity: quantity,
-      subTotal: parseFloat(displayPrice * quantity).toFixed(2),
-      countInStock: stock,
-      brand: product?.brand,
+      productTitle: product?.name || '',
+      image: getImageUrl(selectedVariation?.image) || getImageUrl(product?.images?.[0]) || getImageUrl(product?.featuredImage) || '',
+      rating: product?.rating || 0,
+      price: parseFloat(displayPrice) || 0,
+      oldPrice: product?.oldPrice ? parseFloat(product.oldPrice) : null,
+      discount: product?.discount || 0,
+      quantity: parseInt(quantity) || 1,
+      subTotal: parseFloat(displayPrice * quantity) || 0,
+      countInStock: parseInt(stock) || 0,
+      brand: product?.brand || '',
+      productType: product?.productType || (product?.variations && product.variations.length > 0 ? 'variable' : 'simple'),
       variation: selectedVariation ? {
-        attributes: selectedVariation.attributes,
-        sku: selectedVariation.sku
+        attributes: selectedVariation.attributes || [],
+        sku: selectedVariation.sku || '',
+        image: getImageUrl(selectedVariation.image) || ''
       } : null
     }
 
@@ -163,24 +214,30 @@ export const ProductDetailsComponent = (props) => {
 
 
   return (
-    <>
-      <h1 className="text-[18px] sm:text-[22px] font-[600] mb-2">
+    <div className="product-details-wrapper">
+      {/* Product Title */}
+      <h1 className="text-[24px] sm:text-[28px] lg:text-[32px] font-[700] mb-3 text-gray-900">
         {product?.name}
       </h1>
-      <div className="flex items-start sm:items-center lg:items-center flex-col sm:flex-row md:flex-row lg:flex-row gap-3 justify-start">
-        <span className="text-gray-400 text-[13px]">
-          Brands :{" "}
-          <span className="font-[500] text-black opacity-75">
-            {product?.brand}
-          </span>
-        </span>
 
-        <Rating name="size-small" value={product?.rating} size="small" readOnly />
-        <span className="text-[13px] cursor-pointer" onClick={props.gotoReviews}>Review ({props.reviewsCount})</span>
+      {/* Brand and Rating */}
+      <div className="flex items-center flex-wrap gap-4 mb-4">
+        {product?.brand && (
+          <span className="text-gray-600 text-[14px]">
+            <span className="font-[500] text-gray-800">Brand:</span> {product?.brand}
+          </span>
+        )}
+        <div className="flex items-center gap-2">
+          <Rating name="size-small" value={product?.rating || 0} size="small" readOnly />
+          <span className="text-[13px] text-gray-600 cursor-pointer hover:text-primary transition" onClick={props.gotoReviews}>
+            ({props.reviewsCount || 0} Reviews)
+          </span>
+        </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row md:flex-row lg:flex-row items-start sm:items-center gap-4 mt-4">
-        <div className="flex items-center gap-4">
+      {/* Pricing */}
+      <div className="mb-6">
+        <div className="flex items-center gap-4 flex-wrap">
           {(() => {
             // Use variation price if selected, otherwise use product price
             let salePrice, regularPrice;
@@ -197,10 +254,10 @@ export const ProductDetailsComponent = (props) => {
               // Product is on sale - show regular price crossed out, sale price as current
               return (
                 <>
-                  <span className="oldPrice line-through text-gray-500 text-[20px] font-[500]">
+                  <span className="oldPrice line-through text-gray-400 text-[22px] font-[500]">
                     {formatCurrency(regularPrice)}
                   </span>
-                  <span className="price text-primary text-[20px] font-[600]">
+                  <span className="price text-primary text-[28px] font-[700]">
                     {formatCurrency(salePrice)}
                   </span>
                 </>
@@ -208,7 +265,7 @@ export const ProductDetailsComponent = (props) => {
             } else {
               // No sale - show regular price only
               return (
-                <span className="price text-primary text-[20px] font-[600]">
+                <span className="price text-primary text-[28px] font-[700]">
                   {formatCurrency(regularPrice)}
                 </span>
               );
@@ -217,9 +274,14 @@ export const ProductDetailsComponent = (props) => {
         </div>
       </div>
 
-      <p className="mt-3 pr-10 mb-5">
-        {product?.description}
-      </p>
+      {/* Product Description */}
+      {product?.description && (
+        <div className="mb-6">
+          <p className="text-[14px] text-gray-700 leading-relaxed pr-4">
+            {product?.description}
+          </p>
+        </div>
+      )}
 
       {/* Product Variations */}
       {(() => {
@@ -244,7 +306,7 @@ export const ProductDetailsComponent = (props) => {
           return (
             <ProductVariations 
               product={product} 
-              onVariationSelect={setSelectedVariation}
+              onVariationSelect={handleVariationChange}
               selectedVariation={selectedVariation}
             />
           );
@@ -254,60 +316,96 @@ export const ProductDetailsComponent = (props) => {
       })()}
 
       {/* Stock display - update based on selected variation */}
-      <div className="flex items-center gap-4 mt-4">
-        <span className="text-[14px]">
-          Available In Stock:{" "}
+      <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[14px] font-[600] text-gray-700">
+            Availability:
+          </span>
           <span className={`text-[14px] font-bold ${
             (selectedVariation ? selectedVariation.stock : (product?.countInStock || product?.stock)) > 0 
               ? 'text-green-600' 
               : 'text-red-600'
           }`}>
             {selectedVariation 
-              ? `${selectedVariation.stock} Items` 
-              : `${product?.countInStock || product?.stock} Items`}
+              ? `${selectedVariation.stock} Items Available` 
+              : `${product?.countInStock || product?.stock} Items Available`}
           </span>
-        </span>
-      </div>
-
-      <p className="text-[14px] mt-5 mb-2 text-[#000]">
-        Free Shipping (Est. Delivery Time 2-3 Days)
-      </p>
-      <div className="flex items-center gap-4 py-4">
-        <div className="qtyBoxWrapper w-[70px]">
-          <QtyBox handleSelecteQty={handleSelecteQty} />
         </div>
-
-        <Button className="btn-org flex gap-2 !min-w-[150px]" onClick={() => addToCart(product, context?.userData?._id, quantity)}>
-          {
-            isLoading === true ? <CircularProgress /> :
-              <>
-                {
-                  isAdded === true ? <><FaCheckDouble /> Added</> :
-                    <>
-                      <MdOutlineShoppingCart className="text-[22px]" /> Add to Cart
-                    </>
-                }
-
-              </>
-          }
-
-        </Button>
+        <p className="text-[13px] text-gray-600 mt-2">
+          ✓ Free Shipping (Est. Delivery Time 2-3 Days)
+        </p>
       </div>
 
-      <div className="flex items-center gap-4 mt-4">
-        <span className="flex items-center gap-2 text-[14px] sm:text-[15px] link cursor-pointer font-[500]" onClick={() => handleAddToMyList(product)}>
-          {
-            isAddedInMyList === true ? <IoMdHeart className="text-[18px] !text-primary group-hover:text-white hover:!text-white" /> :
-              <FaRegHeart className="text-[18px] !text-black group-hover:text-white hover:!text-white" />
+      {/* Quantity and Add to Cart */}
+      <div className="mb-6">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="qtyBoxWrapper">
+            <label className="block text-[13px] font-[600] text-gray-700 mb-2">Quantity:</label>
+            <QtyBox handleSelecteQty={handleSelecteQty} />
+          </div>
+        </div>
+        
+        <div className="mt-4">
+          <Button 
+            className="btn-org flex gap-2 !min-w-[200px] !py-3 !text-[16px] !font-[600]" 
+            onClick={() => addToCart(product, context?.userData?._id, quantity)}
+            disabled={isLoading}
+            fullWidth
+            sx={{
+              backgroundColor: '#efb291',
+              color: '#0b2735',
+              '&:hover': {
+                backgroundColor: '#e5a080',
+              },
+              '&.Mui-disabled': {
+                backgroundColor: '#d1d5db',
+                color: '#9ca3af'
+              }
+            }}
+          >
+            {
+              isLoading === true ? (
+                <CircularProgress size={20} sx={{ color: '#0b2735' }} />
+              ) : (
+                <>
+                  {
+                    isAdded === true ? (
+                      <>
+                        <FaCheckDouble className="text-[20px]" /> Added to Cart
+                      </>
+                    ) : (
+                      <>
+                        <MdOutlineShoppingCart className="text-[22px]" /> Add to Cart
+                      </>
+                    )
+                  }
+                </>
+              )
+            }
+          </Button>
+        </div>
+      </div>
 
+      {/* Wishlist and Compare */}
+      <div className="flex items-center gap-6 pt-4 border-t border-gray-200">
+        <span 
+          className="flex items-center gap-2 text-[14px] text-gray-700 cursor-pointer font-[500] hover:text-primary transition-colors" 
+          onClick={() => handleAddToMyList(product)}
+        >
+          {
+            isAddedInMyList === true ? (
+              <IoMdHeart className="text-[20px] text-primary" />
+            ) : (
+              <FaRegHeart className="text-[20px]" />
+            )
           }
           Add to Wishlist
         </span>
 
-        <span className="flex items-center gap-2  text-[14px] sm:text-[15px] link cursor-pointer font-[500]">
-          <IoGitCompareOutline className="text-[18px]" /> Add to Compare
+        <span className="flex items-center gap-2 text-[14px] text-gray-700 cursor-pointer font-[500] hover:text-primary transition-colors">
+          <IoGitCompareOutline className="text-[20px]" /> Add to Compare
         </span>
       </div>
-    </>
+    </div>
   );
 };

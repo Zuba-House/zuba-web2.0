@@ -10,50 +10,28 @@ import { formatCurrency } from "../../utils/currency";
 
 const CartPage = () => {
 
-  const [productSizeData, setProductSizeData] = useState([]);
-  const [productRamsData, setProductRamsData] = useState([]);
-  const [productWeightData, setProductWeightData] = useState([]);
   const context = useContext(MyContext);
 
   useEffect(() => {
-
-    window.scrollTo(0, 0)
-
-    fetchDataFromApi("/api/product/productSize/get").then((res) => {
-      if (res?.error === false) {
-        setProductSizeData(res?.data)
-      }
-    })
-
-    fetchDataFromApi("/api/product/productRAMS/get").then((res) => {
-      if (res?.error === false) {
-        setProductRamsData(res?.data)
-      }
-    })
-
-    fetchDataFromApi("/api/product/productWeight/get").then((res) => {
-      if (res?.error === false) {
-        setProductWeightData(res?.data)
-      }
-    })
+    window.scrollTo(0, 0);
   }, []);
 
 
 
 
-  const selectedSize = (item) => {
-    if (item?.size !== "") {
-      return item?.size;
+  // Helper to get variation display info (backward compatible)
+  const getVariationDisplay = (item) => {
+    // New variation system
+    if (item?.variation && item.variation.attributes && item.variation.attributes.length > 0) {
+      return item.variation.attributes.map(attr => `${attr.name}: ${attr.value}`).join(', ');
     }
-
-    if (item?.weight !== "") {
-      return item?.weight;
-    }
-
-    if (item?.ram !== "") {
-      return item?.ram;
-    }
-
+    
+    // Old system (backward compatibility)
+    if (item?.size) return item.size;
+    if (item?.weight) return item.weight;
+    if (item?.ram) return item.ram;
+    
+    return null;
   }
 
 
@@ -74,7 +52,7 @@ const CartPage = () => {
 
               context?.cartData?.length !== 0 ? context?.cartData?.map((item, index) => {
                 return (
-                  <CartItems selected={() => selectedSize(item)} qty={item?.quantity} item={item} key={index} productSizeData={productSizeData} productRamsData={productRamsData} productWeightData={productWeightData} />
+                  <CartItems qty={item?.quantity} item={item} key={index} />
                 )
               })
 
@@ -107,7 +85,7 @@ const CartPage = () => {
               <span className="text-primary font-bold">
                 {formatCurrency(
                   (context.cartData?.length !== 0 ?
-                    context.cartData?.map(item => parseInt(item.price) * item.quantity)
+                    context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
                       .reduce((total, value) => total + value, 0) : 0)
                 )}
               </span>
@@ -128,7 +106,7 @@ const CartPage = () => {
               <span className="text-primary font-bold">
                 {formatCurrency(
                   (context.cartData?.length !== 0 ?
-                    context.cartData?.map(item => parseInt(item.price) * item.quantity)
+                    context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
                       .reduce((total, value) => total + value, 0) : 0)
                 )}
               </span>

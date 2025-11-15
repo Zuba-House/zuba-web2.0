@@ -43,7 +43,7 @@ const CartItems = (props) => {
       const cartObj = {
         _id: props?.item?._id,
         qty: value,
-        subTotal: props?.item?.price * value
+        subTotal: parseFloat(props?.item?.price || 0) * value
       }
 
       editData("/api/cart/update-qty", cartObj).then((res) => {
@@ -59,107 +59,7 @@ const CartItems = (props) => {
   };
 
 
-  const updateCart = (selectedVal, qty, field) => {
-    handleCloseSize(selectedVal)
-
-    const cartObj = {
-      _id: props?.item?._id,
-      qty: qty,
-      subTotal: props?.item?.price * qty,
-      size: props?.item?.size !== "" ? selectedVal : '',
-      weight: props?.item?.weight !== "" ? selectedVal : '',
-      ram: props?.item?.ram !== "" ? selectedVal : '',
-    }
-
-
-    //if product size available
-    if (field === "size") {
-
-      fetchDataFromApi(`/api/product/${props?.item?.productId}`).then((res) => {
-        const product = res?.product;
-
-
-        const item = product?.size?.filter((size) =>
-          size?.includes(selectedVal)
-        )
-
-        if (item?.length !== 0) {
-          editData("/api/cart/update-qty", cartObj).then((res) => {
-            if (res?.data?.error === false) {
-              context.alertBox("success", res?.data?.message);
-              context?.getCartItems();
-            }
-          })
-        } else {
-          context.alertBox("error", `Product not available with the size of ${selectedVal}`);
-        }
-
-
-      })
-
-    }
-
-
-    //if product weight available
-    if (field === "weight") {
-
-      fetchDataFromApi(`/api/product/${props?.item?.productId}`).then((res) => {
-        const product = res?.product;
-
-
-        const item = product?.productWeight?.filter((weight) =>
-          weight?.includes(selectedVal)
-        )
-
-        if (item?.length !== 0) {
-          editData("/api/cart/update-qty", cartObj).then((res) => {
-            if (res?.data?.error === false) {
-              context.alertBox("success", res?.data?.message);
-              context?.getCartItems();
-            }
-          })
-        } else {
-          context.alertBox("error", `Product not available with the weight of ${selectedVal}`);
-        }
-
-
-      })
-
-    }
-
-
-
-
-    //if product ram available
-    if (field === "ram") {
-
-      fetchDataFromApi(`/api/product/${props?.item?.productId}`).then((res) => {
-        const product = res?.product;
-
-
-        const item = product?.productRam?.filter((ram) =>
-          ram?.includes(selectedVal)
-        )
-
-        if (item?.length !== 0) {
-          editData("/api/cart/update-qty", cartObj).then((res) => {
-            if (res?.data?.error === false) {
-              context.alertBox("success", res?.data?.message);
-              context?.getCartItems();
-            }
-          })
-        } else {
-          context.alertBox("error", `Product not available with the ram of ${selectedVal}`);
-        }
-
-
-      })
-
-    }
-
-
-
-  }
+  // Removed old updateCart function - variations should be changed on product page, not in cart
 
 
 
@@ -173,12 +73,25 @@ const CartItems = (props) => {
 
 
   return (
-    <div className="cartItem w-full p-3 flex items-center gap-4 pb-5 border-b border-[rgba(0,0,0,0.1)]">
-      <div className="img w-[30%] sm:w-[20%] lg:w-[15%] rounded-md overflow-hidden">
+    <div className="cartItem w-full p-3 flex items-center gap-4 pb-5 border-b border-[rgba(0,0,0,0.1)] relative">
+      {/* Out of Stock Badge */}
+      {props?.item?.isOutOfStock && (
+        <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded text-[10px] font-bold z-10">
+          OUT OF STOCK
+        </div>
+      )}
+      {props?.item?.isLowStock && !props?.item?.isOutOfStock && (
+        <div className="absolute top-2 left-2 bg-yellow-400 text-black px-2 py-1 rounded text-[10px] font-bold z-10">
+          Only {props?.item?.currentStock || props?.item?.countInStock} left
+        </div>
+      )}
+
+      <div className="img w-[30%] sm:w-[20%] lg:w-[15%] rounded-md overflow-hidden relative">
         <Link to={`/product/${props?.item?.productId}`} className="group">
           <img
             src={props?.item?.image}
             className="w-full group-hover:scale-105 transition-all"
+            alt={props?.item?.productTitle}
           />
         </Link>
       </div>
@@ -190,176 +103,88 @@ const CartItems = (props) => {
           <Link to={`/product/${props?.item?.productId}`} className="link">{props?.item?.productTitle?.substr(0, context?.windowWidth < 992 ? 30 : 120) + '...'}</Link>
         </h3>
 
+        {/* Variation Info Display */}
+        {props?.item?.variation && props?.item?.variation.attributes && props?.item?.variation.attributes.length > 0 && (
+          <div className="variation-info flex flex-wrap gap-2 mt-1 mb-1">
+            {props.item.variation.attributes.map((attr, idx) => (
+              <span key={idx} className="text-[11px] bg-gray-100 px-2 py-1 rounded">
+                {attr.name}: <strong>{attr.value}</strong>
+              </span>
+            ))}
+          </div>
+        )}
+        {props?.item?.variation?.sku && (
+          <div className="text-[11px] text-gray-500 mt-1">SKU: {props.item.variation.sku}</div>
+        )}
+
         <Rating name="size-small" value={props?.item?.rating} size="small" readOnly />
 
         <div className="flex items-center gap-4 mt-2">
-          {
-            props?.item?.size !== "" &&
-            <>
-              {
-                props?.productSizeData?.length !== 0 &&
-                <div className="relative">
-                  <span
-                    className="flex items-center justify-center bg-[#f1f1f1] text-[11px]
-       font-[600] py-1 px-2 rounded-md cursor-pointer"
-                    onClick={handleClickSize}
-                  >
-                    Size: {selectedSize} <GoTriangleDown />
-                  </span>
-
-                  <Menu
-                    id="size-menu"
-                    anchorEl={sizeanchorEl}
-                    open={openSize}
-                    onClose={() => handleCloseSize(null)}
-                    MenuListProps={{
-                      "aria-labelledby": "basic-button",
-                    }}
-                  >
-                    {
-                      props?.productSizeData?.map((item, index) => {
-                        return (
-                          <MenuItem key={index}
-                            className={`${item?.name === selectedSize && 'selected'}`}
-                            onClick={() => updateCart(item?.name, props?.item?.quantity, "size")}>
-                            {item?.name}
-                          </MenuItem>
-                        )
-                      })
-                    }
-
-                  </Menu>
-                </div>
-              }
-            </>
-          }
-
-
-          {
-            props?.item?.ram !== "" &&
-            <>
-              {
-                props?.productRamsData?.length !== 0 &&
-                <div className="relative">
-                  <span
-                    className="flex items-center justify-center bg-[#f1f1f1] text-[11px]
-       font-[600] py-1 px-2 rounded-md cursor-pointer"
-                    onClick={handleClickSize}
-                  >
-                    RAM: {selectedSize} <GoTriangleDown />
-                  </span>
-
-                  <Menu
-                    id="size-menu"
-                    anchorEl={sizeanchorEl}
-                    open={openSize}
-                    onClose={() => handleCloseSize(null)}
-                    MenuListProps={{
-                      "aria-labelledby": "basic-button",
-                    }}
-                  >
-                    {
-                      props?.productRamsData?.map((item, index) => {
-                        return (
-                          <MenuItem key={index}
-                            className={`${item?.name === selectedSize && 'selected'}`}
-                            onClick={() => updateCart(item?.name, props?.item?.quantity, "ram")}>
-                            {item?.name}
-                          </MenuItem>
-                        )
-                      })
-                    }
-
-                  </Menu>
-                </div>
-              }
-            </>
-          }
-
-
-
-
-          {
-            props?.item?.weight !== "" &&
-            <>
-              {
-                props?.productWeightData?.length !== 0 &&
-                <div className="relative">
-                  <span
-                    className="flex items-center justify-center bg-[#f1f1f1] text-[11px]
-       font-[600] py-1 px-2 rounded-md cursor-pointer"
-                    onClick={handleClickSize}
-                  >
-                    Weight: {selectedSize} <GoTriangleDown />
-                  </span>
-
-                  <Menu
-                    id="size-menu"
-                    anchorEl={sizeanchorEl}
-                    open={openSize}
-                    onClose={() => handleCloseSize(null)}
-                    MenuListProps={{
-                      "aria-labelledby": "basic-button",
-                    }}
-                  >
-                    {
-                      props?.productWeightData?.map((item, index) => {
-                        return (
-                          <MenuItem key={index}
-                            className={`${item?.name === selectedSize && 'selected'}`}
-                            onClick={() => updateCart(item?.name, props?.item?.quantity, "weight")}>
-                            {item?.name}
-                          </MenuItem>
-                        )
-                      })
-                    }
-
-                  </Menu>
-                </div>
-              }
-            </>
-          }
+          {/* Old variation system - kept for backward compatibility only */}
+          {(props?.item?.size || props?.item?.weight || props?.item?.ram) && !props?.item?.variation && (
+            <div className="text-[11px] bg-gray-100 px-2 py-1 rounded">
+              {props?.item?.size && `Size: ${props.item.size}`}
+              {props?.item?.weight && `Weight: ${props.item.weight}`}
+              {props?.item?.ram && `RAM: ${props.item.ram}`}
+            </div>
+          )}
 
 
 
           <div className="relative">
             <span
-              className="flex items-center justify-center bg-[#f1f1f1] text-[11px]
-     font-[600] py-1 px-2 rounded-md cursor-pointer"
-              onClick={handleClickQty}
+              className={`flex items-center justify-center bg-[#f1f1f1] text-[11px] font-[600] py-1 px-2 rounded-md ${
+                props?.item?.isOutOfStock ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+              }`}
+              onClick={props?.item?.isOutOfStock ? undefined : handleClickQty}
             >
               Qty: {selectedQty} <GoTriangleDown />
             </span>
 
-            <Menu
-              id="size-menu"
-              anchorEl={qtyanchorEl}
-              open={openQty}
-              onClose={() => handleCloseQty(null)}
-              MenuListProps={{
-                "aria-labelledby": "basic-button",
-              }}
-            >
-
-
-              {Array.from({ length: 15 }).map((_, index) => (
-                <MenuItem key={index} onClick={() => handleCloseQty(index + 1)}>{index + 1}</MenuItem>
-              ))}
-
-            </Menu>
+            {!props?.item?.isOutOfStock && (
+              <Menu
+                id="qty-menu"
+                anchorEl={qtyanchorEl}
+                open={openQty}
+                onClose={() => handleCloseQty(null)}
+                MenuListProps={{
+                  "aria-labelledby": "basic-button",
+                }}
+              >
+                {Array.from({ length: Math.min(15, props?.item?.currentStock || props?.item?.countInStock || 15) }).map((_, index) => (
+                  <MenuItem key={index} onClick={() => handleCloseQty(index + 1)}>{index + 1}</MenuItem>
+                ))}
+              </Menu>
+            )}
           </div>
         </div>
 
+        {/* Stock Warning Messages */}
+        {props?.item?.isOutOfStock && (
+          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-[12px] text-red-700">
+            ⚠️ This item is no longer available. Please remove it from your cart.
+          </div>
+        )}
+        {props?.item?.stockChanged && !props?.item?.isOutOfStock && (
+          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-[12px] text-blue-700">
+            ℹ️ Stock has changed. Quantity adjusted to available stock.
+          </div>
+        )}
+
         <div className="flex items-center gap-4 mt-2">
-          <span className="price text-[14px]  font-[600]">{formatCurrency(props?.item?.price)}</span>
+          <span className="price text-[14px] font-[600]">{formatCurrency(props?.item?.price)}</span>
 
-          <span className="oldPrice line-through text-gray-500 text-[14px] font-[500]">
-            {formatCurrency(props?.item?.oldPrice)}
-          </span>
+          {props?.item?.oldPrice && props?.item?.oldPrice > props?.item?.price && (
+            <span className="oldPrice line-through text-gray-500 text-[14px] font-[500]">
+              {formatCurrency(props?.item?.oldPrice)}
+            </span>
+          )}
 
-          <span className="price text-primary text-[14px]  font-[600]">
-            {props?.item?.discount}% OFF
-          </span>
+          {props?.item?.discount && props?.item?.discount > 0 && (
+            <span className="price text-primary text-[14px] font-[600]">
+              {props?.item?.discount}% OFF
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -367,3 +192,4 @@ const CartItems = (props) => {
 };
 
 export default CartItems;
+

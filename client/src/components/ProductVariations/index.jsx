@@ -1,152 +1,281 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { formatCurrency } from '../../utils/currency';
+import './ProductVariations.css';
 
 const ProductVariations = ({ product, onVariationSelect, selectedVariation }) => {
   const [selectedAttributes, setSelectedAttributes] = useState({});
   const [availableVariations, setAvailableVariations] = useState([]);
   const [currentVariation, setCurrentVariation] = useState(null);
 
-  // Initialize selected attributes from default variation or first available
+  // Auto-select variation on mount (only runs once when product loads)
   useEffect(() => {
-    if (product?.variations && product.variations.length > 0) {
-      // Find default variation
+    // Only run this effect for auto-selection on mount
+    // Regular selection changes are now handled directly in handleAttributeChange
+    
+    if (!product?.variations || product.variations.length === 0) {
+      return;
+    }
+    
+    // Don't auto-select if user has already made selections
+    if (Object.keys(selectedAttributes).length > 0) {
+      return;
+    }
+    
+    // Auto-select if only one variation exists
+    if (product.variations.length === 1) {
+      const singleVariation = product.variations[0];
+      const autoSelection = {};
+      
+      if (Array.isArray(singleVariation.attributes)) {
+        singleVariation.attributes.forEach(attr => {
+          if (attr.name && attr.value) {
+            autoSelection[attr.name] = attr.value;
+          }
+        });
+      }
+      
+      if (Object.keys(autoSelection).length > 0) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔄 Auto-selecting single variation:', autoSelection);
+        }
+        
+        setSelectedAttributes(autoSelection);
+        setCurrentVariation(singleVariation);
+        
+        if (onVariationSelect) {
+          onVariationSelect(singleVariation);
+        }
+      }
+    } else if (product.variations.length > 1) {
+      // Find default variation or use first one
       const defaultVariation = product.variations.find(v => v.isDefault) || product.variations[0];
       
-      if (defaultVariation) {
+      if (defaultVariation && Array.isArray(defaultVariation.attributes)) {
         const initialAttributes = {};
-        defaultVariation.attributes?.forEach(attr => {
-          initialAttributes[attr.name] = attr.value;
+        defaultVariation.attributes.forEach(attr => {
+          if (attr.name && attr.value) {
+            initialAttributes[attr.name] = attr.value;
+          }
         });
-        setSelectedAttributes(initialAttributes);
-        setCurrentVariation(defaultVariation);
-        if (onVariationSelect) {
-          onVariationSelect(defaultVariation);
+        
+        if (Object.keys(initialAttributes).length > 0) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔄 Auto-selecting default variation:', initialAttributes);
+          }
+          
+          setSelectedAttributes(initialAttributes);
+          setCurrentVariation(defaultVariation);
+          
+          if (onVariationSelect) {
+            onVariationSelect(defaultVariation);
+          }
         }
       }
     }
+    
+    // Only run once when product changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?._id]);
+
+  // Find matching variation based on selected attributes
+  const findMatchingVariation = useMemo(() => {
+    return (selectedAttrs) => {
+      if (!Array.isArray(product?.variations) || product.variations.length === 0) {
+        return null;
+      }
+      
+      const selectedEntries = Object.entries(selectedAttrs);
+      if (selectedEntries.length === 0) {
+        return null;
+      }
+      
+      // Find variation where ALL selected attributes match
+      return product.variations.find(variation => {
+        if (!Array.isArray(variation?.attributes)) {
+          return false;
+        }
+        
+        return selectedEntries.every(([attrName, attrValue]) => {
+          const varAttr = variation.attributes.find(
+            a => a && a.name === attrName
+          );
+          
+          if (!varAttr) return false;
+          
+          // Compare values (case-insensitive)
+          const varValue = varAttr.value || '';
+          return varValue.toLowerCase() === attrValue.toLowerCase();
+        }) && variation.attributes.length === selectedEntries.length;
+      });
+    };
   }, [product]);
 
-  // Update available variations when attributes change
-  useEffect(() => {
-    if (!product?.variations || product.variations.length === 0) return;
-
-    // Filter variations based on selected attributes
-    const filtered = product.variations.filter(variation => {
-      if (!variation.attributes || variation.attributes.length === 0) return false;
+  // Check if a specific attribute value is available based on current selection
+  const isValueAvailable = (attributeName, value) => {
+    const otherSelectedAttrs = Object.entries(selectedAttributes).filter(
+      ([name]) => name !== attributeName
+    );
+    
+    if (otherSelectedAttrs.length === 0) {
+      return true;
+    }
+    
+    return product.variations.some(variation => {
+      if (!Array.isArray(variation?.attributes)) return false;
       
-      // Check if all selected attributes match this variation
-      return Object.keys(selectedAttributes).every(attrName => {
-        const selectedValue = selectedAttributes[attrName];
-        const variationAttr = variation.attributes.find(a => a.name === attrName);
-        return variationAttr && variationAttr.value === selectedValue;
+      const hasValue = variation.attributes.some(
+        attr => attr.name === attributeName && attr.value === value
+      );
+      
+      if (!hasValue) return false;
+      
+      return otherSelectedAttrs.every(([otherName, otherValue]) => {
+        return variation.attributes.some(
+          attr => attr.name === otherName && attr.value === otherValue
+        );
       });
     });
-
-    setAvailableVariations(filtered);
-    
-    // Find matching variation
-    const matching = product.variations.find(variation => {
-      if (!variation.attributes || variation.attributes.length === 0) return false;
-      
-      return Object.keys(selectedAttributes).every(attrName => {
-        const selectedValue = selectedAttributes[attrName];
-        const variationAttr = variation.attributes.find(a => a.name === attrName);
-        return variationAttr && variationAttr.value === selectedValue;
-      }) && variation.attributes.length === Object.keys(selectedAttributes).length;
-    });
-
-    if (matching) {
-      setCurrentVariation(matching);
-      if (onVariationSelect) {
-        onVariationSelect(matching);
-      }
-    }
-  }, [selectedAttributes, product]);
+  };
 
   // Handle attribute selection
   const handleAttributeChange = (attributeName, value) => {
-    setSelectedAttributes(prev => ({
-      ...prev,
-      [attributeName]: value
-    }));
-  };
-
-  // Get unique values for an attribute
-  const getAttributeValues = (attributeName) => {
-    if (!product?.variations || product.variations.length === 0) {
-      console.log('ProductVariations - No variations found for attribute:', attributeName);
-      return [];
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔄 Attribute Change:', attributeName, '=', value);
     }
     
-    const values = new Set();
-    product.variations.forEach(variation => {
-      if (variation.attributes && Array.isArray(variation.attributes)) {
-        const attr = variation.attributes.find(a => {
-          // Handle both object format {name, value} and string format
-          if (typeof a === 'object' && a.name === attributeName) {
-            return true;
-          }
-          return false;
-        });
+    // If clicking the same value, deselect it
+    if (selectedAttributes[attributeName] === value) {
+      const newSelection = { ...selectedAttributes };
+      delete newSelection[attributeName];
+      
+      // Update state
+      setSelectedAttributes(newSelection);
+      setCurrentVariation(null);
+      
+      // Immediately notify parent (don't wait for useEffect)
+      if (onVariationSelect) {
+        onVariationSelect(null);
+      }
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 Deselected:', attributeName);
+      }
+      
+      return;
+    }
+    
+    // Create new selection
+    const newSelection = {
+      ...selectedAttributes,
+      [attributeName]: value
+    };
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔄 New Selection:', newSelection);
+    }
+    
+    // Update state
+    setSelectedAttributes(newSelection);
+    
+    // Find matching variation IMMEDIATELY (don't wait for useEffect)
+    const matchedVariation = findMatchingVariation(newSelection);
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔄 Matched Variation:', matchedVariation);
+    }
+    
+    // Update selected variation
+    setCurrentVariation(matchedVariation);
+    
+    // Notify parent component IMMEDIATELY
+    if (onVariationSelect) {
+      onVariationSelect(matchedVariation);
+    }
+  };
+
+  // Get unique values for an attribute - ENHANCED with multiple data sources
+  const getAttributeValues = useMemo(() => {
+    return (attributeName) => {
+      const values = new Set();
+      
+      // Method 1: From product.attributes (structured data - primary source)
+      if (Array.isArray(product?.attributes)) {
+        const attribute = product.attributes.find(
+          attr => attr && attr.name === attributeName
+        );
         
-        if (attr) {
-          // Extract value - could be attr.value, attr.label, or just attr
-          const value = attr.value || attr.label || attr;
-          if (value) {
-            values.add(value);
-          }
+        if (attribute && Array.isArray(attribute.values)) {
+          attribute.values.forEach(valueObj => {
+            // Handle both {label, slug} and string formats
+            const value = typeof valueObj === 'object' ? valueObj.label : valueObj;
+            if (value) values.add(value);
+          });
         }
       }
-    });
-    
-    const valuesArray = Array.from(values);
-    console.log(`ProductVariations - Values for ${attributeName}:`, valuesArray);
-    return valuesArray;
-  };
-
-  // Get all attribute names
-  const getAttributeNames = () => {
-    // First, try to get from product.attributes
-    if (product?.attributes && product.attributes.length > 0) {
-      const names = product.attributes
-        .filter(attr => attr.visible !== false && attr.variation !== false)
-        .map(attr => attr.name);
       
-      if (names.length > 0) {
-        console.log('ProductVariations - Attribute names from product.attributes:', names);
-        return names;
+      // Method 2: From variations.attributes (fallback)
+      if (values.size === 0 && Array.isArray(product?.variations)) {
+        product.variations.forEach(variation => {
+          if (Array.isArray(variation?.attributes)) {
+            const attr = variation.attributes.find(
+              a => a && a.name === attributeName
+            );
+            if (attr && attr.value) {
+              values.add(attr.value);
+            }
+          }
+        });
       }
+      
+      const valuesArray = Array.from(values);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`ProductVariations - Values for ${attributeName}:`, valuesArray);
+      }
+      return valuesArray;
+    };
+  }, [product]);
+
+  // Get all attribute names - ENHANCED with proper fallbacks
+  const getAttributeNames = useMemo(() => {
+    const attributeNames = new Set();
+    
+    // Method 1: From product.attributes (primary source)
+    if (Array.isArray(product?.attributes) && product.attributes.length > 0) {
+      product.attributes.forEach(attr => {
+        if (attr && attr.name && attr.visible !== false && attr.variation !== false) {
+          attributeNames.add(attr.name);
+        }
+      });
     }
     
-    // If no attributes, extract from variations
-    if (product?.variations && product.variations.length > 0) {
-      const names = new Set();
+    // Method 2: From variations.attributes (fallback)
+    if (attributeNames.size === 0 && Array.isArray(product?.variations)) {
       product.variations.forEach(variation => {
-        if (variation.attributes && Array.isArray(variation.attributes)) {
+        if (Array.isArray(variation?.attributes)) {
           variation.attributes.forEach(attr => {
             if (attr && attr.name) {
-              names.add(attr.name);
+              attributeNames.add(attr.name);
             }
           });
         }
       });
-      const namesArray = Array.from(names);
-      console.log('ProductVariations - Attribute names extracted from variations:', namesArray);
-      return namesArray;
     }
     
-    console.log('ProductVariations - No attribute names found');
-    return [];
-  };
+    const namesArray = Array.from(attributeNames);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('ProductVariations - Attribute names:', namesArray);
+    }
+    return namesArray;
+  }, [product]);
 
   // Check if a variation is available (in stock)
   const isVariationAvailable = (variation) => {
     return variation.stock > 0 && variation.stockStatus === 'in_stock';
   };
 
-  // Debug logging
+  // Debug logging (only in development)
   useEffect(() => {
-    if (product) {
+    if (product && process.env.NODE_ENV === 'development') {
       console.log('ProductVariations - Product data:', {
         productType: product.productType,
         hasVariations: !!product.variations,
@@ -159,58 +288,67 @@ const ProductVariations = ({ product, onVariationSelect, selectedVariation }) =>
     }
   }, [product]);
 
-  // Check if product is variable - be more lenient with checks
-  const isVariableProduct = product?.productType === 'variable' || 
-                           (product?.variations && product.variations.length > 0) ||
-                           (product?.attributes && product.attributes.length > 0);
-
-  if (!product || !isVariableProduct) {
-    console.log('ProductVariations - Not rendering:', {
-      hasProduct: !!product,
-      isVariableProduct,
-      productType: product?.productType,
-      variationsCount: product?.variations?.length || 0
-    });
-    return null;
-  }
-
-  const attributeNames = getAttributeNames();
-
-  if (attributeNames.length === 0) {
-    // If no attributes but has variations, show a message or extract from variations
-    if (product.variations && product.variations.length > 0) {
-      console.log('ProductVariations - No attributes found, but variations exist. Variations:', product.variations);
-      
-      // Try to show variations directly if attributes can't be extracted
-      return (
-        <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p className="text-sm text-yellow-800 mb-2">
-            ⚠️ This product has {product.variations.length} variation(s), but attribute structure is missing.
-          </p>
-          <p className="text-xs text-yellow-600">
-            Please check the product data structure. Variations: {JSON.stringify(product.variations, null, 2)}
-          </p>
-        </div>
-      );
+  // ============================================
+  // RENDER CONDITIONS - FIXED (Less Strict)
+  // ============================================
+  
+  // ✅ FIRST CHECK: Do we have variations at all?
+  // This is the MOST IMPORTANT check - if no variations, nothing to show
+  if (!Array.isArray(product?.variations) || product.variations.length === 0) {
+    // Only log in development
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('ProductVariations: No variations array found', product);
     }
     return null;
   }
 
-  console.log('ProductVariations - Rendering with:', {
-    attributeNames,
-    variationsCount: product.variations?.length || 0,
-    selectedAttributes
-  });
+  // ✅ SECOND CHECK: Can we extract any attributes?
+  // Try to extract from both sources before giving up
+  const extractedAttributeNames = getAttributeNames;
+  
+  if (extractedAttributeNames.length === 0) {
+    // Variations exist but we can't extract attributes
+    // Show a helpful message instead of crashing
+    if (process.env.NODE_ENV === 'development') {
+      console.error('ProductVariations: Variations exist but no attributes found', {
+        variations: product.variations,
+        attributes: product.attributes
+      });
+    }
+    
+    return (
+      <div className="variation-error" style={{
+        padding: '15px',
+        background: '#fff3cd',
+        border: '1px solid #ffc107',
+        borderRadius: '6px',
+        color: '#856404',
+        marginTop: '15px'
+      }}>
+        <p style={{ margin: 0 }}>
+          ⚠️ This product has variations but the attribute data is not properly configured.
+          Please contact support or try another product.
+        </p>
+      </div>
+    );
+  }
+
+  // ✅ ALL CHECKS PASSED - Render the component!
+  // We have variations AND we can extract attributes
+  // ProductType doesn't matter - if data exists, we show it
 
   return (
-    <div className="mt-6 space-y-4">
-      <h3 className="text-[16px] font-[600] text-gray-800 mb-4">Select Options:</h3>
-      {attributeNames.map((attrName, index) => {
+    <div className="product-variations">
+      <h3 className="variations-title">Select Options</h3>
+      
+      {extractedAttributeNames.map((attrName, index) => {
         const values = getAttributeValues(attrName);
         const selectedValue = selectedAttributes[attrName];
         
         if (values.length === 0) {
-          console.warn(`ProductVariations - No values found for attribute: ${attrName}`);
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(`ProductVariations - No values found for attribute: ${attrName}`);
+          }
           return null;
         }
 
@@ -225,16 +363,17 @@ const ProductVariations = ({ product, onVariationSelect, selectedVariation }) =>
             <div className="flex flex-wrap gap-2">
               {values.map((value, valueIndex) => {
                 const isSelected = selectedValue === value;
-                const isAvailable = product.variations.some(v => {
-                  const attr = v.attributes?.find(a => a.name === attrName && a.value === value);
-                  return attr && isVariationAvailable(v);
-                });
+                const isAvailable = isValueAvailable(attrName, value);
 
                 return (
                   <button
                     key={valueIndex}
                     type="button"
-                    onClick={() => handleAttributeChange(attrName, value)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleAttributeChange(attrName, value);
+                    }}
                     disabled={!isAvailable}
                     className={`px-4 py-2 rounded-md text-[13px] font-[500] transition-all ${
                       isSelected
@@ -289,6 +428,26 @@ const ProductVariations = ({ product, onVariationSelect, selectedVariation }) =>
         );
       })}
 
+      {/* Clear selection button */}
+      {Object.keys(selectedAttributes).length > 0 && (
+        <button 
+          type="button"
+          className="mt-4 px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setSelectedAttributes({});
+            setCurrentVariation(null);
+            if (onVariationSelect) {
+              onVariationSelect(null);
+            }
+          }}
+          style={{ cursor: 'pointer' }}
+        >
+          Clear Selection
+        </button>
+      )}
+
       {/* Display current variation details */}
       {currentVariation && (
         <div className="mt-4 p-4 bg-gray-50 rounded-lg">
@@ -331,9 +490,15 @@ const ProductVariations = ({ product, onVariationSelect, selectedVariation }) =>
           </div>
         </div>
       )}
+
+      {/* Warning if selection incomplete */}
+      {Object.keys(selectedAttributes).length < extractedAttributeNames.length && (
+        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+          Please select all options to add to cart
+        </div>
+      )}
     </div>
   );
 };
 
 export default ProductVariations;
-

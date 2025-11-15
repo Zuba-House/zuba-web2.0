@@ -18,6 +18,7 @@ import {
 import { MyContext } from '../../../App';
 import { fetchDataFromApi, postData, uploadImages } from '../../../utils/api';
 import UploadBox from '../../../Components/UploadBox';
+import MediaLibrary from '../../../Components/MediaLibrary';
 import SimpleProduct from './SimpleProduct';
 import VariableProduct from './VariableProduct';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -28,6 +29,10 @@ const AddProductEnhanced = () => {
 
   // Product Type Selection
   const [productType, setProductType] = useState('simple');
+  
+  // Media Library State
+  const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false);
+  const [mediaLibraryType, setMediaLibraryType] = useState('product'); // 'product' or 'banner'
   
   // Basic Information
   const [formData, setFormData] = useState({
@@ -280,6 +285,44 @@ const AddProductEnhanced = () => {
       ...prev,
       bannerimages: newBannerPreviews
     }));
+  };
+
+  // Handle media library selection
+  const handleMediaSelect = (selectedMedia) => {
+    if (selectedMedia.length === 0) return;
+    
+    const urls = selectedMedia.map(item => item.secureUrl || item.url);
+    
+    if (mediaLibraryType === 'product') {
+      const imgArr = [...previews, ...urls];
+      setPreviews(imgArr);
+      
+      const imagesFormatted = imgArr.map((url, index) => ({
+        url: typeof url === 'string' ? url : url.url || url,
+        alt: '',
+        title: '',
+        position: index,
+        isFeatured: index === 0
+      }));
+      
+      setFormData(prev => ({
+        ...prev,
+        images: imagesFormatted,
+        featuredImage: imgArr[0] || ''
+      }));
+    } else {
+      const bannerArr = [...bannerPreviews, ...urls];
+      setBannerPreviews(bannerArr);
+      setFormData(prev => ({
+        ...prev,
+        bannerimages: bannerArr
+      }));
+    }
+  };
+
+  const openMediaLibrary = (type) => {
+    setMediaLibraryType(type);
+    setMediaLibraryOpen(true);
   };
 
   // Validate form
@@ -802,12 +845,22 @@ const AddProductEnhanced = () => {
                     ))}
                   </div>
                   
-                  <UploadBox 
-                    multiple={true} 
-                    name="images" 
-                    url="/api/product/uploadImages" 
-                    setPreviewsFun={setPreviewsFun} 
-                  />
+                  <div className="flex gap-2">
+                    <UploadBox 
+                      multiple={true} 
+                      name="images" 
+                      url="/api/product/uploadImages" 
+                      setPreviewsFun={setPreviewsFun} 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => openMediaLibrary('product')}
+                      className="px-4 py-2 rounded-lg font-semibold flex items-center gap-2"
+                      style={{ backgroundColor: '#efb291', color: '#0b2735' }}
+                    >
+                      <FaImage /> Choose from Library
+                    </button>
+                  </div>
                   
                   {errors.images && (
                     <p className="text-red-500 text-sm mt-2">{errors.images}</p>
@@ -843,12 +896,22 @@ const AddProductEnhanced = () => {
                     ))}
                   </div>
                   
-                  <UploadBox 
-                    multiple={true} 
-                    name="bannerimages" 
-                    url="/api/product/uploadBannerImages" 
-                    setPreviewsFun={setBannerImagesFun} 
-                  />
+                  <div className="flex gap-2">
+                    <UploadBox 
+                      multiple={true} 
+                      name="bannerimages" 
+                      url="/api/product/uploadBannerImages" 
+                      setPreviewsFun={setBannerImagesFun} 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => openMediaLibrary('banner')}
+                      className="px-4 py-2 rounded-lg font-semibold flex items-center gap-2"
+                      style={{ backgroundColor: '#efb291', color: '#0b2735' }}
+                    >
+                      <FaImage /> Choose from Library
+                    </button>
+                  </div>
                 </div>
 
                 {/* Banner Title */}
@@ -1051,6 +1114,14 @@ const AddProductEnhanced = () => {
           </div>
         </form>
       </div>
+
+      {/* Media Library Dialog */}
+      <MediaLibrary
+        open={mediaLibraryOpen}
+        onClose={() => setMediaLibraryOpen(false)}
+        onSelect={handleMediaSelect}
+        multiple={true}
+      />
     </div>
   );
 };
