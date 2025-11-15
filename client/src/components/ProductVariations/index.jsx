@@ -73,39 +73,70 @@ const ProductVariations = ({ product, onVariationSelect, selectedVariation }) =>
 
   // Get unique values for an attribute
   const getAttributeValues = (attributeName) => {
-    if (!product?.variations) return [];
+    if (!product?.variations || product.variations.length === 0) {
+      console.log('ProductVariations - No variations found for attribute:', attributeName);
+      return [];
+    }
     
     const values = new Set();
     product.variations.forEach(variation => {
-      const attr = variation.attributes?.find(a => a.name === attributeName);
-      if (attr) {
-        // Include all values, not just in-stock ones (for better UX)
-        values.add(attr.value);
+      if (variation.attributes && Array.isArray(variation.attributes)) {
+        const attr = variation.attributes.find(a => {
+          // Handle both object format {name, value} and string format
+          if (typeof a === 'object' && a.name === attributeName) {
+            return true;
+          }
+          return false;
+        });
+        
+        if (attr) {
+          // Extract value - could be attr.value, attr.label, or just attr
+          const value = attr.value || attr.label || attr;
+          if (value) {
+            values.add(value);
+          }
+        }
       }
     });
     
-    return Array.from(values);
+    const valuesArray = Array.from(values);
+    console.log(`ProductVariations - Values for ${attributeName}:`, valuesArray);
+    return valuesArray;
   };
 
   // Get all attribute names
   const getAttributeNames = () => {
-    if (!product?.attributes || product.attributes.length === 0) {
-      // Extract from variations if attributes not set
-      if (product?.variations && product.variations.length > 0) {
-        const names = new Set();
-        product.variations.forEach(variation => {
-          variation.attributes?.forEach(attr => {
-            names.add(attr.name);
-          });
-        });
-        return Array.from(names);
+    // First, try to get from product.attributes
+    if (product?.attributes && product.attributes.length > 0) {
+      const names = product.attributes
+        .filter(attr => attr.visible !== false && attr.variation !== false)
+        .map(attr => attr.name);
+      
+      if (names.length > 0) {
+        console.log('ProductVariations - Attribute names from product.attributes:', names);
+        return names;
       }
-      return [];
     }
     
-    return product.attributes
-      .filter(attr => attr.visible !== false && attr.variation !== false)
-      .map(attr => attr.name);
+    // If no attributes, extract from variations
+    if (product?.variations && product.variations.length > 0) {
+      const names = new Set();
+      product.variations.forEach(variation => {
+        if (variation.attributes && Array.isArray(variation.attributes)) {
+          variation.attributes.forEach(attr => {
+            if (attr && attr.name) {
+              names.add(attr.name);
+            }
+          });
+        }
+      });
+      const namesArray = Array.from(names);
+      console.log('ProductVariations - Attribute names extracted from variations:', namesArray);
+      return namesArray;
+    }
+    
+    console.log('ProductVariations - No attribute names found');
+    return [];
   };
 
   // Check if a variation is available (in stock)
@@ -113,21 +144,75 @@ const ProductVariations = ({ product, onVariationSelect, selectedVariation }) =>
     return variation.stock > 0 && variation.stockStatus === 'in_stock';
   };
 
-  if (!product || product.productType !== 'variable' || !product.variations || product.variations.length === 0) {
+  // Debug logging
+  useEffect(() => {
+    if (product) {
+      console.log('ProductVariations - Product data:', {
+        productType: product.productType,
+        hasVariations: !!product.variations,
+        variationsCount: product.variations?.length || 0,
+        hasAttributes: !!product.attributes,
+        attributesCount: product.attributes?.length || 0,
+        variations: product.variations,
+        attributes: product.attributes
+      });
+    }
+  }, [product]);
+
+  // Check if product is variable - be more lenient with checks
+  const isVariableProduct = product?.productType === 'variable' || 
+                           (product?.variations && product.variations.length > 0) ||
+                           (product?.attributes && product.attributes.length > 0);
+
+  if (!product || !isVariableProduct) {
+    console.log('ProductVariations - Not rendering:', {
+      hasProduct: !!product,
+      isVariableProduct,
+      productType: product?.productType,
+      variationsCount: product?.variations?.length || 0
+    });
     return null;
   }
 
   const attributeNames = getAttributeNames();
 
   if (attributeNames.length === 0) {
+    // If no attributes but has variations, show a message or extract from variations
+    if (product.variations && product.variations.length > 0) {
+      console.log('ProductVariations - No attributes found, but variations exist. Variations:', product.variations);
+      
+      // Try to show variations directly if attributes can't be extracted
+      return (
+        <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-sm text-yellow-800 mb-2">
+            ⚠️ This product has {product.variations.length} variation(s), but attribute structure is missing.
+          </p>
+          <p className="text-xs text-yellow-600">
+            Please check the product data structure. Variations: {JSON.stringify(product.variations, null, 2)}
+          </p>
+        </div>
+      );
+    }
     return null;
   }
 
+  console.log('ProductVariations - Rendering with:', {
+    attributeNames,
+    variationsCount: product.variations?.length || 0,
+    selectedAttributes
+  });
+
   return (
     <div className="mt-6 space-y-4">
+      <h3 className="text-[16px] font-[600] text-gray-800 mb-4">Select Options:</h3>
       {attributeNames.map((attrName, index) => {
         const values = getAttributeValues(attrName);
         const selectedValue = selectedAttributes[attrName];
+        
+        if (values.length === 0) {
+          console.warn(`ProductVariations - No values found for attribute: ${attrName}`);
+          return null;
+        }
 
         return (
           <div key={index} className="mb-4">

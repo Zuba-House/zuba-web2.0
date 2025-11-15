@@ -349,6 +349,10 @@ const AddProductEnhanced = () => {
         images: previews.map(url => typeof url === 'string' ? url : url.url || url),
         bannerimages: bannerPreviews.map(url => typeof url === 'string' ? url : url.url || url),
         
+        // Explicitly include variations and attributes for variable products
+        variations: formData.variations || [],
+        attributes: formData.attributes || [],
+        
         // Map new structure to legacy fields for backward compatibility
         price: formData.pricing?.salePrice || formData.pricing?.regularPrice || formData.oldPrice || 0,
         oldPrice: formData.pricing?.regularPrice || formData.oldPrice || 0,
@@ -381,6 +385,15 @@ const AddProductEnhanced = () => {
           slug: formData.seo?.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
         }
       };
+
+      // Debug logging
+      console.log('Submitting product data:', {
+        productType,
+        variationsCount: productData.variations?.length || 0,
+        attributesCount: productData.attributes?.length || 0,
+        variations: productData.variations,
+        attributes: productData.attributes
+      });
 
       const response = await postData('/api/product/create', productData);
       

@@ -35,7 +35,7 @@ const ProductAttributeSchema = new mongoose.Schema({
   attributeId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Attribute',
-    required: true
+    required: false // Made optional to support simple attribute structure
   },
   name: { 
     type: String, 
@@ -49,7 +49,7 @@ const ProductAttributeSchema = new mongoose.Schema({
     valueId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'AttributeValue',
-      required: true
+      required: false // Made optional to support simple attribute structure
     },
     label: { 
       type: String, 

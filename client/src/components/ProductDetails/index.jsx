@@ -222,13 +222,36 @@ export const ProductDetailsComponent = (props) => {
       </p>
 
       {/* Product Variations */}
-      {product?.productType === 'variable' && (
-        <ProductVariations 
-          product={product} 
-          onVariationSelect={setSelectedVariation}
-          selectedVariation={selectedVariation}
-        />
-      )}
+      {(() => {
+        // Debug: Log product data
+        if (product) {
+          console.log('ProductDetails - Product data check:', {
+            productType: product.productType,
+            hasVariations: !!product.variations,
+            variationsCount: product.variations?.length || 0,
+            hasAttributes: !!product.attributes,
+            attributesCount: product.attributes?.length || 0,
+            fullProduct: product
+          });
+        }
+
+        // Show variations if product is variable OR has variations/attributes
+        const shouldShowVariations = product?.productType === 'variable' || 
+                                    (product?.variations && product.variations.length > 0) ||
+                                    (product?.attributes && product.attributes.length > 0);
+
+        if (shouldShowVariations) {
+          return (
+            <ProductVariations 
+              product={product} 
+              onVariationSelect={setSelectedVariation}
+              selectedVariation={selectedVariation}
+            />
+          );
+        }
+        
+        return null;
+      })()}
 
       {/* Stock display - update based on selected variation */}
       <div className="flex items-center gap-4 mt-4">

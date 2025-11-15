@@ -35,8 +35,35 @@ export const ProductDetails = () => {
     setIsLoading(true);
     fetchDataFromApi(`/api/product/${id}`).then((res) => {
       if (res?.error === false) {
+        // Debug: Log raw product data from API
+        console.log('ProductDetails - Raw product from API:', {
+          id: res?.product?._id,
+          name: res?.product?.name,
+          productType: res?.product?.productType,
+          hasVariations: !!res?.product?.variations,
+          variationsCount: res?.product?.variations?.length || 0,
+          hasAttributes: !!res?.product?.attributes,
+          attributesCount: res?.product?.attributes?.length || 0,
+          variations: res?.product?.variations,
+          attributes: res?.product?.attributes
+        });
+
         // Normalize product data to handle both old and new formats
         const normalizedProduct = normalizeProduct(res?.product);
+        
+        // Debug: Log normalized product data
+        console.log('ProductDetails - Normalized product:', {
+          id: normalizedProduct?._id,
+          name: normalizedProduct?.name,
+          productType: normalizedProduct?.productType,
+          hasVariations: !!normalizedProduct?.variations,
+          variationsCount: normalizedProduct?.variations?.length || 0,
+          hasAttributes: !!normalizedProduct?.attributes,
+          attributesCount: normalizedProduct?.attributes?.length || 0,
+          variations: normalizedProduct?.variations,
+          attributes: normalizedProduct?.attributes
+        });
+        
         setProductData(normalizedProduct);
 
         fetchDataFromApi(`/api/product/getAllProductsBySubCatId/${res?.product?.subCatId}`).then((res) => {

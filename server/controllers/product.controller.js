@@ -335,8 +335,38 @@ export async function createProduct(request, response) {
             // Tags
             tags: request.body.tags || [],
             // Attributes and Variations (for variable products)
-            attributes: request.body.attributes || [],
-            variations: request.body.variations || [],
+            // Normalize attributes to ensure proper structure
+            attributes: (request.body.attributes || []).map(attr => ({
+                attributeId: attr.attributeId || null, // Optional
+                name: attr.name,
+                slug: attr.slug || attr.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                values: (attr.values || []).map(val => ({
+                    valueId: val.valueId || null, // Optional
+                    label: val.label || val,
+                    slug: val.slug || (val.label || val).toLowerCase().replace(/[^a-z0-9]+/g, '-')
+                })),
+                visible: attr.visible !== false,
+                variation: attr.variation !== false
+            })),
+            // Normalize variations to ensure proper structure
+            variations: (request.body.variations || []).map(variation => ({
+                ...variation,
+                // Ensure required fields have defaults
+                regularPrice: variation.regularPrice || variation.price || 0,
+                price: variation.price || variation.regularPrice || variation.salePrice || 0,
+                stock: variation.stock || 0,
+                stockStatus: variation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock'),
+                manageStock: variation.manageStock !== false,
+                isActive: variation.isActive !== false,
+                isDefault: variation.isDefault || false,
+                // Normalize variation attributes to ensure proper structure
+                attributes: (variation.attributes || []).map(attr => ({
+                    name: attr.name || attr,
+                    slug: attr.slug || (attr.name || attr).toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                    value: attr.value || attr.label || attr,
+                    valueSlug: attr.valueSlug || (attr.value || attr.label || attr).toLowerCase().replace(/[^a-z0-9]+/g, '-')
+                }))
+            })),
             // Legacy fields for backward compatibility
             price: pricingData.price,
             oldPrice: pricingData.regularPrice,
@@ -1097,7 +1127,10 @@ export async function deleteMultipleProduct(request, response) {
 //get single product 
 export async function getProduct(request, response) {
     try {
-        const product = await ProductModel.findById(request.params.id).populate("category");
+        // Fetch product with all fields including variations and attributes
+        // Variations and attributes are embedded documents, so they're automatically included
+        const product = await ProductModel.findById(request.params.id)
+            .populate("category");
 
         if (!product) {
             return response.status(404).json({
@@ -1107,13 +1140,27 @@ export async function getProduct(request, response) {
             })
         }
 
+        // Convert to plain object to ensure all fields are serialized
+        const productObj = product.toObject ? product.toObject() : product;
+
+        // Debug logging
+        console.log('getProduct - Returning product:', {
+            id: productObj._id,
+            name: productObj.name,
+            productType: productObj.productType,
+            variationsCount: productObj.variations?.length || 0,
+            attributesCount: productObj.attributes?.length || 0,
+            hasVariations: !!productObj.variations && productObj.variations.length > 0
+        });
+
         return response.status(200).json({
             error: false,
             success: true,
-            product: product
+            product: productObj
         })
 
     } catch (error) {
+        console.error('getProduct error:', error);
         return response.status(500).json({
             message: error.message || error,
             error: true,
