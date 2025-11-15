@@ -15,7 +15,7 @@ import { IoMdLogOut } from "react-icons/io";
 import { MyContext } from "../../App";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { fetchDataFromApi } from "../../utils/api";
-import AddProduct from "../../Pages/Products/addProduct";
+import AddProductEnhanced from "../../Pages/Products/AddProductEnhanced";
 import AddHomeSlide from "../../Pages/HomeSliderBanners/addHomeSlide";
 import AddCategory from "../../Pages/Categegory/addCategory";
 import AddSubCategory from "../../Pages/Categegory/addSubCategory";
@@ -30,7 +30,7 @@ import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { IoMdClose } from "react-icons/io";
 import Slide from '@mui/material/Slide';
-import EditProduct from "../../Pages/Products/editProduct";
+import EditProductEnhanced from "../../Pages/Products/EditProductEnhanced";
 import { AddBannerV1 } from "../../Pages/Banners/addBannerV1";
 import { EditBannerV1 } from "../../Pages/Banners/editBannerV1";
 import { BannerList2_AddBanner } from "../../Pages/Banners/bannerList2_AddBanner";
@@ -297,7 +297,7 @@ const Header = () => {
 
 
         {
-          context?.isOpenFullScreenPanel?.model === "Add Product" && <AddProduct />
+          context?.isOpenFullScreenPanel?.model === "Add Product" && <AddProductEnhanced />
         }
 
 
@@ -327,7 +327,7 @@ const Header = () => {
 
 
         {
-          context?.isOpenFullScreenPanel?.model === "Edit Product" && <EditProduct />
+          context?.isOpenFullScreenPanel?.model === "Edit Product" && <EditProductEnhanced />
         }
 
 

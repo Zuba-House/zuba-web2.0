@@ -1,5 +1,5 @@
 import OrderModel from "../models/order.model.js";
-import ProductModel from '../models/product.modal.js';
+import ProductModel from '../models/product.model.js';
 import UserModel from '../models/user.model.js';
 import paypal from "@paypal/checkout-server-sdk";
 import OrderConfirmationEmail from "../utils/orderEmailTemplate.js";

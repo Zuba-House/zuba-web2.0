@@ -1,6 +1,6 @@
 import ProductVariationModel from "../models/productVariation.model.js";
 import AttributeValueModel from "../models/attributeValue.model.js";
-import ProductModel from "../models/product.modal.js";
+import ProductModel from "../models/product.model.js";
 
 // ============ VARIATIONS CRUD ============
 

@@ -45,8 +45,26 @@ const ProductDetails = () => {
     useEffect(() => {
         fetchDataFromApi(`/api/product/${id}`).then((res) => {
             if (res?.error === false) {
+                // Normalize images - handle both string and object formats
+                const normalizeImages = (images) => {
+                    if (!images || images.length === 0) return [];
+                    // If array of strings, return as is
+                    if (typeof images[0] === 'string') return images;
+                    // If array of objects, extract URLs
+                    return images.map(img => {
+                        if (typeof img === 'string') return img;
+                        if (typeof img === 'object' && img.url) return img.url;
+                        return null;
+                    }).filter(img => img !== null);
+                };
+
+                const normalizedProduct = {
+                    ...res?.product,
+                    images: normalizeImages(res?.product?.images)
+                };
+
                 setTimeout(() => {
-                    setProduct(res?.product)
+                    setProduct(normalizedProduct)
                 }, 500);
             }
         })
@@ -83,16 +101,22 @@ const ProductDetails = () => {
                                             >
                                                 {
                                                     product?.images?.map((item, index) => {
+                                                        // Handle both string and object formats
+                                                        const imageUrl = typeof item === 'string' ? item : (item?.url || item);
+                                                        if (!imageUrl) return null;
+                                                        
                                                         return (
                                                             <SwiperSlide key={index}>
                                                                 <div className={`item rounded-md overflow-hidden cursor-pointer group ${slideIndex === index ? 'opacity-1' : 'opacity-30'}`} onClick={() => goto(index)}>
                                                                     <img
-                                                                        src={item} className="w-full transition-all group-hover:scale-105"
+                                                                        src={imageUrl} 
+                                                                        alt={`Product image ${index + 1}`}
+                                                                        className="w-full transition-all group-hover:scale-105"
                                                                     />
                                                                 </div>
                                                             </SwiperSlide>
                                                         )
-                                                    })
+                                                    }).filter(Boolean)
                                                 }
 
                                             </Swiper>
@@ -107,18 +131,21 @@ const ProductDetails = () => {
                                             >
                                                 {
                                                     product?.images?.map((item, index) => {
+                                                        // Handle both string and object formats
+                                                        const imageUrl = typeof item === 'string' ? item : (item?.url || item);
+                                                        if (!imageUrl) return null;
+                                                        
                                                         return (
                                                             <SwiperSlide key={index}>
                                                                 <InnerImageZoom
                                                                     zoomType="hover"
                                                                     zoomScale={1}
-                                                                    src={
-                                                                        item
-                                                                    }
+                                                                    src={imageUrl}
+                                                                    alt={`Product image ${index + 1}`}
                                                                 />
                                                             </SwiperSlide>
                                                         )
-                                                    })
+                                                    }).filter(Boolean)
                                                 }
 
 

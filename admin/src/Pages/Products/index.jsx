@@ -186,8 +186,22 @@ export const Products = () => {
             let arr = [];
 
             for (let i = 0; i < res?.products?.length; i++) {
+                // Normalize image - handle both string and object formats
+                const firstImage = res?.products[i]?.images?.[0];
+                let imageUrl = '';
+                if (firstImage) {
+                    if (typeof firstImage === 'string') {
+                        imageUrl = firstImage;
+                    } else if (typeof firstImage === 'object' && firstImage.url) {
+                        imageUrl = firstImage.url;
+                    }
+                }
+                if (!imageUrl) {
+                    imageUrl = res?.products[i]?.featuredImage || '';
+                }
+                
                 arr.push({
-                    src: res?.products[i]?.images[0]
+                    src: imageUrl
                 })
             }
 
@@ -521,7 +535,14 @@ export const Products = () => {
                                                         <LazyLoadImage
                                                             alt={"image"}
                                                             effect="blur"
-                                                            src={product?.images[0]}
+                                                            src={(() => {
+                                                                // Normalize image - handle both string and object formats
+                                                                const firstImage = product?.images?.[0];
+                                                                if (!firstImage) return product?.featuredImage || '';
+                                                                if (typeof firstImage === 'string') return firstImage;
+                                                                if (typeof firstImage === 'object' && firstImage.url) return firstImage.url;
+                                                                return '';
+                                                            })()}
                                                             className="w-full group-hover:scale-105 transition-all"
                                                         />
                                                     </div>
@@ -545,14 +566,32 @@ export const Products = () => {
                                             </TableCell>
 
                                             <TableCell style={{ minWidth: columns.minWidth }}>
-                                                <div className="flex gap-1 flex-col">
-                                                    <span className="oldPrice line-through leading-3 text-gray-500 text-[14px] font-[500]">
-                                                        {product?.price?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-                                                    </span>
-                                                    <span className="price text-primary text-[14px]  font-[600]">
-                                                        {product?.oldPrice?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-                                                    </span>
-                                                </div>
+                                                {(() => {
+                                                    // Normalize pricing - determine sale price and regular price
+                                                    const salePrice = product?.pricing?.salePrice || (product?.price && product?.oldPrice && product?.price < product?.oldPrice ? product?.price : null);
+                                                    const regularPrice = product?.pricing?.regularPrice || product?.oldPrice || product?.price;
+                                                    
+                                                    if (salePrice && salePrice < regularPrice) {
+                                                        // Product is on sale - show regular price crossed out, sale price as current
+                                                        return (
+                                                            <div className="flex gap-1 flex-col">
+                                                                <span className="oldPrice line-through leading-3 text-gray-500 text-[14px] font-[500]">
+                                                                    {regularPrice?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                                                                </span>
+                                                                <span className="price text-primary text-[14px] font-[600]">
+                                                                    {salePrice?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    } else {
+                                                        // No sale - show regular price only
+                                                        return (
+                                                            <span className="price text-primary text-[14px] font-[600]">
+                                                                {regularPrice?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                                                            </span>
+                                                        );
+                                                    }
+                                                })()}
                                             </TableCell>
 
                                             <TableCell style={{ minWidth: columns.minWidth }}>

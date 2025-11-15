@@ -220,77 +220,13 @@ const Sidebar = () => {
                   </Link>
                 </li>
                 <li className="w-full">
-                  <Link to="/add-product-v2" onClick={() => {
+                  <Link to="/add-product-enhanced" onClick={() => {
                     context?.windowWidth < 992 && context?.setisSidebarOpen(false)
                     setSubmenuIndex(null)
                   }}>
                     <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
                       <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
-                      Product Upload
-                    </Button>
-                  </Link>
-                </li>
-
-
-                <li className="w-full">
-                  <Link to="/product/addRams" onClick={() => {
-                    context?.windowWidth < 992 && context?.setisSidebarOpen(false)
-                    setSubmenuIndex(null)
-                  }}>
-                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
-                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
-                      Add Product RAMS
-                    </Button>
-                  </Link>
-                </li>
-
-                <li className="w-full">
-                  <Link to="/product/addWeight"
-                    onClick={() => {
-                      context?.windowWidth < 992 && context?.setisSidebarOpen(false)
-                      setSubmenuIndex(null)
-                    }}
-                  >
-                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
-                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
-                      Add Product WEIGHT
-                    </Button>
-                  </Link>
-                </li>
-
-                <li className="w-full">
-                  <Link to="/product/addSize"
-                    onClick={() => {
-                      context?.windowWidth < 992 && context?.setisSidebarOpen(false)
-                      setSubmenuIndex(null)
-                    }}
-                  >
-                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
-                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
-                      Add Product SIZE
-                    </Button>
-                  </Link>
-                </li>
-                <li className="w-full">
-                  <Link to="/add-product-v2" onClick={() => {
-                    context?.windowWidth < 992 && context?.setisSidebarOpen(false)
-                    setSubmenuIndex(null)
-                  }}>
-                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
-                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
-                      Add Product (New)
-                    </Button>
-                  </Link>
-                </li>
-
-                <li className="w-full">
-                  <Link to="/attributes" onClick={() => {
-                    context?.windowWidth < 992 && context?.setisSidebarOpen(false)
-                    setSubmenuIndex(null)
-                  }}>
-                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
-                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
-                      Attributes Manager
+                      Add Product (Enhanced)
                     </Button>
                   </Link>
                 </li>

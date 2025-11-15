@@ -1,4 +1,4 @@
-import ProductModel from '../models/product.modal.js';
+import ProductModel from '../models/product.model.js';
 import ProductRAMSModel from '../models/productRAMS.js';
 import ProductWEIGHTModel from '../models/productWEIGHT.js';
 import ProductSIZEModel from '../models/productSIZE.js';
@@ -24,29 +24,61 @@ export async function uploadImages(request, response) {
 
         const image = request.files;
 
+        if (!image || image.length === 0) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: "No images provided"
+            });
+        }
+
         const options = {
             use_filename: true,
             unique_filename: false,
             overwrite: false,
         };
 
-        for (let i = 0; i < image?.length; i++) {
-
-            const img = await cloudinary.uploader.upload(
-                image[i].path,
-                options,
-                function (error, result) {
-                    imagesArr.push(result.secure_url);
-                    fs.unlinkSync(`uploads/${request.files[i].filename}`);
-                }
+        // Use Promise.all to wait for all uploads to complete
+        const uploadPromises = [];
+        for (let i = 0; i < image.length; i++) {
+            uploadPromises.push(
+                cloudinary.uploader.upload(image[i].path, options)
+                    .then((result) => {
+                        // Delete the temporary file
+                        try {
+                            fs.unlinkSync(`uploads/${image[i].filename}`);
+                        } catch (unlinkError) {
+                            console.error('Error deleting temp file:', unlinkError);
+                        }
+                        return result.secure_url;
+                    })
+                    .catch((error) => {
+                        console.error('Cloudinary upload error:', error);
+                        // Delete temp file even on error
+                        try {
+                            fs.unlinkSync(`uploads/${image[i].filename}`);
+                        } catch (unlinkError) {
+                            console.error('Error deleting temp file:', unlinkError);
+                        }
+                        throw error;
+                    })
             );
         }
 
+        // Wait for all uploads to complete
+        const uploadedUrls = await Promise.all(uploadPromises);
+        imagesArr = uploadedUrls;
+
         return response.status(200).json({
-            images: imagesArr
+            error: false,
+            success: true,
+            data: {
+                images: imagesArr
+            }
         });
 
     } catch (error) {
+        console.error('Upload images error:', error);
         return response.status(500).json({
             message: error.message || error,
             error: true,
@@ -62,29 +94,61 @@ export async function uploadBannerImages(request, response) {
 
         const image = request.files;
 
+        if (!image || image.length === 0) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: "No images provided"
+            });
+        }
+
         const options = {
             use_filename: true,
             unique_filename: false,
             overwrite: false,
         };
 
-        for (let i = 0; i < image?.length; i++) {
-
-            const img = await cloudinary.uploader.upload(
-                image[i].path,
-                options,
-                function (error, result) {
-                    bannerImage.push(result.secure_url);
-                    fs.unlinkSync(`uploads/${request.files[i].filename}`);
-                }
+        // Use Promise.all to wait for all uploads to complete
+        const uploadPromises = [];
+        for (let i = 0; i < image.length; i++) {
+            uploadPromises.push(
+                cloudinary.uploader.upload(image[i].path, options)
+                    .then((result) => {
+                        // Delete the temporary file
+                        try {
+                            fs.unlinkSync(`uploads/${image[i].filename}`);
+                        } catch (unlinkError) {
+                            console.error('Error deleting temp file:', unlinkError);
+                        }
+                        return result.secure_url;
+                    })
+                    .catch((error) => {
+                        console.error('Cloudinary upload error:', error);
+                        // Delete temp file even on error
+                        try {
+                            fs.unlinkSync(`uploads/${image[i].filename}`);
+                        } catch (unlinkError) {
+                            console.error('Error deleting temp file:', unlinkError);
+                        }
+                        throw error;
+                    })
             );
         }
 
+        // Wait for all uploads to complete
+        const uploadedUrls = await Promise.all(uploadPromises);
+        bannerImage = uploadedUrls;
+
         return response.status(200).json({
-            images: bannerImage
+            error: false,
+            success: true,
+            data: {
+                images: bannerImage
+            }
         });
 
     } catch (error) {
+        console.error('Upload banner images error:', error);
         return response.status(500).json({
             message: error.message || error,
             error: true,
@@ -97,37 +161,209 @@ export async function uploadBannerImages(request, response) {
 //create product
 export async function createProduct(request, response) {
     try {
+        // Get images from request body (form) or from global imagesArr (upload endpoint)
+        let productImages = [];
+        
+        // Check request body first (from form submission)
+        if (request.body.images) {
+            if (Array.isArray(request.body.images) && request.body.images.length > 0) {
+                productImages = request.body.images;
+            } else if (typeof request.body.images === 'string') {
+                // Handle case where images might be a JSON string
+                try {
+                    const parsed = JSON.parse(request.body.images);
+                    if (Array.isArray(parsed)) {
+                        productImages = parsed;
+                    }
+                } catch (e) {
+                    // Not JSON, treat as single URL
+                    productImages = [request.body.images];
+                }
+            }
+        }
+        
+        // Fallback to global imagesArr if no images in request body
+        if (productImages.length === 0 && imagesArr && imagesArr.length > 0) {
+            productImages = imagesArr;
+        }
+        
+        // Transform images array to new format
+        const imagesFormatted = productImages
+            .filter(img => img && (typeof img === 'string' || (typeof img === 'object' && img.url))) // Filter out invalid entries
+            .map((img, index) => {
+                // If already an object, use it
+                if (typeof img === 'object' && img.url) {
+                    return {
+                        url: img.url,
+                        alt: img.alt || '',
+                        title: img.title || '',
+                        position: img.position !== undefined ? img.position : index,
+                        isFeatured: img.isFeatured !== undefined ? img.isFeatured : index === 0
+                    };
+                }
+                // If string URL, convert to object
+                return {
+                    url: typeof img === 'string' ? img : '',
+                    alt: '',
+                    title: '',
+                    position: index,
+                    isFeatured: index === 0
+                };
+            });
 
-        let product = new ProductModel({
+        // Get banner images
+        let bannerImages = [];
+        if (request.body.bannerimages && Array.isArray(request.body.bannerimages) && request.body.bannerimages.length > 0) {
+            bannerImages = request.body.bannerimages;
+        } else if (bannerImage && bannerImage.length > 0) {
+            bannerImages = bannerImage;
+        }
+
+        // Handle pricing - support both new structure and legacy
+        let pricingData = {};
+        if (request.body.pricing && typeof request.body.pricing === 'object') {
+            pricingData = {
+                regularPrice: request.body.pricing.regularPrice || request.body.oldPrice || request.body.price || 0,
+                salePrice: request.body.pricing.salePrice || null,
+                price: request.body.pricing.salePrice || request.body.pricing.regularPrice || request.body.price || request.body.oldPrice || 0,
+                currency: request.body.pricing.currency || request.body.currency || 'USD',
+                onSale: request.body.pricing.onSale || (request.body.pricing.salePrice && request.body.pricing.salePrice < request.body.pricing.regularPrice),
+                taxStatus: request.body.pricing.taxStatus || 'taxable',
+                taxClass: request.body.pricing.taxClass || 'standard'
+            };
+        } else {
+            pricingData = {
+                regularPrice: request.body.oldPrice || request.body.price || 0,
+                salePrice: request.body.oldPrice && request.body.price && request.body.price < request.body.oldPrice ? request.body.price : null,
+                price: request.body.price || request.body.oldPrice || 0,
+                currency: request.body.currency || 'USD',
+                onSale: request.body.oldPrice && request.body.price && request.body.price < request.body.oldPrice,
+                taxStatus: 'taxable',
+                taxClass: 'standard'
+            };
+        }
+
+        // Handle inventory - support both new structure and legacy
+        let inventoryData = {};
+        if (request.body.inventory && typeof request.body.inventory === 'object') {
+            inventoryData = {
+                stock: request.body.inventory.stock || request.body.countInStock || 0,
+                stockStatus: request.body.inventory.stockStatus || ((request.body.inventory.stock || request.body.countInStock || 0) > 0 ? 'in_stock' : 'out_of_stock'),
+                manageStock: request.body.inventory.manageStock !== false,
+                allowBackorders: request.body.inventory.allowBackorders || 'no',
+                lowStockThreshold: request.body.inventory.lowStockThreshold || 5,
+                soldIndividually: request.body.inventory.soldIndividually || false
+            };
+        } else {
+            inventoryData = {
+                stock: request.body.countInStock || 0,
+                stockStatus: (request.body.countInStock || 0) > 0 ? 'in_stock' : 'out_of_stock',
+                manageStock: true,
+                allowBackorders: 'no',
+                lowStockThreshold: 5,
+                soldIndividually: false
+            };
+        }
+
+        // Handle shipping
+        let shippingData = {};
+        if (request.body.shipping && typeof request.body.shipping === 'object') {
+            shippingData = {
+                weight: request.body.shipping.weight || null,
+                weightUnit: request.body.shipping.weightUnit || 'kg',
+                dimensions: request.body.shipping.dimensions || {
+                    length: null,
+                    width: null,
+                    height: null,
+                    unit: 'cm'
+                },
+                shippingClass: request.body.shipping.shippingClass || 'standard',
+                freeShipping: request.body.shipping.freeShipping || false
+            };
+        }
+
+        // Handle SEO - support both new structure and legacy
+        let seoData = {};
+        if (request.body.seo && typeof request.body.seo === 'object') {
+            seoData = {
+                metaTitle: request.body.seo.metaTitle || request.body.name || '',
+                metaDescription: request.body.seo.metaDescription || request.body.description?.substring(0, 160) || '',
+                metaKeywords: request.body.seo.metaKeywords || [],
+                slug: request.body.seo.slug || null
+            };
+        } else {
+            seoData = {
+                metaTitle: request.body.metaTitle || request.body.name || '',
+                metaDescription: request.body.metaDescription || request.body.description?.substring(0, 160) || '',
+                metaKeywords: request.body.metaKeywords || [],
+                slug: request.body.slug || null
+            };
+        }
+
+        // Build product data with backward compatibility
+        const productData = {
             name: request.body.name,
             description: request.body.description,
-            images: imagesArr,
-            bannerimages: bannerImage,
-            bannerTitleName: request.body.bannerTitleName,
-            isDisplayOnHomeBanner: request.body.isDisplayOnHomeBanner,
-            brand: request.body.brand,
-            price: request.body.price,
-            oldPrice: request.body.oldPrice,
-            catName: request.body.catName,
-            category: request.body.category,
-            catId: request.body.catId,
-            subCatId: request.body.subCatId,
-            subCat: request.body.subCat,
-            thirdsubCat: request.body.thirdsubCat,
-            thirdsubCatId: request.body.thirdsubCatId,
-            countInStock: request.body.countInStock,
-            rating: request.body.rating,
-            isFeatured: request.body.isFeatured,
-            discount: request.body.discount,
-            productRam: request.body.productRam,
-            size: request.body.size,
-            productWeight: request.body.productWeight,
+            shortDescription: request.body.shortDescription || '',
+            brand: request.body.brand || '',
+            category: request.body.category || request.body.catId,
+            catName: request.body.catName || '',
+            catId: request.body.catId || '',
+            subCatId: request.body.subCatId || '',
+            subCat: request.body.subCat || '',
+            thirdsubCat: request.body.thirdsubCat || '',
+            thirdsubCatId: request.body.thirdsubCatId || '',
+            isFeatured: request.body.isFeatured || false,
+            bannerimages: bannerImages,
+            bannerTitleName: request.body.bannerTitleName || '',
+            isDisplayOnHomeBanner: request.body.isDisplayOnHomeBanner || false,
+            productRam: request.body.productRam || [],
+            size: request.body.size || [],
+            productWeight: request.body.productWeight || [],
+            // New structure
+            productType: request.body.productType || 'simple',
+            status: request.body.status || 'draft',
+            visibility: request.body.visibility || 'visible',
+            // Images in new format
+            images: imagesFormatted,
+            // Pricing (new structure)
+            pricing: pricingData,
+            // Inventory (new structure)
+            inventory: inventoryData,
+            // Shipping (new structure)
+            shipping: Object.keys(shippingData).length > 0 ? shippingData : undefined,
+            // Tags
+            tags: request.body.tags || [],
+            // Attributes and Variations (for variable products)
+            attributes: request.body.attributes || [],
+            variations: request.body.variations || [],
+            // Legacy fields for backward compatibility
+            price: pricingData.price,
+            oldPrice: pricingData.regularPrice,
+            countInStock: inventoryData.stock,
+            rating: request.body.rating || 0,
+            discount: request.body.discount || null,
+            currency: pricingData.currency,
+            // SEO
+            seo: seoData,
+            // SKU
+            sku: request.body.sku || null,
+            barcode: request.body.barcode || null
+        };
 
-        });
+        // Validate that we have at least one image
+        if (imagesFormatted.length === 0) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: "At least one product image is required"
+            });
+        }
 
+        let product = new ProductModel(productData);
         product = await product.save();
 
-        console.log(product)
+        console.log('Product created with images:', product.images?.length || 0, 'images');
 
         if (!product) {
             response.status(500).json({
@@ -916,34 +1152,90 @@ export async function removeImageFromCloudinary(request, response) {
 //updated product 
 export async function updateProduct(request, response) {
     try {
+        // Handle images - transform to new format if needed
+        let imagesFormatted = [];
+        if (request.body.images && Array.isArray(request.body.images) && request.body.images.length > 0) {
+            // Filter out any null/undefined/empty entries
+            const validImages = request.body.images.filter(img => img != null && img !== '');
+            
+            imagesFormatted = validImages.map((img, index) => {
+                // If already an object, use it
+                if (typeof img === 'object' && img.url) {
+                    return {
+                        url: img.url,
+                        alt: img.alt || '',
+                        title: img.title || '',
+                        position: img.position !== undefined ? img.position : index,
+                        isFeatured: img.isFeatured !== undefined ? img.isFeatured : index === 0
+                    };
+                }
+                // If string URL, convert to object
+                return {
+                    url: typeof img === 'string' ? img : '',
+                    alt: '',
+                    title: '',
+                    position: index,
+                    isFeatured: index === 0
+                };
+            }).filter(img => img.url && img.url !== ''); // Filter out any with empty URLs
+        }
+
+        // Build update data
+        const updateData = {
+            name: request.body.name,
+            subCat: request.body.subCat,
+            description: request.body.description,
+            bannerimages: request.body.bannerimages || [],
+            bannerTitleName: request.body.bannerTitleName || '',
+            isDisplayOnHomeBanner: request.body.isDisplayOnHomeBanner || false,
+            images: imagesFormatted.length > 0 ? imagesFormatted : undefined,
+            brand: request.body.brand,
+            price: request.body.price,
+            oldPrice: request.body.oldPrice,
+            catId: request.body.catId,
+            catName: request.body.catName,
+            subCatId: request.body.subCatId,
+            category: request.body.category,
+            thirdsubCat: request.body.thirdsubCat,
+            thirdsubCatId: request.body.thirdsubCatId,
+            countInStock: request.body.countInStock,
+            rating: request.body.rating,
+            isFeatured: request.body.isFeatured,
+            productRam: request.body.productRam || [],
+            size: request.body.size || [],
+            productWeight: request.body.productWeight || [],
+        };
+
+        // Remove undefined fields
+        Object.keys(updateData).forEach(key => {
+            if (updateData[key] === undefined) {
+                delete updateData[key];
+            }
+        });
+
+        // Update pricing if price fields are provided
+        if (request.body.price !== undefined || request.body.oldPrice !== undefined) {
+            updateData.pricing = {
+                regularPrice: request.body.oldPrice || request.body.price || 0,
+                salePrice: request.body.oldPrice && request.body.price < request.body.oldPrice ? request.body.price : null,
+                price: request.body.price || request.body.oldPrice || 0,
+                currency: request.body.currency || 'USD',
+                onSale: request.body.oldPrice && request.body.price < request.body.oldPrice
+            };
+        }
+
+        // Update inventory if stock is provided
+        if (request.body.countInStock !== undefined) {
+            updateData.inventory = {
+                stock: request.body.countInStock || 0,
+                stockStatus: (request.body.countInStock || 0) > 0 ? 'in_stock' : 'out_of_stock',
+                manageStock: true
+            };
+        }
+
         const product = await ProductModel.findByIdAndUpdate(
             request.params.id,
-            {
-                name: request.body.name,
-                subCat: request.body.subCat,
-                description: request.body.description,
-                bannerimages: request.body.bannerimages,
-                bannerTitleName: request.body.bannerTitleName,
-                isDisplayOnHomeBanner: request.body.isDisplayOnHomeBanner,
-                images: request.body.images,
-                bannerTitleName: request.body.bannerTitleName,
-                brand: request.body.brand,
-                price: request.body.price,
-                oldPrice: request.body.oldPrice,
-                catId: request.body.catId,
-                catName: request.body.catName,
-                subCat: request.body.subCat,
-                subCatId: request.body.subCatId,
-                category: request.body.category,
-                thirdsubCat: request.body.thirdsubCat,
-                thirdsubCatId: request.body.thirdsubCatId,
-                countInStock: request.body.countInStock,
-                rating: request.body.rating,
-                isFeatured: request.body.isFeatured,
-                productRam: request.body.productRam,
-                size: request.body.size,
-                productWeight: request.body.productWeight,
-            },
+            updateData,
             { new: true }
         );
 

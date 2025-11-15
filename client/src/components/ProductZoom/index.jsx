@@ -36,16 +36,21 @@ export const ProductZoom = (props) => {
           >
             {
               props?.images?.map((item, index) => {
+                // Handle both string and object formats
+                const imageUrl = typeof item === 'string' ? item : (item?.url || item);
+                if (!imageUrl) return null;
+                
                 return (
                   <SwiperSlide key={index}>
                     <div className={`item rounded-md overflow-hidden cursor-pointer group h-[100%] ${slideIndex === index ? 'opacity-1' : 'opacity-30'}`} onClick={() => goto(index)}>
                       <img
-                        src={item}
+                        src={imageUrl}
+                        alt={`Product image ${index + 1}`}
                       />
                     </div>
                   </SwiperSlide>
                 )
-              })
+              }).filter(Boolean)
             }
 
           </Swiper>
@@ -60,16 +65,21 @@ export const ProductZoom = (props) => {
           >
             {
               props?.images?.map((item, index) => {
+                // Handle both string and object formats
+                const imageUrl = typeof item === 'string' ? item : (item?.url || item);
+                if (!imageUrl) return null;
+                
                 return (
                   <SwiperSlide key={index}>
                     <InnerImageZoom
                       zoomType="hover"
                       zoomScale={1}
-                      src={item}
+                      src={imageUrl}
+                      alt={`Product image ${index + 1}`}
                     />
                   </SwiperSlide>
                 )
-              })
+              }).filter(Boolean)
             }
 
 

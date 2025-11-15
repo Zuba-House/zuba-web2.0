@@ -8,6 +8,7 @@ import { ProductDetailsComponent } from "../../components/ProductDetails";
 import { fetchDataFromApi } from "../../utils/api";
 import CircularProgress from '@mui/material/CircularProgress';
 import { Reviews } from "./reviews";
+import { normalizeProduct } from "../../utils/productNormalizer";
 
 export const ProductDetails = () => {
 
@@ -34,7 +35,9 @@ export const ProductDetails = () => {
     setIsLoading(true);
     fetchDataFromApi(`/api/product/${id}`).then((res) => {
       if (res?.error === false) {
-        setProductData(res?.product);
+        // Normalize product data to handle both old and new formats
+        const normalizedProduct = normalizeProduct(res?.product);
+        setProductData(normalizedProduct);
 
         fetchDataFromApi(`/api/product/getAllProductsBySubCatId/${res?.product?.subCatId}`).then((res) => {
           if (res?.error === false) {

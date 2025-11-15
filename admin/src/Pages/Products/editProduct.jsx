@@ -131,8 +131,24 @@ const EditProduct = () => {
             setProductWeight(res?.product?.productWeight);
             setCheckedSwitch(res?.product?.isDisplayOnHomeBanner)
 
-            setPreviews(res?.product?.images);
-            setBannerPreviews(res?.product?.bannerimages);
+            // Normalize images - handle both string array and object array formats
+            const normalizeImages = (images) => {
+                if (!images || images.length === 0) return [];
+                // If array of strings, return as is
+                if (typeof images[0] === 'string') return images;
+                // If array of objects, extract URLs
+                return images.map(img => (typeof img === 'object' && img.url) ? img.url : img).filter(img => img);
+            };
+
+            const normalizedImages = normalizeImages(res?.product?.images);
+            const normalizedBannerImages = normalizeImages(res?.product?.bannerimages);
+            
+            setPreviews(normalizedImages);
+            setBannerPreviews(normalizedBannerImages);
+            
+            // Also update formFields with normalized images
+            formFields.images = normalizedImages;
+            formFields.bannerimages = normalizedBannerImages;
 
 
         })
@@ -367,13 +383,18 @@ const EditProduct = () => {
         }
 
 
+        // Ensure images are set from previews state before submission
+        formFields.images = previews;
+        formFields.bannerimages = bannerPreviews;
+
         setIsLoading(true);
 
         editData(`/api/product/updateProduct/${context?.isOpenFullScreenPanel?.id}`, formFields).then((res) => {
 
             console.log(res)
-            if (res?.data?.error === false) {
-                context.alertBox("success", res?.data?.message);
+            // editData returns res.data directly, so check res.error not res.data.error
+            if (res?.error === false) {
+                context.alertBox("success", res?.message);
                 setTimeout(() => {
                     setIsLoading(false);
                     context.setIsOpenFullScreenPanel({
@@ -383,8 +404,12 @@ const EditProduct = () => {
                 }, 1000);
             } else {
                 setIsLoading(false);
-                context.alertBox("error", res?.data?.message);
+                context.alertBox("error", res?.message || "Failed to update product");
             }
+        }).catch((error) => {
+            setIsLoading(false);
+            console.error('Update error:', error);
+            context.alertBox("error", error?.response?.data?.message || "Failed to update product");
         })
     }
 

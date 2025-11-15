@@ -1,6 +1,104 @@
 import axios from "axios";
 const apiUrl = import.meta.env.VITE_API_URL;
 
+// Flag to prevent multiple simultaneous refresh attempts
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+    failedQueue.forEach(prom => {
+        if (error) {
+            prom.reject(error);
+        } else {
+            prom.resolve(token);
+        }
+    });
+    
+    failedQueue = [];
+};
+
+// Axios interceptor to handle token refresh
+axios.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const originalRequest = error.config;
+
+        // If error is 401 and message is "Token expired", try to refresh
+        if (error.response?.status === 401 && 
+            (error.response?.data?.message === "Token expired" || 
+             error.response?.data?.message === "Invalid token")) {
+            
+            // If we're already refreshing, queue this request
+            if (isRefreshing) {
+                return new Promise((resolve, reject) => {
+                    failedQueue.push({ resolve, reject });
+                })
+                    .then(token => {
+                        originalRequest.headers['Authorization'] = `Bearer ${token}`;
+                        return axios(originalRequest);
+                    })
+                    .catch(err => {
+                        return Promise.reject(err);
+                    });
+            }
+
+            isRefreshing = true;
+            const refreshToken = localStorage.getItem('refreshToken');
+
+            if (!refreshToken) {
+                // No refresh token, redirect to login
+                processQueue(error, null);
+                isRefreshing = false;
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
+                window.location.href = '/login';
+                return Promise.reject(error);
+            }
+
+            try {
+                // Call refresh token endpoint
+                const response = await axios.post(
+                    apiUrl + '/api/user/refresh-token',
+                    {},
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${refreshToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+
+                if (response.data?.error === false && response.data?.data?.accessToken) {
+                    const newAccessToken = response.data.data.accessToken;
+                    localStorage.setItem('accessToken', newAccessToken);
+                    
+                    // Update the original request with new token
+                    originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+                    
+                    // Process queued requests
+                    processQueue(null, newAccessToken);
+                    isRefreshing = false;
+                    
+                    // Retry the original request
+                    return axios(originalRequest);
+                } else {
+                    throw new Error('Failed to refresh token');
+                }
+            } catch (refreshError) {
+                // Refresh failed, redirect to login
+                processQueue(refreshError, null);
+                isRefreshing = false;
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
+                window.location.href = '/login';
+                return Promise.reject(refreshError);
+            }
+        }
+
+        return Promise.reject(error);
+    }
+);
+
 export const postData = async (url, formData) => {
     try {
         
@@ -69,7 +167,7 @@ export const uploadImages = async (url, formData ) => {
     const params={
         headers: {
             'Authorization': `Bearer ${localStorage.getItem('accessToken')}`, // Include your API key in the Authorization header
-            'Content-Type': 'multipart/form-data', // Adjust the content type as needed
+            // DO NOT set Content-Type for FormData - axios will set it automatically with boundary
           },
     
     } 

@@ -43,12 +43,24 @@ const UploadBox = (props) => {
 
             uploadImages(apiEndPoint, formdata).then((res) => {
                 setUploading(false);
-                const images = Array.isArray(res?.data?.images) ? res.data.images : [];
+                // Handle both response formats: { data: { images: [] } } or { images: [] }
+                const images = Array.isArray(res?.data?.images) 
+                    ? res.data.images 
+                    : Array.isArray(res?.images) 
+                        ? res.images 
+                        : [];
+                
+                if (images.length === 0) {
+                    context.alertBox('error', 'No images were uploaded. Please try again.');
+                    return;
+                }
+                
                 props.setPreviewsFun(images);
             }).catch((err) => {
                 setUploading(false);
-                console.error(err);
-                context.alertBox('error', 'Image upload failed');
+                console.error('Upload error:', err);
+                const errorMessage = err?.response?.data?.message || err?.message || 'Image upload failed. Please check your authentication and try again.';
+                context.alertBox('error', errorMessage);
             })
 
         } catch (error) {
