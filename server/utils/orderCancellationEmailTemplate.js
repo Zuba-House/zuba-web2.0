@@ -1,8 +1,8 @@
 const OrderCancellationEmail = (username, order, cancellationReason = '') => {
-    // Get logo URL from environment or use placeholder
+    // Get logo URL from environment or use default Zuba House logo
     const logoUrl = process.env.ZUBA_LOGO_URL || 
                    process.env.LOGO_URL || 
-                   'https://via.placeholder.com/180x60/2c3e50/ffffff?text=ZUBA+HOUSE';
+                   'https://res.cloudinary.com/dimtdehjp/image/upload/v1763333609/1_wwx8sr.png';
     
     return `<!DOCTYPE html>
 <html>

@@ -1,8 +1,8 @@
 const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
-    // Get logo URL from environment or use placeholder
+    // Get logo URL from environment or use default Zuba House logo
     const logoUrl = process.env.ZUBA_LOGO_URL || 
                    process.env.LOGO_URL || 
-                   'https://via.placeholder.com/180x60/2c3e50/ffffff?text=ZUBA+HOUSE';
+                   'https://res.cloudinary.com/dimtdehjp/image/upload/v1763333609/1_wwx8sr.png';
     
     // Helper function to format price
     const formatPrice = (price) => {
@@ -54,6 +54,8 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
             margin: 0;
             padding: 0;
             line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
         .email-container {
             max-width: 700px;
@@ -62,6 +64,28 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 4px 12px rgba(44, 62, 80, 0.1);
+        }
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                margin: 0;
+                border-radius: 0;
+                width: 100% !important;
+            }
+            .content {
+                padding: 20px 15px !important;
+            }
+            .header {
+                padding: 20px 15px !important;
+            }
+            .header h1 {
+                font-size: 22px !important;
+            }
+            .header p {
+                font-size: 14px !important;
+            }
+            .logo-container img {
+                max-width: 150px !important;
+            }
         }
         .header {
             background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
@@ -132,6 +156,29 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
         .info-value {
             color: #1a252f;
             flex: 1;
+            word-break: break-word;
+        }
+        @media only screen and (max-width: 600px) {
+            .info-row {
+                flex-direction: column;
+                margin: 15px 0;
+                padding: 10px 0;
+            }
+            .info-label {
+                width: 100%;
+                margin-bottom: 5px;
+                font-size: 13px;
+            }
+            .info-value {
+                width: 100%;
+                font-size: 14px;
+            }
+            .info-section {
+                padding: 15px !important;
+            }
+            .info-section h3 {
+                font-size: 16px !important;
+            }
         }
         .order-details {
             width: 100%;
@@ -155,6 +202,49 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
             border-bottom: 1px solid #e8e8e8;
             font-size: 14px;
             vertical-align: top;
+            word-break: break-word;
+        }
+        @media only screen and (max-width: 600px) {
+            .order-details {
+                font-size: 12px;
+                display: block;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .order-details thead {
+                display: none;
+            }
+            .order-details tbody {
+                display: block;
+            }
+            .order-details tr {
+                display: block;
+                margin-bottom: 15px;
+                border: 1px solid #e8e8e8;
+                border-radius: 8px;
+                padding: 10px;
+                background: #f8f9fa;
+            }
+            .order-details td {
+                display: block;
+                padding: 8px 0;
+                border-bottom: 1px solid #e0e0e0;
+                text-align: left !important;
+            }
+            .order-details td:last-child {
+                border-bottom: none;
+            }
+            .order-details td:before {
+                content: attr(data-label);
+                font-weight: 600;
+                color: #2c3e50;
+                display: block;
+                margin-bottom: 5px;
+            }
+            .order-details .total-row td {
+                font-size: 14px;
+                padding: 12px 0;
+            }
         }
         .order-details tr:last-child td {
             border-bottom: none;
@@ -195,6 +285,21 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
             border-radius: 6px;
             margin: 20px 0;
             font-weight: 600;
+        }
+        @media only screen and (max-width: 600px) {
+            .action-button {
+                display: block;
+                text-align: center;
+                padding: 14px 20px;
+                font-size: 14px;
+            }
+            .alert-box {
+                padding: 12px !important;
+                font-size: 13px !important;
+            }
+            h3 {
+                font-size: 18px !important;
+            }
         }
     </style>
 </head>
@@ -312,7 +417,7 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
                         
                         return `
                         <tr>
-                            <td>
+                            <td data-label="Product">
                                 <strong>${product?.productTitle || product?.title || 'Product'}</strong>
                                 <div style="font-size: 11px; color: #999; margin-top: 2px;">Product ID: ${product.productId}</div>
                                 ${variations.length > 0 ? `
@@ -322,31 +427,31 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
                                 ` : ''}
                                 <div class="product-sku">SKU: ${sku}</div>
                             </td>
-                            <td>${quantity}</td>
-                            <td style="text-align: right;">$${lineTotal.toFixed(2)}</td>
+                            <td data-label="Quantity">${quantity}</td>
+                            <td data-label="Price (USD)" style="text-align: right;">$${lineTotal.toFixed(2)}</td>
                         </tr>`;
                     }).join('')}
                     
                     <tr>
-                        <td colspan="2"><strong>Subtotal</strong></td>
-                        <td style="text-align: right;"><strong>$${subtotal.toFixed(2)}</strong></td>
+                        <td data-label="Subtotal" colspan="2"><strong>Subtotal</strong></td>
+                        <td data-label="Amount" style="text-align: right;"><strong>$${subtotal.toFixed(2)}</strong></td>
                     </tr>
                     
                     ${shippingCost > 0 ? `
                     <tr style="background: #fff9e6;">
-                        <td colspan="2"><strong>Shipping Cost</strong></td>
-                        <td style="text-align: right;"><strong>$${shippingCost.toFixed(2)}</strong></td>
+                        <td data-label="Shipping Cost" colspan="2"><strong>Shipping Cost</strong></td>
+                        <td data-label="Amount" style="text-align: right;"><strong>$${shippingCost.toFixed(2)}</strong></td>
                     </tr>
                     ` : `
                     <tr style="background: #f0f0f0;">
-                        <td colspan="2"><strong>Shipping</strong></td>
-                        <td style="text-align: right;"><strong>Free</strong></td>
+                        <td data-label="Shipping" colspan="2"><strong>Shipping</strong></td>
+                        <td data-label="Amount" style="text-align: right;"><strong>Free</strong></td>
                     </tr>
                     `}
                     
                     <tr class="total-row">
-                        <td colspan="2"><strong>TOTAL AMOUNT</strong></td>
-                        <td style="text-align: right;"><strong>$${total.toFixed(2)}</strong></td>
+                        <td data-label="Total" colspan="2"><strong>TOTAL AMOUNT</strong></td>
+                        <td data-label="Amount" style="text-align: right;"><strong>$${total.toFixed(2)}</strong></td>
                     </tr>
                 </tbody>
             </table>

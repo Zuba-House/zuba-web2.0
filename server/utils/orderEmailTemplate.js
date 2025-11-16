@@ -1,8 +1,8 @@
 const OrderConfirmationEmail = (username, orders) => {
-    // Get logo URL from environment or use placeholder
+    // Get logo URL from environment or use default Zuba House logo
     const logoUrl = process.env.ZUBA_LOGO_URL || 
                    process.env.LOGO_URL || 
-                   'https://via.placeholder.com/180x60/2c3e50/ffffff?text=ZUBA+HOUSE';
+                   'https://res.cloudinary.com/dimtdehjp/image/upload/v1763333609/1_wwx8sr.png';
     
     // Helper function to ensure price is in USD (convert if needed)
     const formatPrice = (price) => {
@@ -39,6 +39,8 @@ const OrderConfirmationEmail = (username, orders) => {
             margin: 0;
             padding: 0;
             line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
         .email-container {
             max-width: 600px;
@@ -47,6 +49,13 @@ const OrderConfirmationEmail = (username, orders) => {
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 4px 12px rgba(44, 62, 80, 0.1);
+        }
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                margin: 0;
+                border-radius: 0;
+                width: 100% !important;
+            }
         }
         .header {
             background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
