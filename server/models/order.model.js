@@ -135,6 +135,14 @@ const orderSchema = new mongoose.Schema({
     totalAmt: {
         type: Number,
         default: 0
+    },
+    shippingCost: {
+        type: Number,
+        default: 0
+    },
+    shippingRate: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null
     }
 }, {
     timestamps: true

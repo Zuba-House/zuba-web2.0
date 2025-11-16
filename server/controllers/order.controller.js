@@ -1,8 +1,11 @@
 import OrderModel from "../models/order.model.js";
 import ProductModel from '../models/product.model.js';
 import UserModel from '../models/user.model.js';
+import AddressModel from "../models/address.model.js";
 import paypal from "@paypal/checkout-server-sdk";
 import OrderConfirmationEmail from "../utils/orderEmailTemplate.js";
+import OrderCancellationEmail from "../utils/orderCancellationEmailTemplate.js";
+import AdminOrderNotificationEmail from "../utils/adminOrderNotificationEmailTemplate.js";
 import sendEmailFun from "../config/sendEmail.js";
 
 export const createOrderController = async (request, response) => {
@@ -146,27 +149,66 @@ export const createOrderController = async (request, response) => {
             // Get user email - either from logged-in user or guest customer
             let userEmail = null;
             let userName = null;
+            let userInfo = null;
             
             if (request.body.userId) {
                 const user = await UserModel.findOne({ _id: request.body.userId });
                 if (user?.email) {
                     userEmail = user.email;
                     userName = user.name;
+                    userInfo = {
+                        name: user.name,
+                        email: user.email,
+                        mobile: user.mobile,
+                        phone: user.mobile
+                    };
                 }
             } else if (request.body.guestCustomer?.email) {
                 // Guest checkout
                 userEmail = request.body.guestCustomer.email;
                 userName = request.body.guestCustomer.name;
+                userInfo = {
+                    name: request.body.guestCustomer.name,
+                    email: request.body.guestCustomer.email,
+                    phone: request.body.guestCustomer.phone
+                };
             }
             
+            // Send customer confirmation email
             if (userEmail) {
                 const recipients = [userEmail];
                 await sendEmailFun({
                     sendTo: recipients,
-                    subject: "Order Confirmation",
+                    subject: "Order Confirmation - Zuba House",
                     text: "",
                     html: OrderConfirmationEmail(userName || 'Customer', order)
                 });
+            }
+
+            // Send admin notification email
+            try {
+                const adminEmail = process.env.ADMIN_EMAIL || 'sales@zubahouse.com';
+                
+                // Get shipping address if available
+                let shippingAddress = null;
+                if (order.delivery_address) {
+                    try {
+                        shippingAddress = await AddressModel.findById(order.delivery_address);
+                    } catch (addrError) {
+                        console.log('Could not fetch shipping address:', addrError.message);
+                    }
+                }
+
+                await sendEmailFun({
+                    sendTo: [adminEmail],
+                    subject: `New Order #${order._id} - ${userName || 'Guest Customer'}`,
+                    text: "",
+                    html: AdminOrderNotificationEmail(order, userInfo, shippingAddress)
+                });
+                console.log('Admin notification email sent to:', adminEmail);
+            } catch (adminEmailError) {
+                console.error('Error sending admin notification email:', adminEmailError);
+                // Don't fail order creation if admin email fails
             }
         }
 

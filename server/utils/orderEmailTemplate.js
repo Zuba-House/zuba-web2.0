@@ -1,4 +1,9 @@
 const OrderConfirmationEmail = (username, orders) => {
+    // Get logo URL from environment or use placeholder
+    const logoUrl = process.env.ZUBA_LOGO_URL || 
+                   process.env.LOGO_URL || 
+                   'https://via.placeholder.com/180x60/2c3e50/ffffff?text=ZUBA+HOUSE';
+    
     // Helper function to ensure price is in USD (convert if needed)
     const formatPrice = (price) => {
         if (!price) return 0;
@@ -49,6 +54,16 @@ const OrderConfirmationEmail = (username, orders) => {
             padding: 30px 20px;
             text-align: center;
         }
+        .logo-container {
+            margin-bottom: 15px;
+        }
+        .logo-container img {
+            max-width: 180px;
+            height: auto;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+        }
         .header h1 {
             margin: 0;
             font-size: 28px;
@@ -89,6 +104,18 @@ const OrderConfirmationEmail = (username, orders) => {
             padding: 12px;
             border-bottom: 1px solid #e8e8e8;
             font-size: 14px;
+            vertical-align: top;
+        }
+        .product-variations {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+            font-style: italic;
+        }
+        .product-sku {
+            font-size: 11px;
+            color: #999;
+            margin-top: 2px;
         }
         .order-details tr:last-child td {
             border-bottom: none;
@@ -138,6 +165,9 @@ const OrderConfirmationEmail = (username, orders) => {
 <body>
     <div class="email-container">
         <div class="header">
+            <div class="logo-container">
+                <img src="${logoUrl}" alt="Zuba House Logo" style="max-width: 180px; height: auto; background: white; padding: 10px; border-radius: 8px;" />
+            </div>
             <h1>ZUBA HOUSE</h1>
             <p>Order Confirmation</p>
         </div>
@@ -160,9 +190,37 @@ const OrderConfirmationEmail = (username, orders) => {
                         const productPrice = formatPrice(product.subTotal || product.price || 0);
                         const quantity = product.quantity || 1;
                         const lineTotal = productPrice * quantity;
+                        
+                        // Get product variations (size, color, etc.)
+                        const variations = [];
+                        if (product.variation?.attributes && product.variation.attributes.length > 0) {
+                            product.variation.attributes.forEach(attr => {
+                                if (attr.name && attr.value) {
+                                    variations.push(`${attr.name}: ${attr.value}`);
+                                }
+                            });
+                        }
+                        // Fallback to old format (size, weight, ram)
+                        if (variations.length === 0) {
+                            if (product.size) variations.push(`Size: ${product.size}`);
+                            if (product.weight) variations.push(`Weight: ${product.weight}`);
+                            if (product.ram) variations.push(`RAM: ${product.ram}`);
+                        }
+                        
+                        // Get SKU
+                        const sku = product.variation?.sku || product.sku || 'N/A';
+                        
                         return `
                         <tr>
-                            <td><strong>${product?.productTitle || product?.title || 'Product'}</strong></td>
+                            <td>
+                                <strong>${product?.productTitle || product?.title || 'Product'}</strong>
+                                ${variations.length > 0 ? `
+                                <div class="product-variations">
+                                    ${variations.join(' • ')}
+                                </div>
+                                ` : ''}
+                                <div class="product-sku">SKU: ${sku}</div>
+                            </td>
                             <td>${quantity}</td>
                             <td style="text-align: right;">$${lineTotal.toFixed(2)}</td>
                         </tr>`;
@@ -174,11 +232,16 @@ const OrderConfirmationEmail = (username, orders) => {
                     </tr>
                     
                     ${shippingCost > 0 ? `
-                    <tr>
-                        <td colspan="2"><strong>Shipping</strong></td>
+                    <tr style="background: #fff9e6;">
+                        <td colspan="2"><strong>Shipping Cost</strong></td>
                         <td style="text-align: right;"><strong>$${shippingCost.toFixed(2)}</strong></td>
                     </tr>
-                    ` : ''}
+                    ` : `
+                    <tr style="background: #f0f0f0;">
+                        <td colspan="2"><strong>Shipping</strong></td>
+                        <td style="text-align: right;"><strong>Free</strong></td>
+                    </tr>
+                    `}
                     
                     <tr class="total-row">
                         <td colspan="2"><strong>Total</strong></td>
@@ -210,3 +273,4 @@ const OrderConfirmationEmail = (username, orders) => {
 };
 
 export default OrderConfirmationEmail;
+

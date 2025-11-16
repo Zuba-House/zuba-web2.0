@@ -1,4 +1,9 @@
 const OrderCancellationEmail = (username, order, cancellationReason = '') => {
+    // Get logo URL from environment or use placeholder
+    const logoUrl = process.env.ZUBA_LOGO_URL || 
+                   process.env.LOGO_URL || 
+                   'https://via.placeholder.com/180x60/2c3e50/ffffff?text=ZUBA+HOUSE';
+    
     return `<!DOCTYPE html>
 <html>
 <head>
@@ -19,12 +24,27 @@ const OrderCancellationEmail = (username, order, cancellationReason = '') => {
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
         .header {
-            background: #e74c3c;
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
             color: white;
-            padding: 10px;
+            padding: 30px 20px;
             text-align: center;
-            font-size: 22px;
             border-radius: 8px 8px 0 0;
+        }
+        .logo-container {
+            margin-bottom: 15px;
+        }
+        .logo-container img {
+            max-width: 180px;
+            height: auto;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 1px;
         }
         .content {
             padding: 20px;
@@ -59,7 +79,12 @@ const OrderCancellationEmail = (username, order, cancellationReason = '') => {
 </head>
 <body>
     <div class="email-container">
-        <div class="header">Order Cancelled</div>
+        <div class="header">
+            <div class="logo-container">
+                <img src="${logoUrl}" alt="Zuba House Logo" style="max-width: 180px; height: auto; background: white; padding: 10px; border-radius: 8px;" />
+            </div>
+            <h1>Order Cancelled</h1>
+        </div>
         <div class="content">
             <p>Dear <strong>${username}</strong>,</p>
             <p>We regret to inform you that your order has been cancelled.</p>
