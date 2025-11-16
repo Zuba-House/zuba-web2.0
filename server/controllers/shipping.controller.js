@@ -9,6 +9,16 @@ export const getShippingRates = async (req, res) => {
   try {
     const { cartItems, shippingAddress } = req.body;
 
+    console.log('Shipping rates request:', {
+      cartItemsCount: cartItems?.length,
+      hasShippingAddress: !!shippingAddress,
+      shippingAddress: shippingAddress ? {
+        city: shippingAddress.city || shippingAddress.address?.city,
+        country: shippingAddress.countryCode || shippingAddress.country || shippingAddress.address?.countryCode,
+        postalCode: shippingAddress.postal_code || shippingAddress.postalCode || shippingAddress.address?.postalCode
+      } : null
+    });
+
     // Validation
     if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
       return res.status(400).json({
@@ -26,15 +36,53 @@ export const getShippingRates = async (req, res) => {
                       shippingAddress?.country ||
                       shippingAddress?.address?.countryCode;
     
+    console.log('Address validation:', {
+      hasCity: !!hasCity,
+      hasCountry: !!hasCountry,
+      hasPostalCode: !!hasPostalCode,
+      city: hasCity,
+      country: hasCountry,
+      postalCode: hasPostalCode
+    });
+    
     if (!hasCity || !hasCountry) {
+      console.error('Missing required address fields:', {
+        city: hasCity,
+        country: hasCountry,
+        shippingAddress: shippingAddress
+      });
       return res.status(400).json({
         success: false,
-        message: 'City and country are required for shipping calculation'
+        message: 'City and country are required for shipping calculation. Please enter a complete address.'
       });
     }
 
     // Get country code (worldwide support)
-    const countryCode = (hasCountry || 'CA').toString().toUpperCase();
+    // Handle both string country codes and country names
+    let countryCode = 'CA'; // Default
+    if (hasCountry) {
+      const countryStr = hasCountry.toString().toUpperCase();
+      // If it's a 2-letter code, use it directly
+      if (countryStr.length === 2) {
+        countryCode = countryStr;
+      } else {
+        // Try to extract from country name or use default
+        // Common country name mappings
+        const countryMap = {
+          'CANADA': 'CA',
+          'UNITED STATES': 'US',
+          'USA': 'US',
+          'UNITED KINGDOM': 'GB',
+          'UK': 'GB',
+          'AUSTRALIA': 'AU',
+          'GERMANY': 'DE',
+          'FRANCE': 'FR'
+        };
+        countryCode = countryMap[countryStr] || 'CA';
+      }
+    }
+    
+    console.log('Country code determined:', countryCode);
 
     // Validate postal code format (relaxed for worldwide)
     const cleanPostalCode = (shippingAddress.postal_code || 
@@ -169,51 +217,75 @@ export const getShippingRates = async (req, res) => {
     }
 
     // ✅ FALLBACK SHIPPING (if Stallion fails) - Region-based
-    const countryCode = (shippingAddress.countryCode || 
-                        shippingAddress.country || 
-                        shippingAddress.address?.countryCode ||
-                        'CA').toUpperCase();
-    
-    const coordinates = shippingAddress.coordinates || 
-                       shippingAddress.googlePlaces?.coordinates ||
-                       null;
+    // countryCode already declared above, reuse it
+    try {
+      const coordinates = shippingAddress.coordinates || 
+                         shippingAddress.googlePlaces?.coordinates ||
+                         null;
 
-    const fallbackResult = ShippingCalculator.calculateFallbackShipping(
-      cartItems.length,
-      packageDetails.weight,
-      countryCode,
-      coordinates
-    );
-
-    const fallbackRates = [
-      {
-        carrier: 'Zuba House',
-        service: `Standard Shipping (${fallbackResult.region})`,
-        serviceCode: 'STANDARD',
-        cost: fallbackResult.cost,
-        currency: 'USD',
-        deliveryDays: fallbackResult.deliveryEstimate,
-        minDays: fallbackResult.minDays,
-        maxDays: fallbackResult.maxDays,
-        deliveryDate: null,
-        isLive: false,
-        region: fallbackResult.region
-      }
-    ];
-
-    return res.json({
-      success: true,
-      source: 'fallback',
-      reason: 'Stallion API unavailable',
-      rates: fallbackRates,
-      packageDetails: packageDetails,
-      formula: {
-        baseRate: process.env.FALLBACK_BASE_RATE || 13,
-        extraItemRate: process.env.FALLBACK_EXTRA_ITEM || 3,
+      console.log('Calculating fallback shipping:', {
         quantity: cartItems.length,
-        totalCost: fallbackCost
-      }
-    });
+        weight: packageDetails.weight,
+        countryCode: countryCode,
+        hasCoordinates: !!coordinates
+      });
+
+      const fallbackResult = ShippingCalculator.calculateFallbackShipping(
+        cartItems.length,
+        packageDetails.weight,
+        countryCode,
+        coordinates
+      );
+
+      console.log('Fallback result:', fallbackResult);
+
+      const fallbackRates = [
+        {
+          carrier: 'Zuba House',
+          service: `Standard Shipping (${fallbackResult.region})`,
+          serviceCode: 'STANDARD',
+          cost: fallbackResult.cost,
+          currency: 'USD',
+          deliveryDays: fallbackResult.deliveryEstimate,
+          minDays: fallbackResult.minDays,
+          maxDays: fallbackResult.maxDays,
+          deliveryDate: null,
+          isLive: false,
+          region: fallbackResult.region
+        }
+      ];
+
+      return res.json({
+        success: true,
+        source: 'fallback',
+        reason: 'Stallion API unavailable',
+        rates: fallbackRates,
+        packageDetails: packageDetails
+      });
+    } catch (fallbackError) {
+      console.error('Fallback calculation error:', fallbackError);
+      // Last resort - simple calculation
+      const simpleCost = 13 + (cartItems.length > 1 ? (cartItems.length - 1) * 3 : 0);
+      return res.json({
+        success: true,
+        source: 'fallback',
+        reason: 'Simple fallback calculation',
+        rates: [{
+          carrier: 'Zuba House',
+          service: 'Standard Shipping',
+          serviceCode: 'STANDARD',
+          cost: simpleCost,
+          currency: 'USD',
+          deliveryDays: '5-7 business days',
+          minDays: 5,
+          maxDays: 7,
+          deliveryDate: null,
+          isLive: false,
+          region: 'International'
+        }],
+        packageDetails: packageDetails
+      });
+    }
 
   } catch (error) {
     console.error('Shipping Controller Error:', error);

@@ -112,8 +112,19 @@ const ShippingRates = ({ cartItems, shippingAddress, onRateSelected }) => {
 
   if (!hasValidAddress) {
     return (
-      <div className="shipping-rates-placeholder">
-        <p>📍 Enter your address (city and country) to see shipping options</p>
+      <div className="shipping-rates-placeholder" style={{ 
+        padding: '20px', 
+        background: '#fff3cd', 
+        border: '1px solid #ffc107', 
+        borderRadius: '8px',
+        textAlign: 'center'
+      }}>
+        <p className="font-semibold text-amber-700">
+          ⚠️ Shipping Address Required
+        </p>
+        <p className="text-sm text-gray-700 mt-2">
+          Please enter your shipping address (city and country) above to see shipping options
+        </p>
         <small className="text-gray-500 text-xs mt-2 block">
           🌍 We ship worldwide! Use the address search above.
         </small>

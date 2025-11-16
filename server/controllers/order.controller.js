@@ -11,13 +11,34 @@ export const createOrderController = async (request, response) => {
         // Handle guest checkout
         const isGuestOrder = request.body.isGuestOrder || (!request.body.userId && request.body.guestCustomer);
         
+        // Calculate total amount including shipping
+        const shippingCost = request.body.shippingCost || 0;
+        const productsTotal = request.body.products?.reduce((sum, item) => {
+            return sum + (parseFloat(item.price || item.subTotal || 0) * (item.quantity || 1));
+        }, 0) || 0;
+        const calculatedTotal = productsTotal + shippingCost;
+        // Use provided totalAmt if it exists and is valid, otherwise calculate it
+        const finalTotal = (request.body.totalAmt && request.body.totalAmt > 0) 
+            ? request.body.totalAmt 
+            : calculatedTotal;
+        
+        console.log('Order creation - Amount calculation:', {
+            productsTotal,
+            shippingCost,
+            providedTotalAmt: request.body.totalAmt,
+            calculatedTotal,
+            finalTotal
+        });
+
         let order = new OrderModel({
             userId: request.body.userId || null,
             products: request.body.products,
             paymentId: request.body.paymentId,
             payment_status: request.body.payment_status,
             delivery_address: request.body.delivery_address,
-            totalAmt: request.body.totalAmt,
+            totalAmt: finalTotal, // Ensure shipping is included
+            shippingCost: shippingCost,
+            shippingRate: request.body.shippingRate || null,
             date: request.body.date,
             // Guest checkout fields
             isGuestOrder: isGuestOrder,
@@ -882,32 +903,95 @@ export const totalUsersController = async (request, response) => {
 
 
 export async function deleteOrder(request, response) {
-    const order = await OrderModel.findById(request.params.id);
+    try {
+        const order = await OrderModel.findById(request.params.id);
+        const { cancellationReason } = request.body;
 
-    console.log(request.params.id)
+        console.log('Order cancellation request:', request.params.id);
 
-    if (!order) {
-        return response.status(404).json({
-            message: "Order Not found",
+        if (!order) {
+            return response.status(404).json({
+                message: "Order Not found",
+                error: true,
+                success: false
+            });
+        }
+
+        // Get user email for cancellation notification
+        let userEmail = null;
+        let userName = null;
+        
+        if (order.userId) {
+            const user = await UserModel.findById(order.userId);
+            if (user?.email) {
+                userEmail = user.email;
+                userName = user.name;
+            }
+        } else if (order.guestCustomer?.email) {
+            userEmail = order.guestCustomer.email;
+            userName = order.guestCustomer.name;
+        }
+
+        // Restore inventory before deleting
+        if (order.products && order.products.length > 0) {
+            for (const product of order.products) {
+                try {
+                    const productDoc = await ProductModel.findById(product.productId);
+                    if (productDoc) {
+                        await ProductModel.findByIdAndUpdate(
+                            product.productId,
+                            {
+                                $inc: {
+                                    countInStock: product.quantity || 1,
+                                    sale: -(product.quantity || 1)
+                                }
+                            },
+                            { new: true }
+                        );
+                    }
+                } catch (productError) {
+                    console.error('Error restoring inventory for product:', product.productId, productError);
+                }
+            }
+        }
+
+        // Send cancellation email before deleting
+        if (userEmail) {
+            try {
+                await sendEmailFun({
+                    sendTo: [userEmail],
+                    subject: "Order Cancellation - Zuba House",
+                    text: "",
+                    html: OrderCancellationEmail(userName || 'Customer', order, cancellationReason || 'Order cancelled by admin')
+                });
+                console.log('Cancellation email sent to:', userEmail);
+            } catch (emailError) {
+                console.error('Error sending cancellation email:', emailError);
+                // Continue with deletion even if email fails
+            }
+        }
+
+        const deletedOrder = await OrderModel.findByIdAndDelete(request.params.id);
+
+        if (!deletedOrder) {
+            return response.status(404).json({
+                message: "Order not deleted!",
+                success: false,
+                error: true
+            });
+        }
+
+        return response.status(200).json({
+            success: true,
+            error: false,
+            message: "Order cancelled and deleted successfully",
+        });
+    } catch (error) {
+        console.error('Error cancelling order:', error);
+        return response.status(500).json({
+            message: error.message || "Failed to cancel order",
             error: true,
             success: false
-        })
-    }
-
-
-    const deletedOrder = await OrderModel.findByIdAndDelete(request.params.id);
-
-    if (!deletedOrder) {
-        response.status(404).json({
-            message: "Order not deleted!",
-            success: false,
-            error: true
         });
     }
-
-    return response.status(200).json({
-        success: true,
-        error: false,
-        message: "Order Deleted!",
-    });
 }

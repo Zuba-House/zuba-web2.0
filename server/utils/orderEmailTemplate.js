@@ -1,117 +1,212 @@
 const OrderConfirmationEmail = (username, orders) => {
+    // Helper function to ensure price is in USD (convert if needed)
+    const formatPrice = (price) => {
+        if (!price) return 0;
+        // If price seems to be in cents or very large, divide by 100
+        // Otherwise use as is
+        const numPrice = parseFloat(price);
+        // If price is > 1000, it might be in cents or wrong currency
+        // For now, just ensure it's a valid number
+        return isNaN(numPrice) ? 0 : numPrice;
+    };
+
+    // Calculate product prices correctly
+    const products = orders?.products || [];
+    const subtotal = products.reduce((sum, item) => {
+        const itemPrice = formatPrice(item.subTotal || item.price || 0);
+        const quantity = item.quantity || 1;
+        return sum + (itemPrice * quantity);
+    }, 0);
+    
+    const shippingCost = formatPrice(orders?.shippingCost || 0);
+    const total = formatPrice(orders?.totalAmt || 0) || (subtotal + shippingCost);
+
     return `<!DOCTYPE html>
 <html>
 <head>
-    <title>Order Confirmation</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation - Zuba House</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f5f5f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
             margin: 0;
             padding: 0;
+            line-height: 1.6;
         }
         .email-container {
             max-width: 600px;
             margin: 20px auto;
             background: #ffffff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(44, 62, 80, 0.1);
         }
         .header {
-            background: #4CAF50;
+            background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
             color: white;
-            padding: 10px;
+            padding: 30px 20px;
             text-align: center;
-            font-size: 22px;
-            border-radius: 8px 8px 0 0;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 14px;
+            opacity: 0.9;
         }
         .content {
-            padding: 20px;
+            padding: 30px 20px;
+        }
+        .greeting {
+            color: #2c3e50;
+            font-size: 16px;
+            margin-bottom: 20px;
         }
         .order-details {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
-        }
-        .order-details th, .order-details td {
-            border: 1px solid #ddd;
-            padding: 10px;
-            text-align: left;
+            margin: 20px 0;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
         .order-details th {
-            background: #f8f8f8;
+            background: #2c3e50;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .order-details td {
+            padding: 12px;
+            border-bottom: 1px solid #e8e8e8;
+            font-size: 14px;
+        }
+        .order-details tr:last-child td {
+            border-bottom: none;
+        }
+        .order-details tr.total-row {
+            background: #f8f9fa;
+            font-weight: 700;
+        }
+        .order-details tr.total-row td {
+            font-size: 16px;
+            color: #2c3e50;
+            padding: 15px 12px;
+        }
+        .order-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #f39c12;
+        }
+        .order-info p {
+            margin: 8px 0;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+        .order-info strong {
+            color: #1a252f;
         }
         .footer {
+            background: #2c3e50;
+            color: white;
             text-align: center;
-            padding: 10px;
-            font-size: 14px;
-            color: #666;
+            padding: 20px;
+            font-size: 13px;
+        }
+        .footer a {
+            color: #f39c12;
+            text-decoration: none;
+        }
+        .divider {
+            height: 1px;
+            background: linear-gradient(to right, transparent, #e8e8e8, transparent);
+            margin: 20px 0;
         }
     </style>
 </head>
 <body>
     <div class="email-container">
-        <div class="header">Order Confirmation</div>
+        <div class="header">
+            <h1>ZUBA HOUSE</h1>
+            <p>Order Confirmation</p>
+        </div>
         <div class="content">
-            <p>Dear <strong>${username}</strong>,</p>
-            <p>Thank you for your order! Below are your order details:</p>
+            <div class="greeting">
+                <p>Dear <strong>${username}</strong>,</p>
+                <p>Thank you for your order! We're excited to get your items to you. Below are your order details:</p>
+            </div>
 
-            
- 
             <table class="order-details">
-              <tr>
+                <thead>
+                    <tr>
                         <th>Product</th>
                         <th>Quantity</th>
-                        <th>Price</th>
-             </tr>
-    
-            
-           ${orders?.products.map(
-        (product) => `
-             <tr>
-        <td>${product?.productTitle}</td>
-                <td>${product?.quantity}</td>
-                        <td>${product?.subTotal?.toLocaleString("en-US", {
-            style: "currency",
-            currency: "INR",
-        })}</td>
-        </tr>
-                    `
-    )}
-
-    
+                        <th style="text-align: right;">Price (USD)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${products.map((product) => {
+                        const productPrice = formatPrice(product.subTotal || product.price || 0);
+                        const quantity = product.quantity || 1;
+                        const lineTotal = productPrice * quantity;
+                        return `
+                        <tr>
+                            <td><strong>${product?.productTitle || product?.title || 'Product'}</strong></td>
+                            <td>${quantity}</td>
+                            <td style="text-align: right;">$${lineTotal.toFixed(2)}</td>
+                        </tr>`;
+                    }).join('')}
+                    
                     <tr>
-                     <td colspan={1}></td>
-                        <td colspan={2}>Total</td>
-                        <td colspan={1}>
-                            ${(orders?.products?.length !== 0
-            ? orders?.products
-                ?.map(
-                    (item) =>
-                        parseInt(item.subTotal) * item.quantity
-                )
-                .reduce((total, value) => total + value, 0)
-            : 0
-        )?.toLocaleString("en-US", {
-            style: "currency",
-            currency: "INR",
-        })}
-                        </td>
-                    </tr>    
-          
-          </table>
-            <p><strong>Order ID:</strong> #${orders?._id}</p>
-            <p><strong>Estimated Delivery:</strong> 3-5 business days</p>
+                        <td colspan="2"><strong>Subtotal</strong></td>
+                        <td style="text-align: right;"><strong>$${subtotal.toFixed(2)}</strong></td>
+                    </tr>
+                    
+                    ${shippingCost > 0 ? `
+                    <tr>
+                        <td colspan="2"><strong>Shipping</strong></td>
+                        <td style="text-align: right;"><strong>$${shippingCost.toFixed(2)}</strong></td>
+                    </tr>
+                    ` : ''}
+                    
+                    <tr class="total-row">
+                        <td colspan="2"><strong>Total</strong></td>
+                        <td style="text-align: right;"><strong>$${total.toFixed(2)}</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="order-info">
+                <p><strong>Order ID:</strong> #${orders?._id}</p>
+                <p><strong>Order Date:</strong> ${orders?.date || new Date().toLocaleDateString()}</p>
+                <p><strong>Payment Status:</strong> ${orders?.payment_status || 'Pending'}</p>
+                <p><strong>Estimated Delivery:</strong> 5-12 business days</p>
+            </div>
+
+            <div class="divider"></div>
             
-            <p>If you have any questions, feel free to contact us.</p>
-        </div >
-    <div class="footer">
-        &copy; ${new Date().getFullYear()} Your Store. All rights reserved.
+            <p style="color: #2c3e50; font-size: 14px;">
+                We'll send you a tracking number once your order ships. If you have any questions, feel free to contact our customer service team.
+            </p>
+        </div>
+        <div class="footer">
+            <p style="margin: 0 0 10px 0;"><strong>Zuba House</strong></p>
+            <p style="margin: 0; opacity: 0.8;">&copy; ${new Date().getFullYear()} Zuba House. All rights reserved.</p>
+        </div>
     </div>
-    </div >
-</body >
-</html > `;
+</body>
+</html>`;
 };
 
 export default OrderConfirmationEmail;

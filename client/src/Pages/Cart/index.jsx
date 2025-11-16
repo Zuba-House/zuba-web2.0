@@ -165,11 +165,41 @@ const CartPage = () => {
 
             <br />
 
-            <Link to="/checkout" state={{ selectedShippingRate, shippingAddress }}>
-              <Button className="btn-org btn-lg w-full flex gap-2">
-                <BsFillBagCheckFill className="text-[20px]" /> Checkout
-              </Button>
-            </Link>
+            {/* Validate address and shipping rate before allowing checkout */}
+            {(() => {
+              const hasValidAddress = shippingAddress && (
+                (shippingAddress.postal_code && shippingAddress.city) ||
+                (shippingAddress.city && shippingAddress.countryCode)
+              );
+              const hasShippingRate = selectedShippingRate && selectedShippingRate.cost > 0;
+              
+              if (!hasValidAddress || !hasShippingRate) {
+                return (
+                  <Button 
+                    className="btn-org btn-lg w-full flex gap-2" 
+                    disabled
+                    onClick={() => {
+                      if (!hasValidAddress) {
+                        context?.alertBox("error", "Please enter a complete shipping address (city and country required)");
+                      } else if (!hasShippingRate) {
+                        context?.alertBox("error", "Please wait for shipping rates to calculate, or enter a valid address");
+                      }
+                    }}
+                  >
+                    <BsFillBagCheckFill className="text-[20px]" /> 
+                    {!hasValidAddress ? "Enter Shipping Address" : "Calculating Shipping..."}
+                  </Button>
+                );
+              }
+              
+              return (
+                <Link to="/checkout" state={{ selectedShippingRate, shippingAddress }}>
+                  <Button className="btn-org btn-lg w-full flex gap-2">
+                    <BsFillBagCheckFill className="text-[20px]" /> Checkout
+                  </Button>
+                </Link>
+              );
+            })()}
           </div>
         </div>
       </div>

@@ -40,8 +40,11 @@ const Checkout = () => {
     if (location.state?.selectedShippingRate) {
       setSelectedShippingRate(location.state.selectedShippingRate);
     } else if (!selectedShippingRate && context?.cartData?.length > 0) {
-      // Warn user if they navigated directly to checkout without calculating shipping
-      console.warn('No shipping rate selected. User may have navigated directly to checkout.');
+      // Redirect user back to cart if they navigated directly to checkout without shipping
+      context?.alertBox("error", "Please enter shipping address in cart first");
+      setTimeout(() => {
+        history("/cart");
+      }, 2000);
     }
   }, [context?.userData, userData, location.state])
 
@@ -120,6 +123,12 @@ const Checkout = () => {
       return;
     }
 
+    // Validate shipping address and rate
+    if (!selectedShippingRate || !selectedShippingRate.cost) {
+      context?.alertBox("error", "Please go back to cart and enter a shipping address to calculate shipping rates");
+      return;
+    }
+
     const user = context?.userData
     setIsloading(true);
 
@@ -155,7 +164,7 @@ const Checkout = () => {
         history("/order/success");
       });
     } else {
-      context.alertBox("error", "Please add address");
+      context.alertBox("error", "Please add a delivery address before proceeding");
       setIsloading(false);
     }
 
@@ -169,11 +178,32 @@ const Checkout = () => {
       return;
     }
 
-    const user = context?.userData;
-    if (userData?.address_details?.length === 0) {
-      context.alertBox("error", "Please add address");
+    // Validate shipping address and rate
+    if (!selectedShippingRate || !selectedShippingRate.cost) {
+      context?.alertBox("error", "Please go back to cart and enter a shipping address to calculate shipping rates");
       return;
     }
+
+    const user = context?.userData;
+    if (userData?.address_details?.length === 0) {
+      context.alertBox("error", "Please add a delivery address before proceeding");
+      return;
+    }
+
+    // Calculate total amount including shipping (use totalAmount state which already includes shipping)
+    const subtotal = context.cartData?.length > 0
+      ? context.cartData.map(item => parseFloat(item.price || 0) * (item.quantity || 0)).reduce((a, b) => a + b, 0)
+      : 0;
+    const shippingCost = selectedShippingRate ? selectedShippingRate.cost : 0;
+    const finalTotal = subtotal + shippingCost;
+    
+    console.log('Order creation - Amounts:', {
+      subtotal,
+      shippingCost,
+      finalTotal,
+      paymentIntentAmount: paymentIntent?.amount ? paymentIntent.amount / 100 : 0,
+      totalAmountState: totalAmount
+    });
 
     const payLoad = {
       userId: user?._id,
@@ -181,8 +211,8 @@ const Checkout = () => {
       paymentId: paymentIntent?.id || '',
       payment_status: "COMPLETED",
       delivery_address: selectedAddress,
-      totalAmt: paymentIntent?.amount ? paymentIntent.amount / 100 : 0,
-      shippingCost: selectedShippingRate ? selectedShippingRate.cost : 0,
+      totalAmt: finalTotal, // Use calculated total with shipping
+      shippingCost: shippingCost,
       shippingRate: selectedShippingRate,
       date: new Date().toLocaleString("en-US", {
         month: "short",

@@ -107,7 +107,12 @@ const ShippingAddressInput = ({ onAddressChange, initialAddress = null }) => {
 
   return (
     <div className="shipping-address-input">
-      <h4 className="text-[14px] font-[600] mb-2">📍 Get Shipping Estimate (Worldwide)</h4>
+      <h4 className="text-[14px] font-[600] mb-2">
+        📍 Shipping Address <span className="text-red-500">*</span> (Required)
+      </h4>
+      <p className="text-[12px] text-gray-600 mb-3">
+        Enter your shipping address to calculate shipping rates and proceed to checkout
+      </p>
       
       {/* Google Maps Autocomplete */}
       {isLoaded && (
