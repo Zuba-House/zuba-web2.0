@@ -3,7 +3,28 @@ import mongoose from "mongoose";
 const orderSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.ObjectId,
-        ref: 'User'
+        ref: 'User',
+        required: false,
+        default: null
+    },
+    // Guest customer fields
+    guestCustomer: {
+        name: {
+            type: String,
+            required: function() { return !this.userId; }
+        },
+        email: {
+            type: String,
+            required: function() { return !this.userId; }
+        },
+        phone: {
+            type: String,
+            required: function() { return !this.userId; }
+        }
+    },
+    isGuestOrder: {
+        type: Boolean,
+        default: false
     },
     products: [
         {
@@ -77,6 +98,35 @@ const orderSchema = new mongoose.Schema({
     order_status : {
         type : String,
         default : "confirm"
+    },
+    // Enhanced status tracking
+    status: {
+        type: String,
+        enum: ['Received', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered'],
+        default: 'Received',
+        required: true
+    },
+    statusHistory: [{
+        status: {
+            type: String,
+            enum: ['Received', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered']
+        },
+        timestamp: {
+            type: Date,
+            default: Date.now
+        },
+        updatedBy: {
+            type: mongoose.Schema.ObjectId,
+            ref: 'User'
+        }
+    }],
+    trackingNumber: {
+        type: String,
+        default: ''
+    },
+    estimatedDelivery: {
+        type: Date,
+        default: null
     },
     delivery_address: {
         type: mongoose.Schema.ObjectId,

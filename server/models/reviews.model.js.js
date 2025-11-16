@@ -10,7 +10,8 @@ const reviewsSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: [true, 'User ID is required'],
+        required: false, // Allow guest reviews
+        default: null,
         index: true
     },
     rating: {
@@ -46,6 +47,23 @@ const reviewsSchema = new mongoose.Schema({
         enum: ['pending', 'approved', 'rejected', 'spam'],
         default: 'pending',
         index: true
+    },
+    isApproved: {
+        type: Boolean,
+        default: false  // Requires admin approval
+    },
+    approvedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+    approvedAt: {
+        type: Date,
+        default: null
+    },
+    rejectionReason: {
+        type: String,
+        default: ''
     },
     verifiedPurchase: {
         type: Boolean,

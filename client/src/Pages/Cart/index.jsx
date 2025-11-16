@@ -7,14 +7,32 @@ import { MyContext } from "../../App";
 import { fetchDataFromApi } from "../../utils/api";
 import { Link } from "react-router-dom";
 import { formatCurrency } from "../../utils/currency";
+import ShippingRates from "../../components/ShippingRates/ShippingRates";
 
 const CartPage = () => {
 
   const context = useContext(MyContext);
+  const [shippingAddress, setShippingAddress] = useState({
+    postal_code: '',
+    city: '',
+    province: '',
+    country: 'CA'
+  });
+  const [selectedShippingRate, setSelectedShippingRate] = useState(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, []);
+    // Pre-fill address if user has one
+    if (context?.userData?.address_details?.[0]) {
+      const addr = context.userData.address_details[0];
+      setShippingAddress({
+        postal_code: addr.postalCode || addr.postal_code || '',
+        city: addr.city || '',
+        province: addr.provinceCode || addr.province || '',
+        country: addr.country || 'CA'
+      });
+    }
+  }, [context?.userData]);
 
 
 
@@ -91,14 +109,65 @@ const CartPage = () => {
               </span>
             </p>
 
-            <p className="flex items-center justify-between">
-              <span className="text-[14px] font-[500]">Shipping</span>
-              <span className="font-bold">Free</span>
-            </p>
+            {/* Shipping Address Input */}
+            <div className="mt-4 mb-4">
+              <h4 className="text-[14px] font-[600] mb-2">📍 Get Shipping Estimate</h4>
+              <input
+                type="text"
+                placeholder="Postal Code (e.g., M1A1A1)"
+                value={shippingAddress.postal_code}
+                onChange={(e) => setShippingAddress({...shippingAddress, postal_code: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded mb-2 text-[14px]"
+              />
+              <input
+                type="text"
+                placeholder="City"
+                value={shippingAddress.city}
+                onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded mb-2 text-[14px]"
+              />
+              <select
+                value={shippingAddress.province}
+                onChange={(e) => setShippingAddress({...shippingAddress, province: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded text-[14px]"
+              >
+                <option value="">Select Province</option>
+                <option value="AB">Alberta</option>
+                <option value="BC">British Columbia</option>
+                <option value="MB">Manitoba</option>
+                <option value="NB">New Brunswick</option>
+                <option value="NL">Newfoundland and Labrador</option>
+                <option value="NS">Nova Scotia</option>
+                <option value="ON">Ontario</option>
+                <option value="PE">Prince Edward Island</option>
+                <option value="QC">Quebec</option>
+                <option value="SK">Saskatchewan</option>
+                <option value="NT">Northwest Territories</option>
+                <option value="NU">Nunavut</option>
+                <option value="YT">Yukon</option>
+              </select>
+            </div>
+
+            {/* Shipping Rates */}
+            {context.cartData?.length > 0 && (
+              <ShippingRates
+                cartItems={context.cartData}
+                shippingAddress={shippingAddress}
+                onRateSelected={setSelectedShippingRate}
+              />
+            )}
+
+            <hr className="my-4" />
 
             <p className="flex items-center justify-between">
-              <span className="text-[14px] font-[500]">Estimate for</span>
-              <span className="font-bold"><span className="font-bold">{context?.userData?.address_details[0]?.country}</span></span>
+              <span className="text-[14px] font-[500]">Shipping</span>
+              <span className="font-bold">
+                {selectedShippingRate ? (
+                  formatCurrency(selectedShippingRate.cost)
+                ) : (
+                  <span className="text-gray-400">Enter address</span>
+                )}
+              </span>
             </p>
 
             <p className="flex items-center justify-between">
@@ -107,14 +176,15 @@ const CartPage = () => {
                 {formatCurrency(
                   (context.cartData?.length !== 0 ?
                     context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
-                      .reduce((total, value) => total + value, 0) : 0)
+                      .reduce((total, value) => total + value, 0) : 0) +
+                  (selectedShippingRate ? selectedShippingRate.cost : 0)
                 )}
               </span>
             </p>
 
             <br />
 
-            <Link to="/checkout">
+            <Link to="/checkout" state={{ selectedShippingRate, shippingAddress }}>
               <Button className="btn-org btn-lg w-full flex gap-2">
                 <BsFillBagCheckFill className="text-[20px]" /> Checkout
               </Button>

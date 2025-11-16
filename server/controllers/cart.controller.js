@@ -8,6 +8,16 @@ export const addToCartItemController = async (request, response) => {
     try {
         const userId = request.userId;
         
+        // For guest users, require login for cart functionality
+        // In future, can implement session-based cart for guests
+        if (!userId) {
+            return response.status(401).json({
+                error: true,
+                success: false,
+                message: "Please login to add items to cart. Guest checkout is available at checkout page."
+            });
+        }
+        
         // Extract all fields (old + new)
         const {
             productTitle,

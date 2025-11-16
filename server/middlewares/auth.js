@@ -52,4 +52,29 @@ const auth = async(request, response, next) => {
     }
 }
 
+// Optional auth - attaches user if token exists, but doesn't require it
+export const optionalAuth = async (request, response, next) => {
+    try {
+        const token = request.cookies.accessToken || request?.headers?.authorization?.split(" ")[1];
+
+        if (token) {
+            try {
+                const decode = await jwt.verify(token, process.env.SECRET_KEY_ACCESS_TOKEN);
+                if (decode) {
+                    request.userId = decode.id;
+                }
+            } catch (error) {
+                // If token is invalid, just continue without user
+                // Don't throw error for optional auth
+            }
+        }
+        
+        // Continue regardless of auth status
+        next();
+    } catch (error) {
+        // If any error occurs, just continue without user
+        next();
+    }
+}
+
 export default auth

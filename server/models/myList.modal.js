@@ -27,7 +27,8 @@ const myListSchema = new mongoose.Schema({
     },
     oldPrice:{
         type:Number,
-        required:true
+        required:false,
+        default:null
     },
     brand:{
         type:String,
@@ -35,7 +36,8 @@ const myListSchema = new mongoose.Schema({
     },
     discount:{
         type:Number,
-        required:true
+        required:false,
+        default:0
     },
 },{
     timestamps : true

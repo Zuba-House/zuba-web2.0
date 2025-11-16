@@ -8,7 +8,7 @@ import { FaPlus } from "react-icons/fa6";
 import Radio from '@mui/material/Radio';
 import { deleteData, fetchDataFromApi, postData } from "../../utils/api";
 import axios from 'axios';
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import CircularProgress from '@mui/material/CircularProgress';
 import StripeCheckout from "../../components/StripeCheckout.jsx";
 import { formatCurrency } from "../../utils/currency";
@@ -25,31 +25,35 @@ const Checkout = () => {
   const [isLoading, setIsloading] = useState(false);
   const [showStripeForm, setShowStripeForm] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
+  const [selectedShippingRate, setSelectedShippingRate] = useState(null);
   const context = useContext(MyContext);
 
   const history = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     window.scrollTo(0, 0);
     setUserData(context?.userData)
     setSelectedAddress(context?.userData?.address_details[0]?._id);
-
-  }, [context?.userData, userData])
+    
+    // Get shipping rate from location state (passed from Cart page)
+    if (location.state?.selectedShippingRate) {
+      setSelectedShippingRate(location.state.selectedShippingRate);
+    }
+  }, [context?.userData, userData, location.state])
 
 
   useEffect(() => {
-    const total = context.cartData?.length !== 0 ?
+    const subtotal = context.cartData?.length !== 0 ?
       context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
         .reduce((sum, value) => sum + value, 0) : 0;
+    
+    const shippingCost = selectedShippingRate ? selectedShippingRate.cost : 0;
+    const total = subtotal + shippingCost;
+    
     // keep numeric for backend; format only when rendering
     setTotalAmount(total);
-
-    // localStorage.setItem("totalAmount", context.cartData?.length !== 0 ?
-    //   context.cartData?.map(item => parseInt(item.price) * item.quantity)
-    //     .reduce((total, value) => total + value, 0) : 0)
-    //   ?.toLocaleString('en-US', { style: 'currency', currency: 'INR' })
-
-  }, [context.cartData])
+  }, [context.cartData, selectedShippingRate])
 
 
 
@@ -124,6 +128,8 @@ const Checkout = () => {
         payment_status: "CASH ON DELIVERY",
         delivery_address: selectedAddress,
         totalAmt: totalAmount,
+        shippingCost: selectedShippingRate ? selectedShippingRate.cost : 0,
+        shippingRate: selectedShippingRate,
         date: new Date().toLocaleString("en-US", {
           month: "short",
           day: "2-digit",
@@ -173,6 +179,8 @@ const Checkout = () => {
       payment_status: "COMPLETED",
       delivery_address: selectedAddress,
       totalAmt: paymentIntent?.amount ? paymentIntent.amount / 100 : 0,
+      shippingCost: selectedShippingRate ? selectedShippingRate.cost : 0,
+      shippingRate: selectedShippingRate,
       date: new Date().toLocaleString("en-US", {
         month: "short",
         day: "2-digit",
@@ -365,6 +373,36 @@ const Checkout = () => {
 
               </div>
 
+              {/* Order Summary Totals */}
+              <div className="border-t border-[rgba(0,0,0,0.1)] pt-3 mt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[14px] font-[500]">Subtotal</span>
+                  <span className="text-[14px] font-[600]">
+                    {formatCurrency(
+                      context.cartData?.length !== 0 ?
+                        context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
+                          .reduce((total, value) => total + value, 0) : 0
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[14px] font-[500]">Shipping</span>
+                  <span className="text-[14px] font-[600]">
+                    {selectedShippingRate ? (
+                      formatCurrency(selectedShippingRate.cost)
+                    ) : (
+                      <span className="text-gray-400">Not calculated</span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-[rgba(0,0,0,0.1)]">
+                  <span className="text-[16px] font-[700]">Total</span>
+                  <span className="text-[16px] font-[700] text-primary">
+                    {formatCurrency(totalAmount)}
+                  </span>
+                </div>
+              </div>
+
               <div className="flex items-center flex-col gap-3 mb-2">
                 <div className="flex flex-col w-full items-center gap-3 mt-3">
                   <Button
@@ -390,11 +428,13 @@ const Checkout = () => {
                         amount={
                           (() => {
                             try {
-                              const total = context.cartData?.length > 0
+                              const subtotal = context.cartData?.length > 0
                                 ? context.cartData
                                   .map((item) => (item.price || 0) * (item.quantity || 0))
                                   .reduce((a, b) => a + b, 0)
                                 : 0;
+                              const shippingCost = selectedShippingRate ? selectedShippingRate.cost : 0;
+                              const total = subtotal + shippingCost;
                               const amount = parseFloat(total?.toFixed(2)) || 0;
                               return amount > 0 ? amount : 0;
                             } catch (e) {

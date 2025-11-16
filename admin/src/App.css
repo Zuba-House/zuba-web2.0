@@ -1,5 +1,44 @@
-body{font-family: "Montserrat", serif; background: #f1f1f1;}
+body{font-family: "Montserrat", serif; background: #f8f9fa;}
+
+/* Zuba House Brand Colors */
+:root {
+  --zuba-primary: #2c3e50;      /* Dark blue-gray (professional, trustworthy) */
+  --zuba-secondary: #e74c3c;      /* Warm red (energy, action) */
+  --zuba-accent: #f39c12;        /* Golden orange (warmth, value) */
+  --zuba-success: #27ae60;       /* Fresh green */
+  --zuba-info: #3498db;          /* Bright blue */
+  --zuba-background: #f8f9fa;    /* Light gray */
+}
+
 .MuiBadge-badge {background: #ff5252 !important;}
+
+/* Apply Zuba colors to buttons */
+.btn-blue, .MuiButton-containedPrimary {
+  background: linear-gradient(135deg, var(--zuba-primary) 0%, #1a252f 100%) !important;
+  color: #fff !important;
+}
+
+.btn-blue:hover, .MuiButton-containedPrimary:hover {
+  background: linear-gradient(135deg, #1a252f 0%, var(--zuba-primary) 100%) !important;
+}
+
+/* Sidebar styling with Zuba colors */
+.sidebar {
+  background: linear-gradient(180deg, var(--zuba-primary) 0%, #1a252f 100%) !important;
+  color: #ffffff !important;
+}
+
+/* Card styling */
+.card, .dashboard-card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(44, 62, 80, 0.08);
+  transition: box-shadow 0.3s ease;
+}
+
+.card:hover, .dashboard-card:hover {
+  box-shadow: 0 8px 24px rgba(44, 62, 80, 0.12);
+}
 
 .ReactCollapse--collapse {
     transition: height 300ms;

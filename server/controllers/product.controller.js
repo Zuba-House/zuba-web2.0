@@ -408,6 +408,9 @@ export async function createProduct(request, response) {
             bannerimages: bannerImages,
             bannerTitleName: request.body.bannerTitleName || '',
             isDisplayOnHomeBanner: request.body.isDisplayOnHomeBanner || false,
+            bannerLink: request.body.bannerLink || '',
+            bannerButtonLink: request.body.bannerButtonLink || '',
+            bannerButtonText: request.body.bannerButtonText || 'SHOP NOW',
             productRam: request.body.productRam || [],
             size: request.body.size || [],
             productWeight: request.body.productWeight || [],
@@ -1318,6 +1321,18 @@ export async function removeImageFromCloudinary(request, response) {
 //updated product 
 export async function updateProduct(request, response) {
     try {
+        const productId = request.params.id;
+        
+        // Check if product exists
+        const existingProduct = await ProductModel.findById(productId);
+        if (!existingProduct) {
+            return response.status(404).json({
+                message: "Product not found",
+                error: true,
+                success: false
+            });
+        }
+
         // Handle images - transform to new format if needed
         let imagesFormatted = [];
         if (request.body.images && Array.isArray(request.body.images) && request.body.images.length > 0) {
@@ -1346,65 +1361,113 @@ export async function updateProduct(request, response) {
             }).filter(img => img.url && img.url !== ''); // Filter out any with empty URLs
         }
 
-        // Build update data
-        const updateData = {
+        // Handle banner images
+        let bannerImages = [];
+        if (request.body.bannerimages && Array.isArray(request.body.bannerimages)) {
+            bannerImages = request.body.bannerimages.filter(img => img != null && img !== '');
+        }
+
+        // Build update data - include all fields
+        let updateData = {
             name: request.body.name,
-            subCat: request.body.subCat,
             description: request.body.description,
-            bannerimages: request.body.bannerimages || [],
-            bannerTitleName: request.body.bannerTitleName || '',
-            isDisplayOnHomeBanner: request.body.isDisplayOnHomeBanner || false,
-            images: imagesFormatted.length > 0 ? imagesFormatted : undefined,
-            brand: request.body.brand,
-            price: request.body.price,
-            oldPrice: request.body.oldPrice,
-            catId: request.body.catId,
-            catName: request.body.catName,
-            subCatId: request.body.subCatId,
+            shortDescription: request.body.shortDescription || '',
+            brand: request.body.brand || '',
+            // Categories
             category: request.body.category || request.body.catId || (request.body.categories && request.body.categories.length > 0 ? request.body.categories[0] : undefined),
             categories: request.body.categories || (request.body.category || request.body.catId ? [request.body.category || request.body.catId] : undefined),
-            thirdsubCat: request.body.thirdsubCat,
-            thirdsubCatId: request.body.thirdsubCatId,
-            countInStock: request.body.countInStock,
-            rating: request.body.rating,
-            isFeatured: request.body.isFeatured,
+            catId: request.body.catId || '',
+            catName: request.body.catName || '',
+            subCat: request.body.subCat || '',
+            subCatId: request.body.subCatId || '',
+            thirdsubCat: request.body.thirdsubCat || '',
+            thirdsubCatId: request.body.thirdsubCatId || '',
+            // Status
+            status: request.body.status || existingProduct.status || 'draft',
+            visibility: request.body.visibility || existingProduct.visibility || 'visible',
+            isFeatured: request.body.isFeatured !== undefined ? request.body.isFeatured : existingProduct.isFeatured || false,
+            // Images
+            images: imagesFormatted.length > 0 ? imagesFormatted : undefined,
+            bannerimages: bannerImages.length > 0 ? bannerImages : undefined,
+            bannerTitleName: request.body.bannerTitleName || '',
+            isDisplayOnHomeBanner: request.body.isDisplayOnHomeBanner || false,
+            bannerLink: request.body.bannerLink || '',
+            bannerButtonLink: request.body.bannerButtonLink || '',
+            bannerButtonText: request.body.bannerButtonText || 'SHOP NOW',
+            // Identification
+            sku: request.body.sku || null,
+            barcode: request.body.barcode || null,
+            // Product Type
+            productType: request.body.productType || existingProduct.productType || 'simple',
+            // Legacy fields for backward compatibility
+            price: request.body.price !== undefined ? request.body.price : (request.body.pricing?.salePrice || request.body.pricing?.regularPrice || existingProduct.price),
+            oldPrice: request.body.oldPrice !== undefined ? request.body.oldPrice : (request.body.pricing?.regularPrice || existingProduct.oldPrice),
+            countInStock: request.body.countInStock !== undefined ? request.body.countInStock : (request.body.inventory?.stock || existingProduct.countInStock),
+            rating: request.body.rating !== undefined ? request.body.rating : existingProduct.rating || 0,
+            // Legacy arrays
             productRam: request.body.productRam || [],
             size: request.body.size || [],
             productWeight: request.body.productWeight || [],
+            // Tags
+            tags: request.body.tags || [],
         };
 
-        // Remove undefined fields
-        Object.keys(updateData).forEach(key => {
-            if (updateData[key] === undefined) {
-                delete updateData[key];
-            }
-        });
-
-        // Update pricing if price fields are provided
-        if (request.body.price !== undefined || request.body.oldPrice !== undefined) {
+        // Update pricing structure (new format)
+        if (request.body.pricing || request.body.price !== undefined || request.body.oldPrice !== undefined) {
             updateData.pricing = {
-                regularPrice: request.body.oldPrice || request.body.price || 0,
-                salePrice: request.body.oldPrice && request.body.price < request.body.oldPrice ? request.body.price : null,
-                price: request.body.price || request.body.oldPrice || 0,
-                currency: request.body.currency || 'USD',
-                onSale: request.body.oldPrice && request.body.price < request.body.oldPrice
+                regularPrice: request.body.pricing?.regularPrice || request.body.oldPrice || request.body.price || existingProduct.pricing?.regularPrice || 0,
+                salePrice: request.body.pricing?.salePrice || (request.body.oldPrice && request.body.price && request.body.price < request.body.oldPrice ? request.body.price : null),
+                price: request.body.pricing?.price || request.body.price || request.body.pricing?.salePrice || request.body.pricing?.regularPrice || request.body.oldPrice || 0,
+                currency: request.body.pricing?.currency || request.body.currency || existingProduct.pricing?.currency || 'USD',
+                onSale: request.body.pricing?.onSale !== undefined ? request.body.pricing.onSale : (request.body.pricing?.salePrice && request.body.pricing.salePrice < request.body.pricing.regularPrice),
+                taxStatus: request.body.pricing?.taxStatus || existingProduct.pricing?.taxStatus || 'taxable',
+                taxClass: request.body.pricing?.taxClass || existingProduct.pricing?.taxClass || 'standard'
             };
         }
 
-        // Update inventory if stock is provided
-        if (request.body.countInStock !== undefined) {
+        // Update inventory structure (new format)
+        if (request.body.inventory || request.body.countInStock !== undefined) {
             updateData.inventory = {
-                stock: request.body.countInStock || 0,
-                stockStatus: (request.body.countInStock || 0) > 0 ? 'in_stock' : 'out_of_stock',
-                manageStock: true
+                stock: request.body.inventory?.stock || request.body.countInStock !== undefined ? request.body.countInStock : existingProduct.inventory?.stock || 0,
+                stockStatus: request.body.inventory?.stockStatus || ((request.body.inventory?.stock || request.body.countInStock || 0) > 0 ? 'in_stock' : 'out_of_stock'),
+                manageStock: request.body.inventory?.manageStock !== undefined ? request.body.inventory.manageStock : (existingProduct.inventory?.manageStock !== undefined ? existingProduct.inventory.manageStock : true),
+                allowBackorders: request.body.inventory?.allowBackorders || existingProduct.inventory?.allowBackorders || 'no',
+                lowStockThreshold: request.body.inventory?.lowStockThreshold || existingProduct.inventory?.lowStockThreshold || 5,
+                soldIndividually: request.body.inventory?.soldIndividually !== undefined ? request.body.inventory.soldIndividually : (existingProduct.inventory?.soldIndividually || false)
+            };
+        }
+
+        // Update shipping structure
+        if (request.body.shipping) {
+            updateData.shipping = {
+                weight: request.body.shipping.weight || null,
+                weightUnit: request.body.shipping.weightUnit || 'kg',
+                dimensions: request.body.shipping.dimensions || {
+                    length: null,
+                    width: null,
+                    height: null,
+                    unit: 'cm'
+                },
+                shippingClass: request.body.shipping.shippingClass || 'standard',
+                freeShipping: request.body.shipping.freeShipping || false
+            };
+        }
+
+        // Update SEO structure
+        if (request.body.seo) {
+            updateData.seo = {
+                metaTitle: request.body.seo.metaTitle || '',
+                metaDescription: request.body.seo.metaDescription || '',
+                metaKeywords: request.body.seo.metaKeywords || [],
+                slug: request.body.seo.slug || request.body.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || existingProduct.seo?.slug || ''
             };
         }
 
         // Handle attributes and variations for variable products
-        if (request.body.productType === 'variable' || request.body.type === 'variable') {
+        if (request.body.productType === 'variable' || request.body.type === 'variable' || updateData.productType === 'variable') {
             // Normalize attributes
-            if (request.body.attributes) {
-                updateData.attributes = (request.body.attributes || []).map(attr => ({
+            if (request.body.attributes && Array.isArray(request.body.attributes)) {
+                updateData.attributes = request.body.attributes.map(attr => ({
                     attributeId: attr.attributeId || null,
                     name: attr.name,
                     slug: attr.slug || attr.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
@@ -1419,8 +1482,8 @@ export async function updateProduct(request, response) {
             }
 
             // Normalize variations
-            if (request.body.variations) {
-                updateData.variations = (request.body.variations || []).map(variation => ({
+            if (request.body.variations && Array.isArray(request.body.variations)) {
+                updateData.variations = request.body.variations.map(variation => ({
                     ...variation,
                     regularPrice: variation.regularPrice || variation.price || 0,
                     price: variation.price || variation.regularPrice || variation.salePrice || 0,
@@ -1438,30 +1501,43 @@ export async function updateProduct(request, response) {
                 }));
             }
 
-            // Ensure attributes are populated
+            // Ensure attributes are populated from variations if needed
             updateData = ensureAttributesFromVariations(updateData);
         }
 
-        const product = await ProductModel.findByIdAndUpdate(
-            request.params.id,
-            updateData,
-            { new: true }
-        );
+        // Remove undefined fields to avoid overwriting with undefined
+        Object.keys(updateData).forEach(key => {
+            if (updateData[key] === undefined) {
+                delete updateData[key];
+            }
+        });
 
+        // Use findByIdAndUpdate with runValidators and return updated document
+        const product = await ProductModel.findByIdAndUpdate(
+            productId,
+            updateData,
+            { 
+                new: true, 
+                runValidators: true,
+                setDefaultsOnInsert: false
+            }
+        );
 
         if (!product) {
             return response.status(404).json({
-                message: "the product can not be updated!",
-                status: false,
+                message: "Product not found or could not be updated",
+                error: true,
+                success: false
             });
         }
 
         imagesArr = [];
 
         return response.status(200).json({
-            message: "The product is updated",
+            message: "Product updated successfully",
             error: false,
-            success: true
+            success: true,
+            product: product
         })
 
     } catch (error) {

@@ -331,7 +331,7 @@ export const ProductDetailsComponent = (props) => {
           </span>
         </div>
         <p className="text-[13px] text-gray-600 mt-2">
-          ✓ Free Shipping (Est. Delivery Time 2-3 Days)
+          📦 Shipping rates calculated at checkout based on your address
         </p>
       </div>
 

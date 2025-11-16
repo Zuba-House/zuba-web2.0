@@ -38,9 +38,15 @@ const ProductItem = (props) => {
   const context = useContext(MyContext);
 
   const addToCart = (product, userId, quantity) => {
-    // Check if user is logged in
+    // For guest users, show info message and redirect to product page
+    // They can add to cart from product detail page or login
     if (userId === undefined) {
-      context?.alertBox("error", "You are not logged in. Please login first.");
+      context?.alertBox(
+        "info", 
+        "Please login to add items to cart, or visit the product page for guest checkout options."
+      );
+      // Redirect to product page where they can see guest checkout option
+      navigate(`/product/${product?._id || product?._id}`);
       return false;
     }
 
@@ -276,11 +282,12 @@ const ProductItem = (props) => {
         )}
 
         <Link to={`/product/${item?._id}`}>
-          <div className="img h-[200px] overflow-hidden">
+          <div className="img product-image-container">
             <img
               src={item?.featuredImage || (item?.images && item?.images[0] ? (typeof item.images[0] === 'string' ? item.images[0] : item.images[0].url) : '')}
-              className="w-full"
+              className="product-image"
               alt={item?.name || ''}
+              loading="lazy"
             />
 
             {

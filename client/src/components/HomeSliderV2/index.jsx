@@ -28,11 +28,15 @@ const HomeBannerV2 = (props) => {
         clickable: true,
       }}
       autoplay={{
-        delay: 2500,
+        delay: 3000,
         disableOnInteraction: false,
+        pauseOnMouseEnter: false,
       }}
+      loopAdditionalSlides={1}
+      speed={800}
       modules={[EffectFade, Navigation, Pagination, Autoplay]}
       className="homeSliderV2"
+      allowTouchMove={true}
     >
 
       {
@@ -73,8 +77,10 @@ const HomeBannerV2 = (props) => {
                     </h3>
 
                     <div className="w-full relative -right-[100%] opacity-0 btn_">
-                      <Link to={`/product/${item?._id}`}>
-                        <Button className="btn btn-org">SHOP NOW</Button>
+                      <Link to={item?.bannerLink || item?.bannerButtonLink || `/product/${item?._id}`}>
+                        <Button className="btn btn-org">
+                          {item?.bannerButtonText || item?.buttonText || 'SHOP NOW'}
+                        </Button>
                       </Link>
                     </div>
                   </div>

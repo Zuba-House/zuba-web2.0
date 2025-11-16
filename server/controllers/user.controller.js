@@ -784,17 +784,34 @@ export async function userDetails(request, response) {
 
 //review controller
 export async function addReview(request, response) {
+    // Allow both guests and logged-in users to submit reviews
+    // userId is optional (from optionalAuth middleware)
     try {
 
-        const {image, userName, review, rating, userId, productId} = request.body;
+        const {image, userName, review, rating, productId, title} = request.body;
+        
+        // Get userId from request (set by optionalAuth middleware) or from body
+        const userId = request.userId || request.body.userId;
+
+        // Validate required fields
+        if (!userName || !review || !rating || !productId) {
+            return response.status(400).json({
+                message: "Please provide userName, review, rating, and productId",
+                error: true,
+                success: false
+            });
+        }
 
         const userReview = new ReviewModel({
-            image:image,
-            userName:userName,
-            review:review,
-            rating:rating,
-            userId:userId,
-            productId:productId
+            image: image || '',
+            userName: userName,
+            review: review,
+            title: title || review.substring(0, 100), // Use review as title if not provided
+            rating: rating,
+            userId: userId || null, // Allow null for guest reviews
+            productId: productId,
+            status: 'pending', // Requires admin approval
+            isApproved: false
         })
 
 

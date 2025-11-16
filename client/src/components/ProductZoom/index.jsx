@@ -89,8 +89,8 @@ export const ProductZoom = (props) => {
           </div>
         )}
 
-        {/* Main Image - Right Side (Desktop) */}
-        <div className={`zoomContainer ${normalizedImages.length > 1 ? 'w-full lg:w-[85%]' : 'w-full'} h-auto lg:h-[500px] overflow-hidden rounded-lg bg-gray-50 order-1 lg:order-2`}>
+        {/* Main Image - Right Side (Desktop) - 4:5 Aspect Ratio */}
+        <div className={`zoomContainer ${normalizedImages.length > 1 ? 'w-full lg:w-[85%]' : 'w-full'} product-detail-image-container overflow-hidden rounded-lg bg-gray-50 order-1 lg:order-2`}>
           <Swiper
             ref={zoomSliderBig}
             slidesPerView={1}

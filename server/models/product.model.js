@@ -445,6 +445,10 @@ const ProductSchema = new mongoose.Schema({
   bannerimages: [String],
   bannerTitleName: { type: String, default: '' },
   isDisplayOnHomeBanner: { type: Boolean, default: false },
+  // Banner customization fields
+  bannerLink: { type: String, default: '' },
+  bannerButtonLink: { type: String, default: '' },
+  bannerButtonText: { type: String, default: 'SHOP NOW' },
   
   // ========== ATTRIBUTES & VARIATIONS ==========
   attributes: {

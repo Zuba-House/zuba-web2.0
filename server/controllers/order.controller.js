@@ -8,14 +8,27 @@ import sendEmailFun from "../config/sendEmail.js";
 export const createOrderController = async (request, response) => {
     try {
 
+        // Handle guest checkout
+        const isGuestOrder = request.body.isGuestOrder || (!request.body.userId && request.body.guestCustomer);
+        
         let order = new OrderModel({
-            userId: request.body.userId,
+            userId: request.body.userId || null,
             products: request.body.products,
             paymentId: request.body.paymentId,
             payment_status: request.body.payment_status,
             delivery_address: request.body.delivery_address,
             totalAmt: request.body.totalAmt,
-            date: request.body.date
+            date: request.body.date,
+            // Guest checkout fields
+            isGuestOrder: isGuestOrder,
+            guestCustomer: request.body.guestCustomer || null,
+            // Status tracking
+            status: 'Received',
+            statusHistory: [{
+                status: 'Received',
+                timestamp: new Date(),
+                updatedBy: request.userId || null
+            }]
         });
 
         if (!order) {
@@ -109,16 +122,31 @@ export const createOrderController = async (request, response) => {
 
         // Send email only for non-failed orders
         if (shouldAffectInventory) {
-            const user = await UserModel.findOne({ _id: request.body.userId })
-            const recipients = [];
-            if (user?.email) recipients.push(user.email);
-
-            await sendEmailFun({
-                sendTo: recipients,
-                subject: "Order Confirmation",
-                text: "",
-                html: OrderConfirmationEmail(user?.name, order)
-            })
+            // Get user email - either from logged-in user or guest customer
+            let userEmail = null;
+            let userName = null;
+            
+            if (request.body.userId) {
+                const user = await UserModel.findOne({ _id: request.body.userId });
+                if (user?.email) {
+                    userEmail = user.email;
+                    userName = user.name;
+                }
+            } else if (request.body.guestCustomer?.email) {
+                // Guest checkout
+                userEmail = request.body.guestCustomer.email;
+                userName = request.body.guestCustomer.name;
+            }
+            
+            if (userEmail) {
+                const recipients = [userEmail];
+                await sendEmailFun({
+                    sendTo: recipients,
+                    subject: "Order Confirmation",
+                    text: "",
+                    html: OrderConfirmationEmail(userName || 'Customer', order)
+                });
+            }
         }
 
 
@@ -348,23 +376,136 @@ export const captureOrderPaypalController = async (request, response) => {
 
 export const updateOrderStatusController = async (request, response) => {
     try {
-        const { id, order_status } = request.body;
+        const { id } = request.params;
+        const { status, trackingNumber, estimatedDelivery, order_status } = request.body;
 
-        const updateOrder = await OrderModel.updateOne(
-            {
-                _id: id,
-            },
-            {
-                order_status: order_status,
-            },
-            { new: true }
-        )
+        console.log('🔧 Order Update Request:', {
+            orderId: id,
+            status: status,
+            order_status: order_status,
+            body: request.body
+        });
+
+        // Validate status if provided
+        const validStatuses = ['Received', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered'];
+        if (status && !validStatuses.includes(status)) {
+            console.log('❌ Invalid status provided:', status);
+            return response.status(400).json({
+                success: false,
+                error: true,
+                message: 'Invalid status. Must be one of: ' + validStatuses.join(', ')
+            });
+        }
+
+        const order = await OrderModel.findById(id);
+        if (!order) {
+            console.log('❌ Order not found:', id);
+            return response.status(404).json({
+                success: false,
+                error: true,
+                message: 'Order not found'
+            });
+        }
+
+        console.log('✅ Order found:', order._id, 'Current status:', order.status || order.order_status);
+
+        // Build update object
+        const updateData = {};
+        
+        // Update new status system
+        if (status) {
+            const oldStatus = order.status;
+            updateData.status = status;
+            
+            // Add to status history
+            if (!order.statusHistory) {
+                order.statusHistory = [];
+            }
+            order.statusHistory.push({
+                status: status,
+                timestamp: new Date(),
+                updatedBy: request.userId || null
+            });
+        }
+        
+        // Update legacy order_status for backward compatibility
+        if (order_status) {
+            updateData.order_status = order_status;
+            
+            // If status is not provided but order_status is, map it
+            if (!status) {
+                const statusMap = {
+                    'pending': 'Received',
+                    'confirm': 'Processing',
+                    'delivered': 'Delivered'
+                };
+                const mappedStatus = statusMap[order_status] || order_status;
+                if (validStatuses.includes(mappedStatus)) {
+                    updateData.status = mappedStatus;
+                    if (!order.statusHistory) {
+                        order.statusHistory = [];
+                    }
+                    order.statusHistory.push({
+                        status: mappedStatus,
+                        timestamp: new Date(),
+                        updatedBy: request.userId || null
+                    });
+                }
+            }
+        }
+        
+        // Update tracking number if provided
+        if (trackingNumber !== undefined) {
+            updateData.trackingNumber = trackingNumber;
+        }
+        
+        // Update estimated delivery if provided
+        if (estimatedDelivery) {
+            updateData.estimatedDelivery = new Date(estimatedDelivery);
+        }
+
+        // Apply updates
+        Object.assign(order, updateData);
+        const savedOrder = await order.save();
+        
+        console.log('✅ Order updated successfully:', {
+            orderId: savedOrder._id,
+            newStatus: savedOrder.status || savedOrder.order_status,
+            updateData: updateData
+        });
+
+        // Create notification for customer if status changed
+        if (status && order.userId) {
+            try {
+                const Notification = (await import('../models/notification.model.js')).default;
+                await Notification.create({
+                    userId: order.userId,
+                    type: 'order_status',
+                    title: `Order ${status}`,
+                    message: `Your order #${order._id} is now ${status}`,
+                    orderId: order._id,
+                    isRead: false
+                });
+            } catch (notifError) {
+                // Don't fail if notification model doesn't exist yet
+                console.log('Notification not created (model may not exist yet):', notifError.message);
+            }
+        }
+
+        const responseMessage = status 
+            ? `Order status updated to ${status}` 
+            : (order_status 
+                ? `Order status updated to ${order_status}` 
+                : "Order updated");
+
+        console.log('📤 Sending response:', responseMessage);
 
         return response.json({
-            message: "Update order status",
+            message: responseMessage,
             success: true,
             error: false,
-            data: updateOrder
+            data: savedOrder,
+            order: savedOrder // Also include for compatibility
         })
     } catch (error) {
         return response.status(500).json({

@@ -37,17 +37,49 @@ export const Orders = () => {
 
 
   const handleChange = (event, id) => {
-    setOrderStatus(event.target.value);
+    const newStatus = event.target.value;
+    setOrderStatus(newStatus);
 
+    // Map old status values to new status system
+    const statusMap = {
+      'pending': 'Received',
+      'confirm': 'Processing',
+      'delivered': 'Delivered'
+    };
+
+    // Determine which status to send
+    const mappedStatus = statusMap[newStatus] || newStatus;
+    
     const obj = {
-      id: id,
-      order_status: event.target.value
+      order_status: newStatus, // Keep for backward compatibility
+      status: mappedStatus // New status system
     }
 
+    console.log('Updating order:', id, 'with status:', obj);
+
     editData(`/api/order/order-status/${id}`, obj).then((res) => {
-      if (res?.data?.error === false) {
-        context.alertBox("success", res?.data?.message);
+      console.log('✅ Order update response:', res);
+      
+      // editData returns res.data directly, so res is already the response object
+      const response = res;
+      
+      if (response?.success === true || response?.error === false) {
+        context.alertBox("success", response?.message || "Order status updated successfully");
+        // Refresh orders list immediately
+        fetchDataFromApi(`/api/order/order-list?page=${pageOrder}&limit=5`).then((res) => {
+          if (res?.error === false) {
+            setOrdersData(res?.data)
+            setOrderStatus(''); // Reset to trigger useEffect refresh
+          }
+        })
+      } else {
+        context.alertBox("error", response?.message || "Failed to update order status");
       }
+    }).catch((error) => {
+      console.error("❌ Order update error:", error);
+      console.error("Error details:", error?.response);
+      const errorMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || "Failed to update order status";
+      context.alertBox("error", errorMessage);
     })
 
   };
@@ -242,25 +274,34 @@ export const Orders = () => {
                       </td>
 
                       <td className="px-6 py-4 font-[500]">
-                        {/* show payment_status badge when available, otherwise the editable order_status select */}
-                        {order?.payment_status ? (
-                          <Badge status={order?.payment_status || order?.order_status} />
-                        ) : (
+                        {/* Always show editable order status select */}
+                        <div className="flex flex-col gap-1">
+                          {/* Payment Status Badge (if exists) */}
+                          {order?.payment_status && (
+                            <Badge status={order?.payment_status} />
+                          )}
+                          {/* Order Status Select - Always editable */}
                           <Select
-                          labelId="demo-simple-select-helper-label"
-                          id="demo-simple-select-helper"
-                          value={order?.order_status !== null ? order?.order_status : orderStatus}
-                          label="Status"
-                          size="small"
-                          style={{ zoom: '80%' }}
-                          className="w-full"
-                          onChange={(e) => handleChange(e, order?._id)}
-                        >
-                          <MenuItem value={'pending'}>Pending</MenuItem>
-                          <MenuItem value={'confirm'}>Confirm</MenuItem>
-                          <MenuItem value={'delivered'}>Delivered</MenuItem>
-                        </Select>
-                        )}
+                            labelId={`order-status-select-${order?._id}`}
+                            id={`order-status-${order?._id}`}
+                            value={order?.status || order?.order_status || 'pending'}
+                            label="Order Status"
+                            size="small"
+                            style={{ zoom: '80%', minWidth: '120px' }}
+                            className="w-full"
+                            onChange={(e) => handleChange(e, order?._id)}
+                          >
+                            {/* Legacy status options */}
+                            <MenuItem value={'pending'}>Pending</MenuItem>
+                            <MenuItem value={'confirm'}>Confirm</MenuItem>
+                            {/* New status system options */}
+                            <MenuItem value={'Received'}>Received</MenuItem>
+                            <MenuItem value={'Processing'}>Processing</MenuItem>
+                            <MenuItem value={'Shipped'}>Shipped</MenuItem>
+                            <MenuItem value={'Out for Delivery'}>Out for Delivery</MenuItem>
+                            <MenuItem value={'Delivered'}>Delivered</MenuItem>
+                          </Select>
+                        </div>
                       </td>
                       <td className="px-6 py-4 font-[500] whitespace-nowrap">
                         {order?.createdAt?.split("T")[0]}

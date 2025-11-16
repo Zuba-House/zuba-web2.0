@@ -55,15 +55,19 @@ const AddressForm = ({ onAddressSave, initialAddress = null, mode = 'checkout' }
   // Initialize Google Places Autocomplete
   useEffect(() => {
     if (isLoaded && autocompleteInputRef.current && !autocompleteRef.current) {
-      // Bias to Canada
+      // Worldwide support with Canada as default bias
       const autocomplete = new window.google.maps.places.Autocomplete(
         autocompleteInputRef.current,
         {
-          componentRestrictions: { country: ['ca', 'us'] }, // Canada + USA
+          // No country restrictions - allow worldwide addresses
           fields: ['address_components', 'formatted_address', 'geometry', 'place_id'],
-          types: ['address']
+          types: ['address'],
+          // Bias to Canada but allow all countries
+          componentRestrictions: undefined
         }
       );
+      
+      // Worldwide search enabled - no country restrictions
 
       autocomplete.addListener('place_changed', () => {
         const place = autocomplete.getPlace();
@@ -178,15 +182,24 @@ const AddressForm = ({ onAddressSave, initialAddress = null, mode = 'checkout' }
     if (!formData.postalCode.trim()) {
       newErrors.postalCode = 'Postal code is required';
     } else {
-      // Validate postal code format
-      const canadaPostal = /^[A-Z]\d[A-Z]\s?\d[A-Z]\d$/i;
-      const usaZip = /^\d{5}(-\d{4})?$/;
-      const isValid = canadaPostal.test(formData.postalCode) || usaZip.test(formData.postalCode);
-      if (!isValid) {
+      // Validate postal code based on country (flexible validation for worldwide)
+      const postalCodeRegex = formData.countryCode === 'CA' 
+        ? /^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/
+        : formData.countryCode === 'US'
+        ? /^\d{5}(-\d{4})?$/
+        : /^.{3,10}$/; // Generic validation for other countries (3-10 characters)
+      
+      if (!postalCodeRegex.test(formData.postalCode)) {
         newErrors.postalCode = formData.countryCode === 'CA' 
           ? 'Invalid format (e.g., A1A 1A1)' 
-          : 'Invalid format (e.g., 12345)';
+          : formData.countryCode === 'US'
+          ? 'Invalid format (e.g., 12345)'
+          : 'Please enter a valid postal code';
       }
+    }
+    
+    if (!formData.country.trim()) {
+      newErrors.country = 'Country is required';
     }
 
     setErrors(newErrors);
@@ -438,15 +451,20 @@ const AddressForm = ({ onAddressSave, initialAddress = null, mode = 'checkout' }
             {errors.postalCode && <span className="error-message">{errors.postalCode}</span>}
           </div>
           <div className="form-group">
-            <label htmlFor="country">Country</label>
+            <label htmlFor="country">
+              Country <span className="required">*</span>
+            </label>
             <input
               type="text"
               id="country"
               name="country"
               value={formData.country}
-              readOnly
-              className="readonly"
+              onChange={handleChange}
+              className={errors.country ? 'error' : ''}
+              placeholder="Canada"
+              required
             />
+            {errors.country && <span className="error-message">{errors.country}</span>}
           </div>
         </div>
       </div>
