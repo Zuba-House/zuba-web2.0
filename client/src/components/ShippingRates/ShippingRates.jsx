@@ -12,12 +12,29 @@ const ShippingRates = ({ cartItems, shippingAddress, onRateSelected }) => {
   const [source, setSource] = useState('');
 
   useEffect(() => {
-    if (shippingAddress && shippingAddress.postal_code && cartItems && cartItems.length > 0) {
-      fetchShippingRates();
+    // Only fetch if we have valid address and cart items
+    if (shippingAddress?.postal_code && cartItems?.length > 0) {
+      // Debounce to avoid too many API calls
+      const timeoutId = setTimeout(() => {
+        fetchShippingRates();
+      }, 500); // Wait 500ms after user stops typing
+
+      return () => clearTimeout(timeoutId);
+    } else {
+      // Reset rates if address is invalid
+      setRates([]);
+      setSelectedRate(null);
+      onRateSelected && onRateSelected(null);
     }
-  }, [shippingAddress, cartItems]);
+  }, [shippingAddress?.postal_code, shippingAddress?.city, shippingAddress?.province, cartItems?.length]);
 
   const fetchShippingRates = async () => {
+    // Validate inputs before making request
+    if (!shippingAddress?.postal_code || !cartItems?.length) {
+      setError('Please enter a valid address');
+      return;
+    }
+
     setLoading(true);
     setError('');
     
@@ -27,23 +44,47 @@ const ShippingRates = ({ cartItems, shippingAddress, onRateSelected }) => {
         {
           cartItems: cartItems,
           shippingAddress: shippingAddress
+        },
+        {
+          timeout: 20000 // 20 second timeout
         }
       );
 
-      if (response.data.success) {
+      if (response?.data?.success && Array.isArray(response.data.rates)) {
         setRates(response.data.rates);
-        setSource(response.data.source);
+        setSource(response.data.source || 'fallback');
         
         // Auto-select cheapest option
         if (response.data.rates.length > 0) {
           const cheapest = response.data.rates[0];
           setSelectedRate(cheapest);
           onRateSelected && onRateSelected(cheapest);
+        } else {
+          setError('No shipping options available for this address');
         }
+      } else {
+        setError(response?.data?.message || 'Unable to calculate shipping rates');
       }
     } catch (err) {
       console.error('Shipping rates error:', err);
-      setError('Unable to calculate shipping. Please try again.');
+      
+      // Provide more specific error messages
+      if (err.code === 'ECONNABORTED') {
+        setError('Request timed out. Please try again.');
+      } else if (err.response?.data?.message) {
+        setError(err.response.data.message);
+      } else if (err.response?.status === 400) {
+        setError('Invalid address. Please check your postal code and try again.');
+      } else if (err.response?.status >= 500) {
+        setError('Server error. Please try again later.');
+      } else {
+        setError('Unable to calculate shipping. Please check your connection and try again.');
+      }
+      
+      // Reset rates on error
+      setRates([]);
+      setSelectedRate(null);
+      onRateSelected && onRateSelected(null);
     } finally {
       setLoading(false);
     }
@@ -135,9 +176,9 @@ const ShippingRates = ({ cartItems, shippingAddress, onRateSelected }) => {
 
               <div className="rate-price">
                 <span className="rate-cost">
-                  ${rate.cost.toFixed(2)}
+                  ${typeof rate.cost === 'number' ? rate.cost.toFixed(2) : '0.00'}
                 </span>
-                <span className="rate-currency">{rate.currency}</span>
+                <span className="rate-currency">{rate.currency || 'USD'}</span>
               </div>
             </div>
           ))}

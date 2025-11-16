@@ -39,6 +39,9 @@ const Checkout = () => {
     // Get shipping rate from location state (passed from Cart page)
     if (location.state?.selectedShippingRate) {
       setSelectedShippingRate(location.state.selectedShippingRate);
+    } else if (!selectedShippingRate && context?.cartData?.length > 0) {
+      // Warn user if they navigated directly to checkout without calculating shipping
+      console.warn('No shipping rate selected. User may have navigated directly to checkout.');
     }
   }, [context?.userData, userData, location.state])
 

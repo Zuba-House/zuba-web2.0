@@ -116,8 +116,13 @@ const CartPage = () => {
                 type="text"
                 placeholder="Postal Code (e.g., M1A1A1)"
                 value={shippingAddress.postal_code}
-                onChange={(e) => setShippingAddress({...shippingAddress, postal_code: e.target.value})}
+                onChange={(e) => {
+                  // Auto-format postal code (remove spaces, uppercase)
+                  const formatted = e.target.value.replace(/\s/g, '').toUpperCase().substring(0, 6);
+                  setShippingAddress({...shippingAddress, postal_code: formatted});
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded mb-2 text-[14px]"
+                maxLength={6}
               />
               <input
                 type="text"

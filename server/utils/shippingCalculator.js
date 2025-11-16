@@ -11,7 +11,7 @@ export default class ShippingCalculator {
    * @returns {Object} Package details
    */
   static calculatePackage(cartItems) {
-    if (!cartItems || cartItems.length === 0) {
+    if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
       return this.getDefaultPackage();
     }
 
@@ -21,30 +21,34 @@ export default class ShippingCalculator {
     let totalHeight = 0;
 
     cartItems.forEach(item => {
+      if (!item) return; // Skip null/undefined items
+      
       const product = item.productId || item.product || item;
-      const quantity = item.quantity || 1;
+      const quantity = Math.max(1, parseInt(item.quantity) || 1); // Ensure quantity is at least 1
       
       if (product && product.shipping) {
         // Weight: sum of all items (convert to kg if needed)
         const itemWeight = product.shipping.weight || 0.5;
         const weightUnit = product.shipping.weightUnit || 'kg';
         
-        // Convert to kg
-        let weightInKg = itemWeight;
-        if (weightUnit === 'g') weightInKg = itemWeight / 1000;
-        else if (weightUnit === 'lb') weightInKg = itemWeight * 0.453592;
-        else if (weightUnit === 'oz') weightInKg = itemWeight * 0.0283495;
+        // Convert to kg (ensure weight is positive)
+        let weightInKg = Math.max(0, parseFloat(itemWeight) || 0.5);
+        if (weightUnit === 'g') weightInKg = weightInKg / 1000;
+        else if (weightUnit === 'lb') weightInKg = weightInKg * 0.453592;
+        else if (weightUnit === 'oz') weightInKg = weightInKg * 0.0283495;
         
+        // Cap weight at reasonable maximum (100kg per item)
+        weightInKg = Math.min(weightInKg, 100);
         totalWeight += weightInKg * quantity;
         
         // Dimensions: max length/width, sum height
         const dims = product.shipping.dimensions || {};
         const dimUnit = dims.unit || 'cm';
         
-        // Convert to cm
-        let length = dims.length || 20;
-        let width = dims.width || 15;
-        let height = dims.height || 10;
+        // Convert to cm (ensure dimensions are positive)
+        let length = Math.max(1, parseFloat(dims.length) || 20);
+        let width = Math.max(1, parseFloat(dims.width) || 15);
+        let height = Math.max(1, parseFloat(dims.height) || 10);
         
         if (dimUnit === 'in') {
           length = length * 2.54;
@@ -55,6 +59,11 @@ export default class ShippingCalculator {
           width = width * 100;
           height = height * 100;
         }
+        
+        // Cap dimensions at reasonable maximum (200cm per dimension)
+        length = Math.min(length, 200);
+        width = Math.min(width, 200);
+        height = Math.min(height, 200);
         
         maxLength = Math.max(maxLength, length);
         maxWidth = Math.max(maxWidth, width);
@@ -68,12 +77,12 @@ export default class ShippingCalculator {
       }
     });
 
-    // Ensure minimum values
+    // Ensure minimum values and cap maximums
     return {
-      weight: Math.max(totalWeight, 0.5),
-      length: Math.max(maxLength, 20),
-      width: Math.max(maxWidth, 15),
-      height: Math.max(totalHeight, 10)
+      weight: Math.min(Math.max(totalWeight, 0.5), 100), // Max 100kg
+      length: Math.min(Math.max(maxLength, 20), 200), // Max 200cm
+      width: Math.min(Math.max(maxWidth, 15), 200), // Max 200cm
+      height: Math.min(Math.max(totalHeight, 10), 200) // Max 200cm
     };
   }
 
@@ -126,16 +135,23 @@ export default class ShippingCalculator {
    * Format address for Stallion API
    */
   static formatAddress(address) {
+    if (!address || typeof address !== 'object') {
+      throw new Error('Address must be a valid object');
+    }
+
+    // Clean and format postal code
+    const postalCode = (address.postal_code || address.postalCode || "").replace(/\s/g, "").toUpperCase();
+    
     return {
-      name: address.name || address.fullName || '',
-      company: address.company || "",
-      address1: address.address1 || address.street || address.addressLine1 || '',
-      address2: address.address2 || address.apartment || address.addressLine2 || "",
-      city: address.city || '',
-      province: address.province || address.state || address.provinceCode || '',
-      postal_code: (address.postal_code || address.postalCode || "").replace(/\s/g, "").toUpperCase(),
-      country: address.country || "CA",
-      phone: address.phone || address.mobile || ''
+      name: (address.name || address.fullName || '').trim().substring(0, 100), // Limit length
+      company: (address.company || "").trim().substring(0, 100),
+      address1: (address.address1 || address.street || address.addressLine1 || '').trim().substring(0, 200),
+      address2: (address.address2 || address.apartment || address.addressLine2 || "").trim().substring(0, 200),
+      city: (address.city || '').trim().substring(0, 100),
+      province: (address.province || address.state || address.provinceCode || '').trim().substring(0, 10).toUpperCase(),
+      postal_code: postalCode.substring(0, 10),
+      country: (address.country || "CA").trim().substring(0, 2).toUpperCase(),
+      phone: (address.phone || address.mobile || '').trim().substring(0, 20)
     };
   }
 }
