@@ -8,6 +8,7 @@ import { fetchDataFromApi } from "../../utils/api";
 import { Link } from "react-router-dom";
 import { formatCurrency } from "../../utils/currency";
 import ShippingRates from "../../components/ShippingRates/ShippingRates";
+import ShippingAddressInput from "../../components/ShippingAddressInput/ShippingAddressInput";
 
 const CartPage = () => {
 
@@ -16,7 +17,9 @@ const CartPage = () => {
     postal_code: '',
     city: '',
     province: '',
-    country: 'CA'
+    country: 'Canada',
+    countryCode: 'CA',
+    coordinates: null
   });
   const [selectedShippingRate, setSelectedShippingRate] = useState(null);
 
@@ -109,48 +112,21 @@ const CartPage = () => {
               </span>
             </p>
 
-            {/* Shipping Address Input */}
+            {/* Shipping Address Input with Google Maps Autocomplete */}
             <div className="mt-4 mb-4">
-              <h4 className="text-[14px] font-[600] mb-2">📍 Get Shipping Estimate</h4>
-              <input
-                type="text"
-                placeholder="Postal Code (e.g., M1A1A1)"
-                value={shippingAddress.postal_code}
-                onChange={(e) => {
-                  // Auto-format postal code (remove spaces, uppercase)
-                  const formatted = e.target.value.replace(/\s/g, '').toUpperCase().substring(0, 6);
-                  setShippingAddress({...shippingAddress, postal_code: formatted});
+              <ShippingAddressInput
+                onAddressChange={(newAddress) => {
+                  setShippingAddress({
+                    postal_code: newAddress.postal_code,
+                    city: newAddress.city,
+                    province: newAddress.province,
+                    country: newAddress.country,
+                    countryCode: newAddress.countryCode,
+                    coordinates: newAddress.coordinates
+                  });
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded mb-2 text-[14px]"
-                maxLength={6}
+                initialAddress={shippingAddress}
               />
-              <input
-                type="text"
-                placeholder="City"
-                value={shippingAddress.city}
-                onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded mb-2 text-[14px]"
-              />
-              <select
-                value={shippingAddress.province}
-                onChange={(e) => setShippingAddress({...shippingAddress, province: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded text-[14px]"
-              >
-                <option value="">Select Province</option>
-                <option value="AB">Alberta</option>
-                <option value="BC">British Columbia</option>
-                <option value="MB">Manitoba</option>
-                <option value="NB">New Brunswick</option>
-                <option value="NL">Newfoundland and Labrador</option>
-                <option value="NS">Nova Scotia</option>
-                <option value="ON">Ontario</option>
-                <option value="PE">Prince Edward Island</option>
-                <option value="QC">Quebec</option>
-                <option value="SK">Saskatchewan</option>
-                <option value="NT">Northwest Territories</option>
-                <option value="NU">Nunavut</option>
-                <option value="YT">Yukon</option>
-              </select>
             </div>
 
             {/* Shipping Rates */}

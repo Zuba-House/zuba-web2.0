@@ -12,8 +12,13 @@ const ShippingRates = ({ cartItems, shippingAddress, onRateSelected }) => {
   const [source, setSource] = useState('');
 
   useEffect(() => {
-    // Only fetch if we have valid address and cart items
-    if (shippingAddress?.postal_code && cartItems?.length > 0) {
+    // Only fetch if we have valid address and cart items (worldwide support)
+    const hasValidAddress = shippingAddress && (
+      (shippingAddress.postal_code && shippingAddress.city) ||
+      (shippingAddress.city && shippingAddress.countryCode)
+    );
+    
+    if (hasValidAddress && cartItems?.length > 0) {
       // Debounce to avoid too many API calls
       const timeoutId = setTimeout(() => {
         fetchShippingRates();
@@ -26,12 +31,17 @@ const ShippingRates = ({ cartItems, shippingAddress, onRateSelected }) => {
       setSelectedRate(null);
       onRateSelected && onRateSelected(null);
     }
-  }, [shippingAddress?.postal_code, shippingAddress?.city, shippingAddress?.province, cartItems?.length]);
+  }, [shippingAddress?.postal_code, shippingAddress?.city, shippingAddress?.province, shippingAddress?.countryCode, cartItems?.length]);
 
   const fetchShippingRates = async () => {
-    // Validate inputs before making request
-    if (!shippingAddress?.postal_code || !cartItems?.length) {
-      setError('Please enter a valid address');
+    // Validate inputs before making request (worldwide support)
+    const hasValidAddress = shippingAddress && (
+      (shippingAddress.postal_code && shippingAddress.city) ||
+      (shippingAddress.city && shippingAddress.countryCode)
+    );
+    
+    if (!hasValidAddress || !cartItems?.length) {
+      setError('Please enter a valid address (city and country required)');
       return;
     }
 
@@ -95,10 +105,18 @@ const ShippingRates = ({ cartItems, shippingAddress, onRateSelected }) => {
     onRateSelected && onRateSelected(rate);
   };
 
-  if (!shippingAddress || !shippingAddress.postal_code) {
+  const hasValidAddress = shippingAddress && (
+    (shippingAddress.postal_code && shippingAddress.city) ||
+    (shippingAddress.city && shippingAddress.countryCode)
+  );
+
+  if (!hasValidAddress) {
     return (
       <div className="shipping-rates-placeholder">
-        <p>📍 Enter your address to see shipping options</p>
+        <p>📍 Enter your address (city and country) to see shipping options</p>
+        <small className="text-gray-500 text-xs mt-2 block">
+          🌍 We ship worldwide! Use the address search above.
+        </small>
       </div>
     );
   }
@@ -164,6 +182,9 @@ const ShippingRates = ({ cartItems, shippingAddress, onRateSelected }) => {
                 {rate.deliveryDays && (
                   <div className="rate-delivery">
                     📦 Estimated delivery: {rate.deliveryDays} business days
+                    {rate.region && (
+                      <span className="text-gray-500 text-xs ml-2">({rate.region})</span>
+                    )}
                   </div>
                 )}
                 

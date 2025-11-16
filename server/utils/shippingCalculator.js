@@ -3,6 +3,8 @@
  * Calculates total package dimensions and weight from cart items
  */
 
+import RegionShippingCalculator from './regionShippingCalculator.js';
+
 export default class ShippingCalculator {
   
   /**
@@ -99,59 +101,116 @@ export default class ShippingCalculator {
   }
 
   /**
-   * Calculate fallback shipping cost
+   * Calculate fallback shipping cost with region-based pricing
    * @param {Number} quantity - Number of items
    * @param {Number} weight - Total weight
-   * @returns {Number} Shipping cost in USD
+   * @param {String} countryCode - Country code (e.g., 'CA', 'US', 'GB')
+   * @param {Object} coordinates - { lat, lng } for distance calculation
+   * @returns {Object} { cost, deliveryEstimate, region }
    */
-  static calculateFallbackShipping(quantity, weight) {
-    const baseRate = parseFloat(process.env.FALLBACK_BASE_RATE || 13);
-    const extraItemRate = parseFloat(process.env.FALLBACK_EXTRA_ITEM || 3);
-    const bulkDiscount = parseFloat(process.env.FALLBACK_BULK_DISCOUNT || 0.85);
-    const bulkThreshold = parseInt(process.env.FALLBACK_BULK_THRESHOLD || 10);
+  static calculateFallbackShipping(quantity, weight, countryCode = 'CA', coordinates = null) {
+    try {
+      // Calculate distance if coordinates provided
+      let distance = null;
+      if (coordinates && coordinates.lat && coordinates.lng) {
+        distance = RegionShippingCalculator.getDistanceFromWarehouse(coordinates);
+      }
 
-    // Base calculation
-    let cost = baseRate;
-    
-    // Add cost for extra items (quantity - 1)
-    if (quantity > 1) {
-      cost += (quantity - 1) * extraItemRate;
+      // Calculate region-based shipping
+      const cost = RegionShippingCalculator.calculateRegionShipping(
+        countryCode,
+        quantity,
+        weight,
+        distance
+      );
+
+      // Get delivery estimate
+      const deliveryEstimate = RegionShippingCalculator.getDeliveryEstimate(countryCode);
+
+      return {
+        cost: Math.round(cost * 100) / 100,
+        deliveryEstimate: deliveryEstimate.estimate,
+        minDays: deliveryEstimate.minDays,
+        maxDays: deliveryEstimate.maxDays,
+        region: deliveryEstimate.regionName
+      };
+    } catch (error) {
+      // Fallback if region calculator fails
+      console.error('Region calculator error:', error);
+      const baseRate = parseFloat(process.env.FALLBACK_BASE_RATE || 13);
+      const extraItemRate = parseFloat(process.env.FALLBACK_EXTRA_ITEM || 3);
+      let cost = baseRate + (quantity > 1 ? (quantity - 1) * extraItemRate : 0);
+      if (weight > 5) cost += (weight - 5) * 2;
+      return {
+        cost: Math.round(cost * 100) / 100,
+        deliveryEstimate: '5-7 business days',
+        minDays: 5,
+        maxDays: 7,
+        region: 'International'
+      };
     }
-
-    // Weight surcharge for heavy packages
-    if (weight > 5) {
-      cost += (weight - 5) * 2; // $2 per kg over 5kg
-    }
-
-    // Bulk discount
-    if (quantity >= bulkThreshold) {
-      cost *= bulkDiscount;
-    }
-
-    return Math.round(cost * 100) / 100; // Round to 2 decimals
   }
 
   /**
-   * Format address for Stallion API
+   * Format address for Stallion API (worldwide support)
    */
   static formatAddress(address) {
     if (!address || typeof address !== 'object') {
       throw new Error('Address must be a valid object');
     }
 
-    // Clean and format postal code
-    const postalCode = (address.postal_code || address.postalCode || "").replace(/\s/g, "").toUpperCase();
+    // Get country code (support multiple formats)
+    const countryCode = (address.countryCode || 
+                        address.country || 
+                        address.address?.countryCode ||
+                        "CA").trim().substring(0, 2).toUpperCase();
+
+    // Clean and format postal code (handle different formats worldwide)
+    let postalCode = (address.postal_code || 
+                     address.postalCode || 
+                     address.address?.postalCode ||
+                     address.pincode ||
+                     "").replace(/\s/g, "").toUpperCase();
+    
+    // For non-Canadian addresses, postal code might be longer
+    const maxPostalLength = countryCode === 'CA' ? 7 : 20;
+    postalCode = postalCode.substring(0, maxPostalLength);
     
     return {
-      name: (address.name || address.fullName || '').trim().substring(0, 100), // Limit length
+      name: (address.name || 
+             address.fullName || 
+             address.contactInfo?.firstName + ' ' + address.contactInfo?.lastName ||
+             '').trim().substring(0, 100),
       company: (address.company || "").trim().substring(0, 100),
-      address1: (address.address1 || address.street || address.addressLine1 || '').trim().substring(0, 200),
-      address2: (address.address2 || address.apartment || address.addressLine2 || "").trim().substring(0, 200),
-      city: (address.city || '').trim().substring(0, 100),
-      province: (address.province || address.state || address.provinceCode || '').trim().substring(0, 10).toUpperCase(),
-      postal_code: postalCode.substring(0, 10),
-      country: (address.country || "CA").trim().substring(0, 2).toUpperCase(),
-      phone: (address.phone || address.mobile || '').trim().substring(0, 20)
+      address1: (address.address1 || 
+                 address.street || 
+                 address.addressLine1 ||
+                 address.address?.addressLine1 ||
+                 '').trim().substring(0, 200),
+      address2: (address.address2 || 
+                 address.apartment || 
+                 address.addressLine2 ||
+                 address.address?.addressLine2 ||
+                 "").trim().substring(0, 200),
+      city: (address.city || 
+             address.address?.city ||
+             '').trim().substring(0, 100),
+      province: (address.province || 
+                 address.state || 
+                 address.provinceCode ||
+                 address.address?.provinceCode ||
+                 address.address?.province ||
+                 '').trim().substring(0, 50), // Increased for international states
+      postal_code: postalCode,
+      country: countryCode,
+      phone: (address.phone || 
+              address.mobile || 
+              address.contactInfo?.phone ||
+              '').trim().substring(0, 20),
+      // Include coordinates if available (for distance calculation)
+      coordinates: address.coordinates || 
+                   address.googlePlaces?.coordinates ||
+                   null
     };
   }
 }

@@ -1,5 +1,6 @@
 import { stallionAPI, WAREHOUSE } from '../config/stallion.js';
 import ShippingCalculator from '../utils/shippingCalculator.js';
+import RegionShippingCalculator from '../utils/regionShippingCalculator.js';
 
 /**
  * Get live shipping rates with fallback
@@ -16,29 +17,40 @@ export const getShippingRates = async (req, res) => {
       });
     }
 
-    if (!shippingAddress || !shippingAddress.postal_code) {
+    // Worldwide support - need at least city and country (postal code optional for some countries)
+    const hasPostalCode = shippingAddress?.postal_code || 
+                         shippingAddress?.postalCode ||
+                         shippingAddress?.address?.postalCode;
+    const hasCity = shippingAddress?.city || shippingAddress?.address?.city;
+    const hasCountry = shippingAddress?.countryCode || 
+                      shippingAddress?.country ||
+                      shippingAddress?.address?.countryCode;
+    
+    if (!hasCity || !hasCountry) {
       return res.status(400).json({
         success: false,
-        message: 'Shipping address with postal code is required'
+        message: 'City and country are required for shipping calculation'
       });
     }
 
-    // Validate postal code format (Canadian format: A1A1A1 or A1A 1A1)
-    const postalCodeRegex = /^[A-Za-z]\d[A-Za-z][\s-]?\d[A-Za-z]\d$/;
-    const cleanPostalCode = (shippingAddress.postal_code || '').replace(/\s/g, '').toUpperCase();
-    if (!postalCodeRegex.test(cleanPostalCode)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid postal code format. Please use format: A1A1A1'
-      });
-    }
+    // Get country code (worldwide support)
+    const countryCode = (hasCountry || 'CA').toString().toUpperCase();
 
-    // Validate required address fields
-    if (!shippingAddress.city || !shippingAddress.province) {
-      return res.status(400).json({
-        success: false,
-        message: 'City and province are required'
-      });
+    // Validate postal code format (relaxed for worldwide)
+    const cleanPostalCode = (shippingAddress.postal_code || 
+                            shippingAddress.postalCode ||
+                            shippingAddress.address?.postalCode ||
+                            '').replace(/\s/g, '').toUpperCase();
+    
+    // Only validate Canadian postal codes strictly (if provided)
+    if (countryCode === 'CA' && cleanPostalCode && cleanPostalCode.length > 0) {
+      const postalCodeRegex = /^[A-Za-z]\d[A-Za-z][\s-]?\d[A-Za-z]\d$/;
+      if (!postalCodeRegex.test(cleanPostalCode)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid Canadian postal code format. Please use format: A1A1A1'
+        });
+      }
     }
 
     // Calculate package dimensions
@@ -92,15 +104,39 @@ export const getShippingRates = async (req, res) => {
             // Filter out invalid rates (negative or zero cost)
             if (isNaN(cost) || cost <= 0) return null;
             
+            // Get delivery estimate from region calculator for consistency
+            const deliveryEstimate = RegionShippingCalculator.getDeliveryEstimate(countryCode);
+            
+            // Parse delivery days if provided by Stallion
+            let minDays = deliveryEstimate.minDays;
+            let maxDays = deliveryEstimate.maxDays;
+            let deliveryDaysStr = deliveryEstimate.estimate;
+            
+            if (rate.delivery_days) {
+              if (typeof rate.delivery_days === 'string' && rate.delivery_days.includes('-')) {
+                const parts = rate.delivery_days.split('-');
+                minDays = parseInt(parts[0]) || deliveryEstimate.minDays;
+                maxDays = parseInt(parts[1]) || deliveryEstimate.maxDays;
+                deliveryDaysStr = rate.delivery_days;
+              } else if (typeof rate.delivery_days === 'number') {
+                minDays = rate.delivery_days;
+                maxDays = rate.delivery_days;
+                deliveryDaysStr = `${rate.delivery_days} business days`;
+              }
+            }
+            
             return {
               carrier: rate.carrier || 'Unknown',
               service: rate.service_name || rate.service || 'Standard',
               serviceCode: rate.service_code || 'STANDARD',
               cost: cost,
               currency: rate.currency || 'CAD',
-              deliveryDays: rate.delivery_days || null,
+              deliveryDays: deliveryDaysStr,
+              minDays: minDays,
+              maxDays: maxDays,
               deliveryDate: rate.delivery_date || null,
-              isLive: true
+              isLive: true,
+              region: deliveryEstimate.regionName
             };
           })
           .filter(rate => rate !== null); // Remove invalid rates
@@ -132,22 +168,36 @@ export const getShippingRates = async (req, res) => {
       // Continue to fallback
     }
 
-    // ✅ FALLBACK SHIPPING (if Stallion fails)
-    const fallbackCost = ShippingCalculator.calculateFallbackShipping(
+    // ✅ FALLBACK SHIPPING (if Stallion fails) - Region-based
+    const countryCode = (shippingAddress.countryCode || 
+                        shippingAddress.country || 
+                        shippingAddress.address?.countryCode ||
+                        'CA').toUpperCase();
+    
+    const coordinates = shippingAddress.coordinates || 
+                       shippingAddress.googlePlaces?.coordinates ||
+                       null;
+
+    const fallbackResult = ShippingCalculator.calculateFallbackShipping(
       cartItems.length,
-      packageDetails.weight
+      packageDetails.weight,
+      countryCode,
+      coordinates
     );
 
     const fallbackRates = [
       {
         carrier: 'Zuba House',
-        service: 'Standard Shipping',
+        service: `Standard Shipping (${fallbackResult.region})`,
         serviceCode: 'STANDARD',
-        cost: fallbackCost,
+        cost: fallbackResult.cost,
         currency: 'USD',
-        deliveryDays: '5-7',
+        deliveryDays: fallbackResult.deliveryEstimate,
+        minDays: fallbackResult.minDays,
+        maxDays: fallbackResult.maxDays,
         deliveryDate: null,
-        isLive: false
+        isLive: false,
+        region: fallbackResult.region
       }
     ];
 

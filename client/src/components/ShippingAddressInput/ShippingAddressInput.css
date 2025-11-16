@@ -1,0 +1,35 @@
+.shipping-address-input {
+  margin: 15px 0;
+}
+
+.shipping-address-input .form-group {
+  margin-bottom: 10px;
+}
+
+.shipping-address-input input[type="text"],
+.shipping-address-input select {
+  transition: border-color 0.3s ease;
+}
+
+.shipping-address-input input[type="text"]:focus,
+.shipping-address-input select:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+}
+
+.shipping-address-error {
+  padding: 15px;
+  background: #fee;
+  border: 1px solid #fcc;
+  border-radius: 6px;
+  color: #c33;
+  font-size: 14px;
+}
+
+.manual-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
