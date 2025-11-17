@@ -27,6 +27,7 @@ import variationRouter from './route/variation.route.js';
 import mediaRouter from './route/media.route.js';
 import notificationRouter from './route/notification.route.js';
 import shippingRouter from './route/shipping.route.js';
+import { transporter } from './config/emailService.js';
 
 // Validate environment variables at startup
 try {
@@ -96,6 +97,48 @@ app.get("/api/health", (request, response) => {
         uptime: process.uptime(),
         timestamp: new Date().toISOString()
     });
+});
+
+// Test email endpoint (for testing SMTP configuration)
+app.get("/test-email", async (req, res) => {
+    try {
+        const senderEmail = process.env.EMAIL || 'orders@zubahouse.com';
+        const senderName = process.env.EMAIL_SENDER_NAME || 'Zuba House';
+        const fromAddress = `${senderName} <${senderEmail}>`;
+        const testRecipient = process.env.TEST_EMAIL || 'olivier.niyo250@gmail.com';
+        
+        const info = await transporter.sendMail({
+            from: fromAddress,
+            to: testRecipient,
+            subject: "Zuba House SMTP Test",
+            text: "Hostinger SMTP is working perfectly!",
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px;">
+                    <h2 style="color: #2c3e50;">✅ SMTP Test Successful!</h2>
+                    <p>Your Hostinger email configuration is working correctly.</p>
+                    <p><strong>From:</strong> ${fromAddress}</p>
+                    <p><strong>SMTP Host:</strong> ${process.env.SMTP_HOST || 'smtp.hostinger.com'}</p>
+                    <p><strong>Port:</strong> ${process.env.SMTP_PORT || '465'}</p>
+                    <p style="margin-top: 20px; color: #27ae60;">🎉 Email sending is ready for production!</p>
+                </div>
+            `
+        });
+        
+        res.json({
+            success: true,
+            message: "Email sent successfully!",
+            messageId: info.messageId,
+            from: fromAddress,
+            to: testRecipient
+        });
+    } catch (error) {
+        console.error('Test email error:', error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to send test email",
+            error: error.message
+        });
+    }
 });
 
 

@@ -45,10 +45,19 @@ cloudinary_Config_api_secret=your_cloudinary_api_secret
 # ============================================
 # EMAIL CONFIGURATION (REQUIRED)
 # ============================================
-# For sending emails (password reset, verification, etc.)
-# For Gmail, use an App Password: https://support.google.com/accounts/answer/185833
-EMAIL=your_email@gmail.com
-EMAIL_PASS=your_email_app_password
+# For sending emails (password reset, verification, order confirmations, etc.)
+# Hostinger SMTP Configuration
+EMAIL=orders@zubahouse.com
+EMAIL_PASS=your_email_password
+EMAIL_SENDER_NAME=Zuba House
+
+# Hostinger SMTP Settings
+SMTP_HOST=smtp.hostinger.com
+SMTP_PORT=465
+SMTP_SECURE=true
+
+# Optional: Test email recipient (for /test-email endpoint)
+TEST_EMAIL=olivier.niyo250@gmail.com
 
 # ============================================
 # STRIPE PAYMENT CONFIGURATION (OPTIONAL)
