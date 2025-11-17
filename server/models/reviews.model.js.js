@@ -35,6 +35,16 @@ const reviewsSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    // Additional customer info for email notifications
+    customerName: {
+        type: String,
+        trim: true
+    },
+    customerEmail: {
+        type: String,
+        trim: true,
+        lowercase: true
+    },
     userAvatar: {
         type: String,
         default: ''
@@ -120,6 +130,70 @@ reviewsSchema.methods.unmarkHelpful = async function(userId) {
         await this.save();
     }
 };
+
+// Update product rating when review is approved/rejected
+reviewsSchema.methods.updateProductRating = async function() {
+    const Product = mongoose.model('Product');
+    
+    // Get all approved reviews for this product
+    const approvedReviews = await this.constructor.find({
+        productId: this.productId,
+        status: 'approved',
+        isApproved: true
+    });
+    
+    if (approvedReviews.length === 0) {
+        await Product.findByIdAndUpdate(this.productId, {
+            'ratingSummary.average': 0,
+            'ratingSummary.count': 0,
+            'ratingSummary.distribution': { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+            rating: 0,
+            reviewsCount: 0
+        });
+        return;
+    }
+    
+    // Calculate average rating
+    const totalRating = approvedReviews.reduce((sum, review) => sum + review.rating, 0);
+    const averageRating = totalRating / approvedReviews.length;
+    
+    // Calculate rating breakdown
+    const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    approvedReviews.forEach(review => {
+        distribution[review.rating] = (distribution[review.rating] || 0) + 1;
+    });
+    
+    // Update product
+    await Product.findByIdAndUpdate(this.productId, {
+        'ratingSummary.average': Math.round(averageRating * 10) / 10,
+        'ratingSummary.count': approvedReviews.length,
+        'ratingSummary.distribution': distribution,
+        rating: Math.round(averageRating * 10) / 10,
+        reviewsCount: approvedReviews.length
+    });
+};
+
+// Hook to update product rating when review is saved
+reviewsSchema.post('save', async function(doc) {
+    if (doc.status === 'approved' && doc.isApproved) {
+        try {
+            await doc.updateProductRating();
+        } catch (error) {
+            console.error('Error updating product rating:', error);
+        }
+    }
+});
+
+// Hook to update product rating when review is removed
+reviewsSchema.post('findOneAndDelete', async function(doc) {
+    if (doc) {
+        try {
+            await doc.updateProductRating();
+        } catch (error) {
+            console.error('Error updating product rating after removal:', error);
+        }
+    }
+});
 
 const ReviewModel = mongoose.model('reviews', reviewsSchema);
 

@@ -6,7 +6,7 @@ import "swiper/css";
 import "swiper/css/navigation";
 import { Navigation } from "swiper/modules";
 import { useParams } from 'react-router-dom';
-import { fetchDataFromApi } from '../../utils/api';
+import { fetchDataFromApi, postData } from '../../utils/api';
 import { MdBrandingWatermark } from "react-icons/md";
 import { BiSolidCategoryAlt } from "react-icons/bi";
 import { MdFilterVintage } from "react-icons/md";
@@ -14,7 +14,222 @@ import { MdRateReview } from "react-icons/md";
 import { BsPatchCheckFill } from "react-icons/bs";
 import Rating from '@mui/material/Rating';
 import CircularProgress from '@mui/material/CircularProgress';
-import VariationsManager from './VariationsManager';
+// import VariationsManager from './VariationsManager'; // Removed - variations section disabled
+
+// Admin Review Management Component
+const AdminReviewManagement = ({ productId }) => {
+    const [reviews, setReviews] = useState([]);
+    const [statusCounts, setStatusCounts] = useState({});
+    const [loading, setLoading] = useState(true);
+    const [activeFilter, setActiveFilter] = useState('all');
+
+    useEffect(() => {
+        if (productId) {
+            loadReviews();
+        }
+    }, [productId]);
+
+    const loadReviews = async () => {
+        setLoading(true);
+        try {
+            const res = await fetchDataFromApi(`/api/user/getProductReviewsAdmin/${productId}`);
+            if (res?.success) {
+                setReviews(res.reviews || []);
+                setStatusCounts(res.statusCounts || {});
+            }
+        } catch (error) {
+            console.error('Error loading reviews:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleApprove = async (reviewId) => {
+        try {
+            const res = await postData(`/api/user/reviews/${reviewId}/approve`, {});
+            if (res.success) {
+                alert('✅ Review approved!');
+                loadReviews();
+            } else {
+                alert('❌ Failed to approve review');
+            }
+        } catch (error) {
+            alert('❌ Failed to approve review');
+        }
+    };
+
+    const handleReject = async (reviewId) => {
+        const reason = prompt('Reason for rejection (optional):');
+        try {
+            const res = await postData(`/api/user/reviews/${reviewId}/reject`, { reason: reason || '' });
+            if (res.success) {
+                alert('✅ Review rejected');
+                loadReviews();
+            } else {
+                alert('❌ Failed to reject review');
+            }
+        } catch (error) {
+            alert('❌ Failed to reject review');
+        }
+    };
+
+    const handleSpam = async (reviewId) => {
+        if (!window.confirm('Mark this review as spam?')) return;
+        try {
+            const res = await postData(`/api/user/reviews/${reviewId}/spam`, {});
+            if (res.success) {
+                alert('✅ Marked as spam');
+                loadReviews();
+            } else {
+                alert('❌ Failed to mark as spam');
+            }
+        } catch (error) {
+            alert('❌ Failed to mark as spam');
+        }
+    };
+
+    const renderStars = (rating) => {
+        return '★'.repeat(rating) + '☆'.repeat(5 - rating);
+    };
+
+    const filteredReviews = activeFilter === 'all' 
+        ? reviews 
+        : reviews.filter(r => r.status === activeFilter);
+
+    if (loading) {
+        return (
+            <div className="mt-8 bg-white rounded-lg shadow-md p-6">
+                <div className="text-center py-8">Loading reviews...</div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="mt-8 bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <MdRateReview className="text-[20px]" />
+                Product Reviews Management ({statusCounts.all || 0})
+            </h3>
+            
+            {/* Status Filter Tabs */}
+            <div className="flex gap-2 mb-6 flex-wrap">
+                {['all', 'pending', 'approved', 'rejected', 'spam'].map((status) => (
+                    <button
+                        key={status}
+                        onClick={() => setActiveFilter(status)}
+                        className={`px-4 py-2 rounded-lg font-medium transition ${
+                            activeFilter === status
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                    >
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                        {statusCounts[status] > 0 && (
+                            <span className="ml-2 bg-white text-blue-600 px-2 py-0.5 rounded-full text-xs">
+                                {statusCounts[status]}
+                            </span>
+                        )}
+                    </button>
+                ))}
+            </div>
+
+            {/* Reviews List */}
+            {filteredReviews.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                    No {activeFilter !== 'all' ? activeFilter : ''} reviews found
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {filteredReviews.map((review) => (
+                        <div
+                            key={review._id}
+                            className={`border rounded-lg p-4 ${
+                                review.status === 'pending' ? 'bg-yellow-50 border-yellow-300' :
+                                review.status === 'approved' ? 'bg-green-50 border-green-300' :
+                                review.status === 'rejected' ? 'bg-red-50 border-red-300' :
+                                'bg-gray-50 border-gray-300'
+                            }`}
+                        >
+                            <div className="flex justify-between items-start mb-3">
+                                <div>
+                                    <div className="flex items-center gap-3 mb-1">
+                                        <span className="font-semibold">{review.userName || review.customerName || 'Guest'}</span>
+                                        <span className="text-yellow-500 text-lg">
+                                            {renderStars(review.rating)}
+                                        </span>
+                                        {review.verifiedPurchase && (
+                                            <span className="text-xs bg-green-500 text-white px-2 py-1 rounded">
+                                                ✓ Verified
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-sm text-gray-600">
+                                        {review.customerEmail && <span>{review.customerEmail} • </span>}
+                                        <span>{new Date(review.createdAt).toLocaleString()}</span>
+                                    </div>
+                                </div>
+                                <span
+                                    className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                        review.status === 'approved' ? 'bg-green-500 text-white' :
+                                        review.status === 'pending' ? 'bg-yellow-500 text-white' :
+                                        review.status === 'rejected' ? 'bg-red-500 text-white' :
+                                        'bg-gray-500 text-white'
+                                    }`}
+                                >
+                                    {review.status.toUpperCase()}
+                                </span>
+                            </div>
+                            <p className="text-gray-700 mb-4">{review.review}</p>
+                            
+                            {/* Action Buttons */}
+                            <div className="flex gap-2 flex-wrap">
+                                {review.status !== 'approved' && (
+                                    <button
+                                        onClick={() => handleApprove(review._id)}
+                                        className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition text-sm"
+                                    >
+                                        ✓ Approve
+                                    </button>
+                                )}
+                                {review.status !== 'rejected' && (
+                                    <button
+                                        onClick={() => handleReject(review._id)}
+                                        className="flex items-center gap-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition text-sm"
+                                    >
+                                        ✗ Reject
+                                    </button>
+                                )}
+                                {review.status !== 'spam' && (
+                                    <button
+                                        onClick={() => handleSpam(review._id)}
+                                        className="flex items-center gap-1 px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 transition text-sm"
+                                    >
+                                        ⚠ Spam
+                                    </button>
+                                )}
+                            </div>
+                            
+                            {/* Admin Note (if rejected) */}
+                            {review.rejectionReason && (
+                                <div className="mt-3 p-3 bg-white border border-gray-300 rounded">
+                                    <span className="text-sm font-medium text-gray-700">Admin Note:</span>
+                                    <p className="text-sm text-gray-600">{review.rejectionReason}</p>
+                                </div>
+                            )}
+                            
+                            {/* Reviewed By Info */}
+                            {review.approvedBy && (
+                                <div className="mt-2 text-xs text-gray-500">
+                                    Reviewed by {review.approvedBy?.name || 'Admin'} on {new Date(review.approvedAt).toLocaleString()}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
 
 const ProductDetails = () => {
 
@@ -271,13 +486,11 @@ const ProductDetails = () => {
 
                         <br />
 
-                        {product?.productType === 'variable' && (
-                            <div className="mb-6">
-                                <h2 className="text-[18px] font-[600] mb-3">Variations</h2>
-                                <VariationsManager productId={product?._id} />
-                            </div>
-                        )}
-
+                        {/* Variations section removed - auto-generate not working */}
+                        
+                        {/* Admin Review Management Section */}
+                        <AdminReviewManagement productId={id} />
+                        
                         {
                             reviewsData?.length !== 0 &&
                             <h2 className="text-[18px] font-[500]">Customer Reviews</h2>

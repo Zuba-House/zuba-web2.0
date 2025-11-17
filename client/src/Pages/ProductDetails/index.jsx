@@ -200,10 +200,98 @@ export const ProductDetails = () => {
                 </div>
 
                 {activeTab === 0 && (
-                  <div className="shadow-md w-full py-5 px-8 rounded-md text-[14px]">
-                    {
-                      productData?.description
-                    }
+                  <div className="shadow-md w-full py-5 px-8 rounded-md">
+                    {/* Short Description */}
+                    {productData?.shortDescription && (
+                      <div className="mb-6 bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
+                        <h3 className="font-semibold text-lg mb-2 text-blue-900">Quick Overview</h3>
+                        <p className="text-[14px] text-gray-800 leading-relaxed">
+                          {productData.shortDescription}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Full Description */}
+                    {productData?.description && (
+                      <div className="mb-6">
+                        <h3 className="font-semibold text-lg mb-3 text-gray-900">Full Description</h3>
+                        <div className="text-[14px] text-gray-700 leading-relaxed whitespace-pre-line">
+                          {productData.description}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Product Specifications */}
+                    <div className="mb-6">
+                      <h3 className="font-semibold text-lg mb-3 text-gray-900">Specifications</h3>
+                      <table className="w-full border-collapse">
+                        <tbody>
+                          {/* Brand */}
+                          {productData?.brand && (
+                            <tr className="border-b">
+                              <td className="py-3 px-4 bg-gray-50 font-medium text-gray-700 w-1/3">Brand</td>
+                              <td className="py-3 px-4 text-gray-800">{productData.brand}</td>
+                            </tr>
+                          )}
+                          {/* Category */}
+                          {productData?.category?.name && (
+                            <tr className="border-b">
+                              <td className="py-3 px-4 bg-gray-50 font-medium text-gray-700">Category</td>
+                              <td className="py-3 px-4 text-gray-800">{productData.category.name}</td>
+                            </tr>
+                          )}
+                          {/* Dimensions */}
+                          {productData?.shipping?.dimensions && (
+                            <tr className="border-b">
+                              <td className="py-3 px-4 bg-gray-50 font-medium text-gray-700">Dimensions (L×W×H)</td>
+                              <td className="py-3 px-4 text-gray-800">
+                                {productData.shipping.dimensions.length} × {productData.shipping.dimensions.width} × {productData.shipping.dimensions.height} {productData.shipping.dimensions.unit || 'cm'}
+                              </td>
+                            </tr>
+                          )}
+                          {/* Weight */}
+                          {productData?.shipping?.weight && (
+                            <tr className="border-b">
+                              <td className="py-3 px-4 bg-gray-50 font-medium text-gray-700">Weight</td>
+                              <td className="py-3 px-4 text-gray-800">
+                                {productData.shipping.weight} {productData.shipping.weightUnit || 'kg'}
+                              </td>
+                            </tr>
+                          )}
+                          {/* Tags */}
+                          {productData?.tags && productData.tags.length > 0 && (
+                            <tr className="border-b">
+                              <td className="py-3 px-4 bg-gray-50 font-medium text-gray-700">Tags</td>
+                              <td className="py-3 px-4">
+                                <div className="flex flex-wrap gap-2">
+                                  {productData.tags.map((tag, index) => (
+                                    <span
+                                      key={index}
+                                      className="inline-block bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded"
+                                    >
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          {/* Stock Status */}
+                          <tr className="border-b">
+                            <td className="py-3 px-4 bg-gray-50 font-medium text-gray-700">Availability</td>
+                            <td className="py-3 px-4">
+                              <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                                productData?.countInStock > 0 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {productData?.countInStock > 0 ? 'In Stock' : 'Out of Stock'}
+                              </span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
 

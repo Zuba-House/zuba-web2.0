@@ -273,7 +273,57 @@ export const ProductDetailsComponent = (props) => {
         </div>
       </div>
 
-      {/* Product Description */}
+      {/* Short Description */}
+      {product?.shortDescription && (
+        <div className="mb-4 bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
+          <p className="text-[14px] text-gray-800 font-medium leading-relaxed">
+            {product?.shortDescription}
+          </p>
+        </div>
+      )}
+
+      {/* Product Tags */}
+      {product?.tags && product.tags.length > 0 && (
+        <div className="mb-4">
+          <div className="flex flex-wrap gap-2">
+            {product.tags.map((tag, index) => (
+              <span
+                key={index}
+                className="inline-block bg-gray-100 text-gray-700 text-xs px-3 py-1 rounded-full hover:bg-blue-100 hover:text-blue-700 cursor-pointer transition"
+              >
+                #{tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Product Specifications (Dimensions & Weight) */}
+      {(product?.shipping?.dimensions || product?.shipping?.weight) && (
+        <div className="mb-6 bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-sm font-semibold mb-3 text-gray-800">Product Specifications</h4>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            {product.shipping?.dimensions && (
+              <div>
+                <span className="text-gray-600">Dimensions:</span>
+                <span className="ml-2 font-medium text-gray-800">
+                  {product.shipping.dimensions.length} × {product.shipping.dimensions.width} × {product.shipping.dimensions.height} {product.shipping.dimensions.unit || 'cm'}
+                </span>
+              </div>
+            )}
+            {product.shipping?.weight && (
+              <div>
+                <span className="text-gray-600">Weight:</span>
+                <span className="ml-2 font-medium text-gray-800">
+                  {product.shipping.weight} {product.shipping.weightUnit || 'kg'}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Full Description */}
       {product?.description && (
         <div className="mb-6">
           <p className="text-[14px] text-gray-700 leading-relaxed pr-4">

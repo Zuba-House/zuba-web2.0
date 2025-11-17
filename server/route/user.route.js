@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import {addReview, authWithGoogle, changePasswordController, deleteMultiple, deleteUser, forgotPasswordController, getAllReviews, getAllUsers, getReviews, loginUserController, logoutController, refreshToken, registerUserController, removeImageFromCloudinary, resetpassword, updateUserDetails, userAvatarController, userDetails, verifyEmailController, verifyForgotPasswordOtp} from '../controllers/user.controller.js';
+import {addReview, approveReview, authWithGoogle, changePasswordController, deleteMultiple, deleteUser, forgotPasswordController, getAllReviews, getAllUsers, getProductReviewsAdmin, getReviews, loginUserController, logoutController, markReviewAsSpam, refreshToken, registerUserController, rejectReview, removeImageFromCloudinary, resetpassword, updateUserDetails, userAvatarController, userDetails, verifyEmailController, verifyForgotPasswordOtp} from '../controllers/user.controller.js';
 import auth, { optionalAuth } from '../middlewares/auth.js';
 import upload from '../middlewares/multer.js';
 
@@ -21,10 +21,15 @@ userRouter.get('/user-details',auth,userDetails);
 // Allow both guests and logged-in users to add reviews
 userRouter.post('/addReview', optionalAuth, addReview);
 userRouter.get('/getReviews',getReviews);
-userRouter.get('/getAllReviews',getAllReviews);
+userRouter.get('/getAllReviews',auth, getAllReviews); // Admin only
+userRouter.get('/getProductReviewsAdmin/:productId', auth, getProductReviewsAdmin); // Admin only - get reviews for specific product
 userRouter.get('/getAllUsers',getAllUsers);
 userRouter.delete('/deleteMultiple',deleteMultiple);
 userRouter.delete('/deleteUser/:id',deleteUser);
+// Admin review management routes
+userRouter.post('/reviews/:reviewId/approve', auth, approveReview);
+userRouter.post('/reviews/:reviewId/reject', auth, rejectReview);
+userRouter.post('/reviews/:reviewId/spam', auth, markReviewAsSpam);
 
 
 export default userRouter

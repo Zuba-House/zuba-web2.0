@@ -31,6 +31,7 @@ import { BannerList2 } from "./Pages/Banners/bannerList2";
 import { BlogList } from "./Pages/Blog";
 import ManageLogo from "./Pages/ManageLogo";
 import LoadingBar from "react-top-loading-bar";
+import NotFound from "./Pages/NotFound";
 
 import { useParams } from 'react-router-dom';
 
