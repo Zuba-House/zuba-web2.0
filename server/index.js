@@ -5,6 +5,7 @@ dotenv.config();
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import helmet from 'helmet';
+import mongoose from 'mongoose';
 import connectDB from './config/connectDb.js';
 import { validateEnv } from './config/validateEnv.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
@@ -41,8 +42,10 @@ const app = express();
 
 // CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
-    ? process.env.ALLOWED_ORIGINS.split(',')
-    : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
+    ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+    : process.env.NODE_ENV === 'production'
+        ? [] // Require explicit origins in production
+        : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
 
 app.use(cors({
     origin: function (origin, callback) {
@@ -58,7 +61,9 @@ app.use(cors({
         if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));
+            const msg = `CORS policy: Origin ${origin} is not allowed. Allowed origins: ${allowedOrigins.length > 0 ? allowedOrigins.join(', ') : 'None configured'}`;
+            console.error(msg);
+            callback(new Error(msg));
         }
     },
     credentials: true,
@@ -92,10 +97,13 @@ app.get("/", (request, response) => {
 
 // Health check API endpoint
 app.get("/api/health", (request, response) => {
+    const dbStatus = mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected';
     response.json({
-        status: "healthy",
+        status: dbStatus === 'Connected' ? "healthy" : "degraded",
         uptime: process.uptime(),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        database: dbStatus,
+        environment: process.env.NODE_ENV || 'development'
     });
 });
 
@@ -158,6 +166,8 @@ app.use("/api/orders", orderTrackingRouter);
 app.use("/api/logo", logoRouter);
 app.use("/api/stripe", stripeRoute);
 app.use("/api/attributes", attributeRouter);
+// Variations route - nested under products
+// Access via: /api/products/:id/variations (id = productId)
 app.use("/api/products/:id/variations", variationRouter);
 app.use("/api/media", mediaRouter);
 app.use("/api", notificationRouter);

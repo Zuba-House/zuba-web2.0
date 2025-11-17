@@ -527,8 +527,6 @@ export async function verifyForgotPasswordOtp(request, response) {
 
         const user = await UserModel.findOne({ email: email })
 
-        console.log(user)
-
         if (!user) {
             return response.status(400).json({
                 message: "Email not available",
