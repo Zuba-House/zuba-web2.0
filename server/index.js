@@ -41,35 +41,77 @@ try {
 const app = express();
 
 // CORS configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-    ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-    : process.env.NODE_ENV === 'production'
-        ? [] // Require explicit origins in production
-        : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
+const allowedOrigins = [
+    // Local development
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    
+    // Vercel production domains
+    'https://zuba-web2-0.vercel.app',
+    'https://zuba-web2-0-git-master-zuba-houses-projects.vercel.app',
+    
+    // Vercel preview deployments (wildcard pattern)
+    'https://*.vercel.app',
+    
+    // Environment variables (for custom domains)
+    process.env.FRONTEND_URL,
+    process.env.ADMIN_URL,
+    
+    // ALLOWED_ORIGINS from environment (comma-separated)
+    ...(process.env.ALLOWED_ORIGINS 
+        ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+        : [])
+].filter(Boolean); // Remove undefined/null values
+
+// Log allowed origins on startup
+console.log('🔐 CORS Allowed Origins:', allowedOrigins.length > 0 ? allowedOrigins : 'None configured');
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        
-        // In development, allow all origins for easier testing
-        if (process.env.NODE_ENV !== 'production') {
+        // Allow requests with no origin (like mobile apps, Postman, curl requests)
+        if (!origin) {
+            console.log('✅ Request with no origin allowed');
             return callback(null, true);
         }
         
-        // In production, only allow specified origins
-        if (allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
+        // In development, allow all origins for easier testing
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('✅ Development mode - allowing origin:', origin);
+            return callback(null, true);
+        }
+        
+        // Check if origin is in allowed list
+        const isAllowed = allowedOrigins.some(allowedOrigin => {
+            // Support wildcard patterns (e.g., https://*.vercel.app)
+            if (allowedOrigin && allowedOrigin.includes('*')) {
+                const pattern = allowedOrigin.replace(/\*/g, '.*');
+                const regex = new RegExp('^' + pattern + '$');
+                return regex.test(origin);
+            }
+            return origin === allowedOrigin;
+        });
+        
+        if (isAllowed) {
+            console.log('✅ CORS allowed for origin:', origin);
+            return callback(null, true);
         } else {
             const msg = `CORS policy: Origin ${origin} is not allowed. Allowed origins: ${allowedOrigins.length > 0 ? allowedOrigins.join(', ') : 'None configured'}`;
-            console.error(msg);
-            callback(new Error(msg));
+            console.error('❌ CORS blocked for origin:', origin);
+            console.error('   Allowed origins:', allowedOrigins);
+            return callback(new Error(msg), false);
         }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    maxAge: 600 // Cache preflight requests for 10 minutes
 }));
+
+// Handle preflight requests explicitly
+app.options('*', cors());
 
 // Body parser with size limit
 app.use(express.json({ limit: '10mb' }));
