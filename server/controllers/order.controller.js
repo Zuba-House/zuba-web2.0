@@ -541,11 +541,24 @@ export const updateOrderStatusController = async (request, response) => {
             orderId: savedOrder._id,
             oldStatus: oldStatus,
             newStatus: newStatus,
+            statusProvided: status,
+            order_statusProvided: order_status,
             updateData: updateData
         });
 
-        // Send email notification if status changed
-        if (status && oldStatus !== newStatus) {
+        // Send email notification if status changed (check both status and order_status)
+        // Always send email if status is provided (even if it's the same, admin might want to notify customer)
+        const statusChanged = status || order_status; // Send email if either status field is updated
+        
+        if (statusChanged) {
+            console.log('📧 Status update detected, preparing to send email...');
+            console.log('📧 Status change details:', {
+                statusProvided: status,
+                order_statusProvided: order_status,
+                oldStatus: oldStatus,
+                newStatus: newStatus,
+                willSendEmail: true
+            });
             try {
                 // Import email service and template
                 const { sendEmail } = await import('../config/emailService.js');
@@ -553,40 +566,67 @@ export const updateOrderStatusController = async (request, response) => {
                 
                 // Get customer email (support both registered users and guest orders)
                 let customerEmail = '';
+                let customerName = '';
+                
                 if (savedOrder.guestCustomer?.email) {
                     customerEmail = savedOrder.guestCustomer.email;
+                    customerName = savedOrder.guestCustomer.name || 'Customer';
+                    console.log('📧 Found guest customer email:', customerEmail);
                 } else if (savedOrder.userId) {
                     const UserModel = (await import('../models/user.model.js')).default;
                     const user = await UserModel.findById(savedOrder.userId);
                     if (user) {
                         customerEmail = user.email;
+                        customerName = user.name || 'Customer';
+                        console.log('📧 Found registered user email:', customerEmail);
+                    } else {
+                        console.log('⚠️ User not found for userId:', savedOrder.userId);
                     }
+                } else {
+                    console.log('⚠️ No userId or guestCustomer found in order');
                 }
                 
                 // Only send email if we have a customer email
                 if (customerEmail) {
                     console.log('📧 Sending status update email to:', customerEmail);
+                    console.log('📧 Order details:', {
+                        orderId: savedOrder._id,
+                        status: newStatus,
+                        hasProducts: savedOrder.products?.length > 0
+                    });
                     
-                    // Populate products for email template
-                    const populatedOrder = await savedOrder.populate('products.productId');
-                    
-                    const emailSubject = `Order Status Update - Order #${savedOrder._id.toString().slice(-8).toUpperCase()}`;
-                    const emailText = `Your order #${savedOrder._id.toString().slice(-8).toUpperCase()} status has been updated to ${newStatus}.`;
-                    
-                    const emailResult = await sendEmail(
-                        customerEmail,
-                        emailSubject,
-                        emailText,
-                        OrderStatusEmailTemplate(populatedOrder, newStatus)
-                    );
-                    
-                    if (emailResult.success) {
-                        console.log('✅ Status update email sent successfully:', emailResult.messageId);
-                    } else {
-                        console.warn('⚠️ Email sending failed, but order updated:', emailResult.error);
+                    try {
+                        // Populate products for email template
+                        const populatedOrder = await savedOrder.populate('products.productId');
+                        
+                        const emailSubject = `Order Status Update - Order #${savedOrder._id.toString().slice(-8).toUpperCase()}`;
+                        const emailText = `Your order #${savedOrder._id.toString().slice(-8).toUpperCase()} status has been updated to ${newStatus}.`;
+                        
+                        console.log('📧 Calling sendEmail function...');
+                        const emailResult = await sendEmail(
+                            customerEmail,
+                            emailSubject,
+                            emailText,
+                            OrderStatusEmailTemplate(populatedOrder, newStatus)
+                        );
+                        
+                        if (emailResult && emailResult.success) {
+                            console.log('✅ Status update email sent successfully:', emailResult.messageId);
+                        } else {
+                            console.error('❌ Email sending failed:', emailResult?.error || 'Unknown error');
+                            console.error('Email result:', emailResult);
+                        }
+                    } catch (templateError) {
+                        console.error('❌ Error generating email template:', templateError.message);
+                        console.error('Template error stack:', templateError.stack);
                     }
                 } else {
-                    console.log('⚠️ No customer email found, skipping email notification');
+                    console.log('⚠️ No customer email found. Order details:', {
+                        hasGuestCustomer: !!savedOrder.guestCustomer,
+                        guestEmail: savedOrder.guestCustomer?.email,
+                        hasUserId: !!savedOrder.userId,
+                        userId: savedOrder.userId
+                    });
                 }
             } catch (emailError) {
                 // Don't fail the order update if email fails

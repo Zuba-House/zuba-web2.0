@@ -60,13 +60,20 @@ export async function registerUserController(request, response) {
         await user.save();
 
         // Send verification email
-        await sendEmailFun({
+        console.log('📧 Sending OTP email to:', email);
+        const emailSent = await sendEmailFun({
             sendTo: email,
             subject: "Verify email from Ecommerce App",
             text: "",
             html: VerificationEmail(name, verifyCode)
-        })
+        });
 
+        if (emailSent) {
+            console.log('✅ OTP email sent successfully to:', email);
+        } else {
+            console.error('❌ Failed to send OTP email to:', email);
+            // Don't fail registration, but log the error
+        }
 
         // Create a JWT token for verification purposes
         const token = jwt.sign(
@@ -493,13 +500,19 @@ export async function forgotPasswordController(request, response) {
 
             await user.save();
 
-            await sendEmailFun({
+            console.log('📧 Sending forgot password OTP email to:', email);
+            const emailSent = await sendEmailFun({
                 sendTo: email,
                 subject: "Verify OTP from Ecommerce App",
                 text: "",
                 html: VerificationEmail(user.name, verifyCode)
-            })
+            });
 
+            if (emailSent) {
+                console.log('✅ Forgot password OTP email sent successfully to:', email);
+            } else {
+                console.error('❌ Failed to send forgot password OTP email to:', email);
+            }
 
             return response.json({
                 message: "check your email",
