@@ -527,15 +527,72 @@ export const updateOrderStatusController = async (request, response) => {
             updateData.estimatedDelivery = new Date(estimatedDelivery);
         }
 
+        // Store old status for comparison
+        const oldStatus = order.status || order.order_status;
+        
         // Apply updates
         Object.assign(order, updateData);
         const savedOrder = await order.save();
         
+        // Get the new status (prioritize new status field)
+        const newStatus = savedOrder.status || savedOrder.order_status;
+        
         console.log('✅ Order updated successfully:', {
             orderId: savedOrder._id,
-            newStatus: savedOrder.status || savedOrder.order_status,
+            oldStatus: oldStatus,
+            newStatus: newStatus,
             updateData: updateData
         });
+
+        // Send email notification if status changed
+        if (status && oldStatus !== newStatus) {
+            try {
+                // Import email service and template
+                const { sendEmail } = await import('../config/emailService.js');
+                const OrderStatusEmailTemplate = (await import('../utils/orderStatusEmailTemplate.js')).default;
+                
+                // Get customer email (support both registered users and guest orders)
+                let customerEmail = '';
+                if (savedOrder.guestCustomer?.email) {
+                    customerEmail = savedOrder.guestCustomer.email;
+                } else if (savedOrder.userId) {
+                    const UserModel = (await import('../models/user.model.js')).default;
+                    const user = await UserModel.findById(savedOrder.userId);
+                    if (user) {
+                        customerEmail = user.email;
+                    }
+                }
+                
+                // Only send email if we have a customer email
+                if (customerEmail) {
+                    console.log('📧 Sending status update email to:', customerEmail);
+                    
+                    // Populate products for email template
+                    const populatedOrder = await savedOrder.populate('products.productId');
+                    
+                    const emailSubject = `Order Status Update - Order #${savedOrder._id.toString().slice(-8).toUpperCase()}`;
+                    const emailText = `Your order #${savedOrder._id.toString().slice(-8).toUpperCase()} status has been updated to ${newStatus}.`;
+                    
+                    const emailResult = await sendEmail(
+                        customerEmail,
+                        emailSubject,
+                        emailText,
+                        OrderStatusEmailTemplate(populatedOrder, newStatus)
+                    );
+                    
+                    if (emailResult.success) {
+                        console.log('✅ Status update email sent successfully:', emailResult.messageId);
+                    } else {
+                        console.warn('⚠️ Email sending failed, but order updated:', emailResult.error);
+                    }
+                } else {
+                    console.log('⚠️ No customer email found, skipping email notification');
+                }
+            } catch (emailError) {
+                // Don't fail the order update if email fails
+                console.error('❌ Error sending status update email:', emailError.message);
+            }
+        }
 
         // Create notification for customer if status changed
         if (status && order.userId) {
@@ -544,8 +601,8 @@ export const updateOrderStatusController = async (request, response) => {
                 await Notification.create({
                     userId: order.userId,
                     type: 'order_status',
-                    title: `Order ${status}`,
-                    message: `Your order #${order._id} is now ${status}`,
+                    title: `Order ${newStatus}`,
+                    message: `Your order #${order._id} is now ${newStatus}`,
                     orderId: order._id,
                     isRead: false
                 });
