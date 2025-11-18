@@ -329,8 +329,9 @@ function App() {
             <Route path={"/privacy-policy"} exact={true} element={<PrivacyPolicy />} />
             <Route path={"/consumer-health-data-privacy"} exact={true} element={<ConsumerHealthData />} />
             <Route path={"/privacy-choices"} exact={true} element={<PrivacyChoices />} />
-            <Route path={"/order/success"} exact={true} element={<OrderSuccess />} />
-            <Route path={"/order/failed"} exact={true} element={<OrderFailed />} />
+            {/* Order result pages - removed exact prop for React Router v7 compatibility */}
+            <Route path={"/order/success"} element={<OrderSuccess />} />
+            <Route path={"/order/failed"} element={<OrderFailed />} />
             <Route path={"/address"} exact={true} element={<Address />} />
             <Route path={"/search"} exact={true} element={<SearchPage />} />
             <Route path={"/blog/:id"} exact={true} element={<BlogDetail />} />
