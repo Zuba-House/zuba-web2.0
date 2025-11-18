@@ -180,13 +180,10 @@ app.get("/test-email", async (req, res) => {
         // Get test recipient from query or env
         const testRecipient = req.query.to || process.env.TEST_EMAIL || 'olivier.niyo250@gmail.com';
         
-        // Check environment variables
+        // Check environment variables (SendGrid configuration)
         const emailConfig = {
-            EMAIL: process.env.EMAIL_USER || process.env.EMAIL,
-            EMAIL_PASS: process.env.EMAIL_PASS ? '***' : 'NOT SET',
-            SMTP_HOST: process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
-            SMTP_PORT: process.env.EMAIL_PORT || process.env.SMTP_PORT || '587',
-            SMTP_SECURE: process.env.SMTP_SECURE || 'false',
+            SENDGRID_API_KEY: process.env.SENDGRID_API_KEY ? '✓ SET (hidden)' : '❌ NOT SET',
+            EMAIL_FROM: process.env.EMAIL_FROM || process.env.EMAIL_USER || process.env.EMAIL || 'NOT SET',
             EMAIL_SENDER_NAME: process.env.EMAIL_SENDER_NAME || 'Zuba House'
         };
         
@@ -203,50 +200,57 @@ app.get("/test-email", async (req, res) => {
             });
         }
         
-        if (!process.env.EMAIL_PASS) {
+        // Check for SendGrid API key instead of EMAIL_PASS
+        if (!process.env.SENDGRID_API_KEY) {
             return res.status(500).json({
                 success: false,
-                message: "EMAIL_PASS environment variable is not set",
-                config: emailConfig
+                message: "SENDGRID_API_KEY environment variable is not set",
+                config: {
+                    ...emailConfig,
+                    SENDGRID_API_KEY: 'NOT SET'
+                },
+                troubleshooting: 'Add SENDGRID_API_KEY to Render environment variables'
             });
         }
-        const senderName = process.env.EMAIL_SENDER_NAME || 'Zuba House';
-        const fromAddress = `${senderName} <${senderEmail}>`;
         
-        console.log('📧 Attempting to send test email:', {
-            from: fromAddress,
+        const senderName = process.env.EMAIL_SENDER_NAME || 'Zuba House';
+        
+        console.log('📧 Attempting to send test email via SendGrid:', {
+            from: `${senderName} <${senderEmail}>`,
             to: testRecipient
         });
         
+        // Use transporter which now uses SendGrid
         const info = await transporter.sendMail({
-            from: fromAddress,
             to: testRecipient,
-            subject: "Zuba House SMTP Test - " + new Date().toISOString(),
-            text: "Gmail SMTP is working perfectly!",
+            subject: "Zuba House Email Test - SendGrid - " + new Date().toISOString(),
+            text: "SendGrid email is working perfectly!",
             html: `
                 <div style="font-family: Arial, sans-serif; padding: 20px;">
-                    <h2 style="color: #2c3e50;">✅ SMTP Test Successful!</h2>
-                    <p>Your Gmail SMTP configuration is working correctly.</p>
-                    <p><strong>From:</strong> ${fromAddress}</p>
+                    <h2 style="color: #2c3e50;">✅ SendGrid Email Test Successful!</h2>
+                    <p>Your SendGrid email configuration is working correctly.</p>
+                    <p><strong>From:</strong> ${senderName} &lt;${senderEmail}&gt;</p>
                     <p><strong>To:</strong> ${testRecipient}</p>
-                    <p><strong>SMTP Host:</strong> ${emailConfig.SMTP_HOST}</p>
-                    <p><strong>Port:</strong> ${emailConfig.SMTP_PORT}</p>
-                    <p><strong>Secure:</strong> ${emailConfig.SMTP_SECURE}</p>
+                    <p><strong>Provider:</strong> SendGrid API</p>
                     <p><strong>Test Time:</strong> ${new Date().toLocaleString()}</p>
                     <p style="margin-top: 20px; color: #27ae60;">🎉 Email sending is ready for production!</p>
                 </div>
             `
         });
         
-        console.log('✅ Test email sent successfully:', info.messageId);
+        console.log('✅ Test email sent successfully via SendGrid:', info.messageId);
         
         res.json({
             success: true,
-            message: "Email sent successfully!",
+            message: "Email sent successfully via SendGrid!",
             messageId: info.messageId,
-            from: fromAddress,
+            from: `${senderName} <${senderEmail}>`,
             to: testRecipient,
-            config: emailConfig,
+            provider: 'SendGrid',
+            config: {
+                ...emailConfig,
+                SENDGRID_API_KEY: '✓ SET (hidden)'
+            },
             response: info.response,
             accepted: info.accepted,
             rejected: info.rejected
@@ -267,13 +271,11 @@ app.get("/test-email", async (req, res) => {
             errorCode: error.code,
             errorResponse: error.response,
             config: {
-                EMAIL_USER: process.env.EMAIL_USER ? 'SET' : 'NOT SET',
-                EMAIL: process.env.EMAIL ? 'SET' : 'NOT SET',
-                EMAIL_PASS: process.env.EMAIL_PASS ? 'SET' : 'NOT SET',
-                SMTP_HOST: process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
-                SMTP_PORT: process.env.EMAIL_PORT || process.env.SMTP_PORT || '587',
-                SMTP_SECURE: process.env.SMTP_SECURE || 'false'
-            }
+                SENDGRID_API_KEY: process.env.SENDGRID_API_KEY ? 'SET' : 'NOT SET',
+                EMAIL_FROM: process.env.EMAIL_FROM || process.env.EMAIL_USER || process.env.EMAIL || 'NOT SET',
+                EMAIL_SENDER_NAME: process.env.EMAIL_SENDER_NAME || 'NOT SET'
+            },
+            troubleshooting: 'Check: 1) SENDGRID_API_KEY is set correctly, 2) Sender email is verified in SendGrid, 3) API key has Mail Send permissions'
         });
     }
 });

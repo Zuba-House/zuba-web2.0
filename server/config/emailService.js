@@ -1,65 +1,116 @@
-import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 
 /**
- * ✅ GMAIL SMTP CONFIGURATION - FIXED
+ * ✅ SENDGRID EMAIL CONFIGURATION
  * 
- * This file configures Nodemailer to use Gmail SMTP
- * Uses environment variables - no hardcoded values
+ * Professional email delivery using SendGrid API
+ * No SMTP ports needed - uses HTTPS (port 443)
+ * Works reliably on Render and other cloud platforms
  */
 
-// Email configuration from environment variables
-const emailConfig = {
-  host: process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.EMAIL_PORT || process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_SECURE === 'true' || process.env.EMAIL_SECURE === 'true', // false for port 587, true for 465
-  auth: {
-    user: process.env.EMAIL_USER || process.env.EMAIL,
-    pass: process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD
-  },
-  tls: {
-    rejectUnauthorized: false  // Allow self-signed certificates
-  },
-  // Connection timeout settings (increased for Gmail)
-  connectionTimeout: 20000, // 20 seconds (Gmail can be slow)
-  greetingTimeout: 10000, // 10 seconds
-  socketTimeout: 20000, // 20 seconds
-  // Connection pooling for faster email delivery
-  pool: true, // Use connection pooling
-  maxConnections: 5, // Max concurrent connections
-  maxMessages: 100, // Max messages per connection
-  rateDelta: 1000, // Time between messages (ms)
-  rateLimit: 10, // Max messages per rateDelta
+// Set SendGrid API Key from environment
+const sendGridApiKey = process.env.SENDGRID_API_KEY;
+
+if (!sendGridApiKey) {
+  console.warn('⚠️ SENDGRID_API_KEY not set. Email sending will fail.');
+  console.warn('   Set SENDGRID_API_KEY in Render environment variables.');
+} else {
+  sgMail.setApiKey(sendGridApiKey);
+  console.log('✅ SendGrid API Key configured');
+  console.log('   From:', process.env.EMAIL_FROM || 'orders@zubahouse.com');
+  console.log('   Sender Name:', process.env.EMAIL_SENDER_NAME || 'Zuba House');
+}
+
+// Get sender email and name from environment
+const getSenderEmail = () => {
+  return process.env.EMAIL_FROM || process.env.EMAIL_USER || process.env.EMAIL || 'orders@zubahouse.com';
 };
 
-// Log configuration (for debugging - shows what's being used)
-console.log('📧 Email Configuration:', {
-  host: emailConfig.host,
-  port: emailConfig.port,
-  secure: emailConfig.secure,
-  user: emailConfig.auth.user,
-  hasPassword: !!emailConfig.auth.pass,
-  connectionTimeout: emailConfig.connectionTimeout
-});
+const getSenderName = () => {
+  return process.env.EMAIL_SENDER_NAME || 'Zuba House';
+};
 
-// Create transporter
-const transporter = nodemailer.createTransport(emailConfig);
+// Verify SendGrid configuration (for backward compatibility with transporter.verify())
+const verifySendGrid = async () => {
+  return new Promise((resolve, reject) => {
+    if (!sendGridApiKey) {
+      reject(new Error('SENDGRID_API_KEY is not set'));
+    } else {
+      console.log('✅ SendGrid API Key configured');
+      resolve(true);
+    }
+  });
+};
 
-// Verify connection on startup
-transporter.verify(function (error, success) {
-  if (error) {
-    console.error('❌ Email Configuration Error:', error);
-    console.error('❌ Email service verification failed. Check your environment variables:');
-    console.error('   - EMAIL_HOST or SMTP_HOST');
-    console.error('   - EMAIL_PORT or SMTP_PORT');
-    console.error('   - EMAIL_USER or EMAIL');
-    console.error('   - EMAIL_PASS or EMAIL_PASSWORD');
-  } else {
-    console.log('✅ Email server is ready to send messages');
-    console.log('✅ Gmail SMTP configured successfully');
-  }
-});
+// Transporter object for backward compatibility with existing code
+// This allows code using transporter.sendMail() to continue working
+const transporter = {
+  sendMail: async (mailOptions) => {
+    try {
+      // Parse from field if provided (can be string or object)
+      let fromEmail = getSenderEmail();
+      let fromName = getSenderName();
+      
+      if (mailOptions.from) {
+        // Handle string format: "Name <email@domain.com>" or just "email@domain.com"
+        if (typeof mailOptions.from === 'string') {
+          const fromMatch = mailOptions.from.match(/(?:([^<]+)<)?([^>]+@[^>]+)>?/);
+          if (fromMatch) {
+            fromName = fromMatch[1]?.trim() || getSenderName();
+            fromEmail = fromMatch[2]?.trim() || getSenderEmail();
+          } else {
+            fromEmail = mailOptions.from;
+          }
+        }
+        // Handle object format: { email: "...", name: "..." }
+        else if (typeof mailOptions.from === 'object') {
+          fromEmail = mailOptions.from.email || getSenderEmail();
+          fromName = mailOptions.from.name || getSenderName();
+        }
+      }
 
-// Function to send email (optimized for speed)
+      const msg = {
+        to: mailOptions.to,
+        from: {
+          email: fromEmail,
+          name: fromName
+        },
+        subject: mailOptions.subject,
+        html: mailOptions.html || mailOptions.text || '',
+        text: mailOptions.text || (mailOptions.html ? mailOptions.html.replace(/<[^>]*>/g, '') : '')
+      };
+
+      if (!sendGridApiKey) {
+        throw new Error('SENDGRID_API_KEY is not set');
+      }
+
+      const response = await sgMail.send(msg);
+      
+      // Return in Nodemailer-compatible format
+      return {
+        messageId: response[0]?.headers?.['x-message-id'] || 'sendgrid-' + Date.now(),
+        response: `SendGrid: ${response[0]?.statusCode || 202}`,
+        accepted: Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to],
+        rejected: []
+      };
+    } catch (error) {
+      console.error('❌ SendGrid sendMail error:', error.response?.body || error.message);
+      throw error;
+    }
+  },
+  
+  verify: verifySendGrid
+};
+
+/**
+ * Send email using SendGrid
+ * Maintains backward compatibility with existing sendEmail() function signature
+ * @param {string} to - Recipient email address
+ * @param {string} subject - Email subject
+ * @param {string} text - Plain text content (optional)
+ * @param {string} html - HTML content (optional)
+ * @returns {Promise<Object>} - { success: boolean, messageId?: string, error?: string }
+ */
 async function sendEmail(to, subject, text, html) {
   try {
     // Validate inputs
@@ -72,21 +123,17 @@ async function sendEmail(to, subject, text, html) {
       console.error('❌ Email subject is missing');
       return { success: false, error: 'Email subject is missing' };
     }
-    
-    // Get sender email and display name from environment
-    const senderEmail = process.env.EMAIL_USER || process.env.EMAIL || process.env.EMAIL_FROM || 'orders.zubahouse@gmail.com';
-    const senderName = process.env.EMAIL_SENDER_NAME || 'Zuba House';
-    
-    if (!senderEmail) {
-      console.error('❌ EMAIL_USER or EMAIL environment variable is not set');
-      return { success: false, error: 'EMAIL_USER or EMAIL environment variable is not set' };
+
+    if (!sendGridApiKey) {
+      console.error('❌ SENDGRID_API_KEY is not set');
+      return { success: false, error: 'SENDGRID_API_KEY environment variable is not set' };
     }
     
-    // Format: "Display Name <email@address.com>"
-    const fromAddress = `${senderName} <${senderEmail}>`;
+    const senderEmail = getSenderEmail();
+    const senderName = getSenderName();
    
-    console.log('📧 Email service - Preparing to send:', {
-      from: fromAddress,
+    console.log('📧 SendGrid - Preparing to send:', {
+      from: `${senderName} <${senderEmail}>`,
       to: to,
       subject: subject,
       hasHtml: !!html,
@@ -94,33 +141,49 @@ async function sendEmail(to, subject, text, html) {
     });
    
     const startTime = Date.now();
-    const info = await transporter.sendMail({
-      from: fromAddress, // sender address with display name
-      to, // list of receivers
-      subject, // Subject line
-      text: text || '', // plain text body
-      html: html || text || '', // html body (fallback to text if html not provided)
-    });
+    
+    const msg = {
+      to: to,
+      from: {
+        email: senderEmail,
+        name: senderName
+      },
+      subject: subject,
+      html: html || text || '',
+      text: text || (html ? html.replace(/<[^>]*>/g, '') : '')
+    };
+
+    const response = await sgMail.send(msg);
     
     const duration = Date.now() - startTime;
-    console.log(`✅ Email sent successfully in ${duration}ms:`, info.messageId);
-    console.log('📧 Email response:', {
-      messageId: info.messageId,
-      response: info.response,
-      accepted: info.accepted,
-      rejected: info.rejected
+    const messageId = response[0]?.headers?.['x-message-id'] || 'sendgrid-' + Date.now();
+    
+    console.log(`✅ Email sent successfully via SendGrid in ${duration}ms`);
+    console.log('📧 SendGrid response:', {
+      statusCode: response[0]?.statusCode,
+      messageId: messageId,
+      to: to
     });
-    return { success: true, messageId: info.messageId, duration };
+    
+    return { 
+      success: true, 
+      messageId: messageId, 
+      duration,
+      statusCode: response[0]?.statusCode
+    };
   } catch (error) {
-    console.error('❌ Error sending email:', error.message);
+    console.error('❌ SendGrid error:', error.message);
     console.error('❌ Error details:', {
       code: error.code,
-      command: error.command,
-      response: error.response,
-      responseCode: error.responseCode,
-      stack: error.stack
+      response: error.response?.body || error.response,
+      statusCode: error.response?.statusCode,
+      errors: error.response?.body?.errors
     });
-    return { success: false, error: error.message, details: error };
+    return { 
+      success: false, 
+      error: error.message, 
+      details: error.response?.body || error 
+    };
   }
 }
 
