@@ -182,21 +182,23 @@ app.get("/test-email", async (req, res) => {
         
         // Check environment variables
         const emailConfig = {
-            EMAIL: process.env.EMAIL,
+            EMAIL: process.env.EMAIL_USER || process.env.EMAIL,
             EMAIL_PASS: process.env.EMAIL_PASS ? '***' : 'NOT SET',
-            SMTP_HOST: process.env.SMTP_HOST || 'smtp.hostinger.com',
-            SMTP_PORT: process.env.SMTP_PORT || '465',
-            SMTP_SECURE: process.env.SMTP_SECURE || 'true',
+            SMTP_HOST: process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
+            SMTP_PORT: process.env.EMAIL_PORT || process.env.SMTP_PORT || '587',
+            SMTP_SECURE: process.env.SMTP_SECURE || 'false',
             EMAIL_SENDER_NAME: process.env.EMAIL_SENDER_NAME || 'Zuba House'
         };
         
         console.log('🧪 Test email endpoint called');
         console.log('📧 Email configuration:', emailConfig);
         
-        if (!process.env.EMAIL) {
+        const senderEmail = process.env.EMAIL_USER || process.env.EMAIL || process.env.EMAIL_FROM;
+        
+        if (!senderEmail) {
             return res.status(500).json({
                 success: false,
-                message: "EMAIL environment variable is not set",
+                message: "EMAIL_USER, EMAIL, or EMAIL_FROM environment variable is not set",
                 config: emailConfig
             });
         }
@@ -208,8 +210,6 @@ app.get("/test-email", async (req, res) => {
                 config: emailConfig
             });
         }
-        
-        const senderEmail = process.env.EMAIL;
         const senderName = process.env.EMAIL_SENDER_NAME || 'Zuba House';
         const fromAddress = `${senderName} <${senderEmail}>`;
         
@@ -222,11 +222,11 @@ app.get("/test-email", async (req, res) => {
             from: fromAddress,
             to: testRecipient,
             subject: "Zuba House SMTP Test - " + new Date().toISOString(),
-            text: "Hostinger SMTP is working perfectly!",
+            text: "Gmail SMTP is working perfectly!",
             html: `
                 <div style="font-family: Arial, sans-serif; padding: 20px;">
                     <h2 style="color: #2c3e50;">✅ SMTP Test Successful!</h2>
-                    <p>Your Hostinger email configuration is working correctly.</p>
+                    <p>Your Gmail SMTP configuration is working correctly.</p>
                     <p><strong>From:</strong> ${fromAddress}</p>
                     <p><strong>To:</strong> ${testRecipient}</p>
                     <p><strong>SMTP Host:</strong> ${emailConfig.SMTP_HOST}</p>
@@ -267,11 +267,12 @@ app.get("/test-email", async (req, res) => {
             errorCode: error.code,
             errorResponse: error.response,
             config: {
+                EMAIL_USER: process.env.EMAIL_USER ? 'SET' : 'NOT SET',
                 EMAIL: process.env.EMAIL ? 'SET' : 'NOT SET',
                 EMAIL_PASS: process.env.EMAIL_PASS ? 'SET' : 'NOT SET',
-                SMTP_HOST: process.env.SMTP_HOST || 'smtp.hostinger.com',
-                SMTP_PORT: process.env.SMTP_PORT || '465',
-                SMTP_SECURE: process.env.SMTP_SECURE || 'true'
+                SMTP_HOST: process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
+                SMTP_PORT: process.env.EMAIL_PORT || process.env.SMTP_PORT || '587',
+                SMTP_SECURE: process.env.SMTP_SECURE || 'false'
             }
         });
     }

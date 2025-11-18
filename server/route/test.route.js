@@ -1,5 +1,4 @@
 import express from 'express';
-import nodemailer from 'nodemailer';
 import { transporter } from '../config/emailService.js';
 
 const router = express.Router();
@@ -24,30 +23,27 @@ router.get('/test-email', async (req, res) => {
 
     console.log('📋 Environment Variables:', config);
 
-    // Create transporter with your Hostinger settings (using existing or creating new)
-    const testTransporter = transporter || nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.hostinger.com',
-      port: parseInt(process.env.EMAIL_PORT || process.env.SMTP_PORT || '465'),
-      secure: true, // Always true for port 465
-      auth: {
-        user: process.env.EMAIL_USER || process.env.EMAIL_FROM || process.env.EMAIL || 'orders@zubahouse.com',
-        pass: process.env.EMAIL_PASS || '',
-      },
-      logger: true,
-      debug: true,
-      tls: {
-        rejectUnauthorized: false, // Allow self-signed certificates
-      }
-    });
+    // Use the transporter from emailService.js (already configured for Gmail)
+    const testTransporter = transporter;
 
-    // Verify connection
-    console.log('🔍 Verifying SMTP connection...');
-    await testTransporter.verify();
-    console.log('✅ SMTP connection verified!');
+    // Verify connection with increased timeout for Gmail
+    console.log('🔍 Verifying SMTP connection to Gmail...');
+    try {
+      await Promise.race([
+        testTransporter.verify(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Connection timeout after 15 seconds')), 15000)
+        )
+      ]);
+      console.log('✅ SMTP connection verified!');
+    } catch (verifyError) {
+      console.error('❌ SMTP verification failed:', verifyError.message);
+      // Continue anyway - sometimes verify fails but sendMail works
+    }
 
     // Send test email
     const testEmail = req.query.to || process.env.TEST_EMAIL || 'olivier.niyo250@gmail.com';
-    const senderEmail = process.env.EMAIL || process.env.EMAIL_USER || process.env.EMAIL_FROM || 'orders@zubahouse.com';
+    const senderEmail = process.env.EMAIL_USER || process.env.EMAIL || process.env.EMAIL_FROM;
     const senderName = process.env.EMAIL_SENDER_NAME || 'Zuba House';
     const fromAddress = `"${senderName}" <${senderEmail}>`;
 
@@ -59,7 +55,7 @@ router.get('/test-email', async (req, res) => {
         <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f5f5f5;">
           <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
             <h2 style="color: #4CAF50;">🎉 Email Configuration Working!</h2>
-            <p>Your Hostinger SMTP is properly configured and working.</p>
+            <p>Your Gmail SMTP is properly configured and working.</p>
             <hr style="border: 1px solid #eee; margin: 20px 0;">
             <p><strong>📅 Time:</strong> ${new Date().toLocaleString()}</p>
             <p><strong>🖥️ Server:</strong> ${config.SMTP_HOST || config.EMAIL_HOST}</p>
@@ -90,13 +86,15 @@ router.get('/test-email', async (req, res) => {
     let troubleshooting = 'Unknown error. Check server logs for details.';
     
     if (error.code === 'ETIMEDOUT') {
-      troubleshooting = '⚠️ Connection timeout. Render cannot reach smtp.hostinger.com:465. This might be a network/firewall issue.';
+      troubleshooting = '⚠️ Connection timeout. Render cannot reach Gmail SMTP. Possible causes: 1) Firewall blocking port 587, 2) Gmail blocking connection, 3) Network issue. Try: Increase timeout, check firewall rules, verify Gmail app password is correct.';
     } else if (error.code === 'EAUTH') {
-      troubleshooting = '⚠️ Authentication failed. Your password might be incorrect. Try resetting it in Hostinger.';
+      troubleshooting = '⚠️ Authentication failed. Check: 1) Gmail app password is correct (no spaces), 2) EMAIL_USER is orders.zubahouse@gmail.com, 3) 2-Step Verification is enabled on Gmail account.';
     } else if (error.code === 'ENOTFOUND') {
-      troubleshooting = '⚠️ SMTP host not found. Check if EMAIL_HOST or SMTP_HOST is set to "smtp.hostinger.com".';
+      troubleshooting = '⚠️ SMTP host not found. Check if EMAIL_HOST or SMTP_HOST is set to "smtp.gmail.com".';
     } else if (error.code === 'ESOCKET') {
-      troubleshooting = '⚠️ Socket error. Check if SMTP_SECURE=true and EMAIL_PORT=465.';
+      troubleshooting = '⚠️ Socket error. For Gmail: EMAIL_PORT should be 587 and SMTP_SECURE should be false.';
+    } else if (error.code === 'ECONNREFUSED') {
+      troubleshooting = '⚠️ Connection refused. Gmail may be blocking the connection. Check: 1) App password is correct, 2) "Less secure app access" is enabled (if using regular password), 3) Try using OAuth2 instead.';
     }
     
     res.status(500).json({

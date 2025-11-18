@@ -1,37 +1,61 @@
 import nodemailer from 'nodemailer';
 
-// Configure the SMTP transporter with Gmail SMTP settings
-// Uses environment variables for flexibility
-// OPTIMIZED: Added connection pooling for faster email delivery
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',  // Gmail SMTP
-  port: Number(process.env.EMAIL_PORT) || Number(process.env.SMTP_PORT) || 587,          // 587 for TLS (Gmail)
-  secure: process.env.EMAIL_SECURE === 'true' || process.env.SMTP_SECURE === 'true' || false,   // false for port 587, true for 465
+/**
+ * ✅ GMAIL SMTP CONFIGURATION - FIXED
+ * 
+ * This file configures Nodemailer to use Gmail SMTP
+ * Uses environment variables - no hardcoded values
+ */
+
+// Email configuration from environment variables
+const emailConfig = {
+  host: process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.EMAIL_PORT || process.env.SMTP_PORT || '587'),
+  secure: process.env.SMTP_SECURE === 'true' || process.env.EMAIL_SECURE === 'true', // false for port 587, true for 465
   auth: {
-    user: process.env.EMAIL_USER || process.env.EMAIL || 'orders.zubahouse@gmail.com',                            // Gmail address
-    pass: process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD,                       // Gmail app password
+    user: process.env.EMAIL_USER || process.env.EMAIL,
+    pass: process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD
   },
   tls: {
     rejectUnauthorized: false  // Allow self-signed certificates
   },
+  // Connection timeout settings (increased for Gmail)
+  connectionTimeout: 20000, // 20 seconds (Gmail can be slow)
+  greetingTimeout: 10000, // 10 seconds
+  socketTimeout: 20000, // 20 seconds
   // Connection pooling for faster email delivery
   pool: true, // Use connection pooling
   maxConnections: 5, // Max concurrent connections
   maxMessages: 100, // Max messages per connection
   rateDelta: 1000, // Time between messages (ms)
   rateLimit: 10, // Max messages per rateDelta
-  // Connection timeout settings
-  connectionTimeout: 10000, // 10 seconds
-  greetingTimeout: 5000, // 5 seconds
-  socketTimeout: 10000, // 10 seconds
+};
+
+// Log configuration (for debugging - shows what's being used)
+console.log('📧 Email Configuration:', {
+  host: emailConfig.host,
+  port: emailConfig.port,
+  secure: emailConfig.secure,
+  user: emailConfig.auth.user,
+  hasPassword: !!emailConfig.auth.pass,
+  connectionTimeout: emailConfig.connectionTimeout
 });
 
-// Verify transporter on startup
-transporter.verify((error, success) => {
+// Create transporter
+const transporter = nodemailer.createTransport(emailConfig);
+
+// Verify connection on startup
+transporter.verify(function (error, success) {
   if (error) {
-    console.error('❌ Email service error:', error);
+    console.error('❌ Email Configuration Error:', error);
+    console.error('❌ Email service verification failed. Check your environment variables:');
+    console.error('   - EMAIL_HOST or SMTP_HOST');
+    console.error('   - EMAIL_PORT or SMTP_PORT');
+    console.error('   - EMAIL_USER or EMAIL');
+    console.error('   - EMAIL_PASS or EMAIL_PASSWORD');
   } else {
-    console.log('✅ Email service ready and verified');
+    console.log('✅ Email server is ready to send messages');
+    console.log('✅ Gmail SMTP configured successfully');
   }
 });
 
