@@ -177,6 +177,14 @@ function StripeForm({ amount, onPaid, onFailed, onProcessingChange, onReady }) {
             // If it's not a promise, just call it
             onPaid(paymentIntent);
           }
+          
+          // FALLBACK: If redirect didn't happen after 3 seconds, force it
+          setTimeout(() => {
+            if (window.location.pathname !== '/order/success' && window.location.pathname !== '/order/failed') {
+              console.warn('⚠️ onPaid handler did not redirect, forcing redirect to success...');
+              window.location.href = "/order/success";
+            }
+          }, 3000);
         } catch (e) {
           console.error('❌ Error in onPaid handler:', e);
           // Even if handler fails, payment succeeded - redirect to success
