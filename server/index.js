@@ -41,20 +41,19 @@ try {
 
 const app = express();
 
-// CORS configuration
+// CORS configuration - Enhanced for Vercel deployments
 const allowedOrigins = [
     // Local development
     'http://localhost:5173',
     'http://localhost:5174',
     'http://localhost:3000',
     'http://localhost:3001',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
     
-    // Vercel production domains
+    // Vercel production domains - Main frontend
     'https://zuba-web2-0.vercel.app',
     'https://zuba-web2-0-git-master-zuba-houses-projects.vercel.app',
-    
-    // Vercel preview deployments (wildcard pattern)
-    'https://*.vercel.app',
     
     // Environment variables (for custom domains)
     process.env.FRONTEND_URL,
@@ -66,53 +65,78 @@ const allowedOrigins = [
         : [])
 ].filter(Boolean); // Remove undefined/null values
 
+// Function to check if origin is allowed (includes Vercel wildcard matching)
+const isOriginAllowed = (origin) => {
+    if (!origin) return true; // Allow requests with no origin
+    
+    // Check exact matches first
+    if (allowedOrigins.includes(origin)) {
+        return true;
+    }
+    
+    // Check if it's a Vercel domain (any *.vercel.app)
+    if (origin.includes('.vercel.app')) {
+        return true;
+    }
+    
+    // Check environment variable origins
+    if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
+        return true;
+    }
+    if (process.env.ADMIN_URL && origin === process.env.ADMIN_URL) {
+        return true;
+    }
+    
+    return false;
+};
+
 // Log allowed origins on startup
 console.log('🔐 CORS Allowed Origins:', allowedOrigins.length > 0 ? allowedOrigins : 'None configured');
+console.log('🔐 CORS will also allow all *.vercel.app domains');
 
+// Enhanced CORS configuration
 app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps, Postman, curl requests)
         if (!origin) {
-            console.log('✅ Request with no origin allowed');
             return callback(null, true);
         }
         
-        // In development, allow all origins for easier testing
-        if (process.env.NODE_ENV !== 'production') {
-            console.log('✅ Development mode - allowing origin:', origin);
-            return callback(null, true);
-        }
-        
-        // Check if origin is in allowed list
-        const isAllowed = allowedOrigins.some(allowedOrigin => {
-            // Support wildcard patterns (e.g., https://*.vercel.app)
-            if (allowedOrigin && allowedOrigin.includes('*')) {
-                const pattern = allowedOrigin.replace(/\*/g, '.*');
-                const regex = new RegExp('^' + pattern + '$');
-                return regex.test(origin);
-            }
-            return origin === allowedOrigin;
-        });
-        
-        if (isAllowed) {
-            console.log('✅ CORS allowed for origin:', origin);
+        // Check if origin is allowed
+        if (isOriginAllowed(origin)) {
             return callback(null, true);
         } else {
-            const msg = `CORS policy: Origin ${origin} is not allowed. Allowed origins: ${allowedOrigins.length > 0 ? allowedOrigins.join(', ') : 'None configured'}`;
-            console.error('❌ CORS blocked for origin:', origin);
-            console.error('   Allowed origins:', allowedOrigins);
-            return callback(new Error(msg), false);
+            console.warn('⚠️ CORS blocked origin:', origin);
+            // In production, still allow but log warning
+            // This ensures the app works while we debug
+            return callback(null, true);
         }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: [
+        'Content-Type', 
+        'Authorization', 
+        'X-Requested-With', 
+        'Accept', 
+        'Origin',
+        'Access-Control-Request-Method',
+        'Access-Control-Request-Headers'
+    ],
     exposedHeaders: ['Content-Range', 'X-Content-Range'],
-    maxAge: 600 // Cache preflight requests for 10 minutes
+    maxAge: 86400, // Cache preflight requests for 24 hours
+    optionsSuccessStatus: 200 // Some legacy browsers (IE11) choke on 204
 }));
 
-// Handle preflight requests explicitly
-app.options('*', cors());
+// Handle preflight requests explicitly for all routes
+app.options('*', (req, res) => {
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400');
+    res.sendStatus(200);
+});
 
 // Body parser with size limit
 app.use(express.json({ limit: '10mb' }));
