@@ -90,6 +90,17 @@ function StripeForm({ amount, onPaid, onFailed, onProcessingChange, onReady }) {
       console.error("Failed to create payment intent on submit:", err.response?.data || err.message);
       setCreatingIntent(false);
       setProcessing(false);
+      
+      // Check for specific Stripe errors
+      const errorData = err.response?.data;
+      if (errorData?.code === 'STRIPE_KEY_INVALID' || errorData?.code === 'STRIPE_NOT_CONFIGURED') {
+        alert('Payment processing is currently unavailable. Please contact support or try again later.');
+      } else if (errorData?.message) {
+        alert(`Payment error: ${errorData.message}`);
+      } else {
+        alert('Failed to initialize payment. Please try again or contact support.');
+      }
+      
       window.location.href = "/order/failed";
       return;
     } finally {
