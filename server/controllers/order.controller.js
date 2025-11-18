@@ -2,7 +2,8 @@ import OrderModel from "../models/order.model.js";
 import ProductModel from '../models/product.model.js';
 import UserModel from '../models/user.model.js';
 import AddressModel from "../models/address.model.js";
-import paypal from "@paypal/checkout-server-sdk";
+// PayPal removed - using Stripe for payments
+// import paypal from "@paypal/checkout-server-sdk";
 import OrderConfirmationEmail from "../utils/orderEmailTemplate.js";
 import OrderCancellationEmail from "../utils/orderCancellationEmailTemplate.js";
 import AdminOrderNotificationEmail from "../utils/adminOrderNotificationEmailTemplate.js";
@@ -10,9 +11,36 @@ import sendEmailFun from "../config/sendEmail.js";
 
 export const createOrderController = async (request, response) => {
     try {
+        console.log('📦 Order creation request received:', {
+            hasUserId: !!request.body.userId,
+            isGuestOrder: !!request.body.guestCustomer,
+            productsCount: request.body.products?.length || 0,
+            paymentId: request.body.paymentId || 'N/A',
+            payment_status: request.body.payment_status || 'N/A'
+        });
+
+        // Validate required fields
+        if (!request.body.products || !Array.isArray(request.body.products) || request.body.products.length === 0) {
+            console.error('❌ Order creation failed: No products provided');
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: 'Products are required to create an order'
+            });
+        }
 
         // Handle guest checkout
         const isGuestOrder = request.body.isGuestOrder || (!request.body.userId && request.body.guestCustomer);
+        
+        // Validate guest customer data if it's a guest order
+        if (isGuestOrder && !request.body.guestCustomer) {
+            console.error('❌ Order creation failed: Guest order requires guestCustomer data');
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: 'Guest customer information is required'
+            });
+        }
         
         // Calculate total amount including shipping
         const shippingCost = request.body.shippingCost || 0;
@@ -25,7 +53,7 @@ export const createOrderController = async (request, response) => {
             ? request.body.totalAmt 
             : calculatedTotal;
         
-        console.log('Order creation - Amount calculation:', {
+        console.log('💰 Order creation - Amount calculation:', {
             productsTotal,
             shippingCost,
             providedTotalAmt: request.body.totalAmt,
@@ -55,14 +83,19 @@ export const createOrderController = async (request, response) => {
             }]
         });
 
-        if (!order) {
-            response.status(500).json({
+        // Save order to database
+        try {
+            order = await order.save();
+            console.log('✅ Order saved successfully:', order._id);
+        } catch (saveError) {
+            console.error('❌ Failed to save order:', saveError);
+            return response.status(500).json({
                 error: true,
-                success: false
-            })
+                success: false,
+                message: 'Failed to save order to database',
+                details: process.env.NODE_ENV === 'development' ? saveError.message : undefined
+            });
         }
-
-        order = await order.save();
 
         // Update inventory only for successful or COD orders
         const paymentStatus = (request.body.payment_status || '').toUpperCase();
@@ -213,20 +246,34 @@ export const createOrderController = async (request, response) => {
         }
 
 
+        console.log('✅ Order created successfully:', {
+            orderId: order._id,
+            userId: order.userId || 'Guest',
+            totalAmount: order.totalAmt,
+            paymentStatus: order.payment_status
+        });
+
         return response.status(200).json({
             error: false,
             success: true,
-            message: "Order Placed",
-            order: order
+            message: "Order Placed Successfully",
+            order: order,
+            orderId: order._id
         });
 
-
     } catch (error) {
+        console.error('❌ Order creation error:', {
+            message: error.message,
+            stack: error.stack,
+            body: request.body
+        });
+        
         return response.status(500).json({
-            message: error.message || error,
             error: true,
-            success: false
-        })
+            success: false,
+            message: error.message || 'Failed to create order',
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 }
 
@@ -310,130 +357,8 @@ export async function getTotalOrdersCountController(request, response) {
 
 
 
-function getPayPalClient() {
-
-    const environment =
-        process.env.PAYPAL_MODE === "live"
-            ? new paypal.core.LiveEnvironment(
-                process.env.PAYPAL_CLIENT_ID_LIVE,
-                process.env.PAYPAL_SECRET_LIVE
-            )
-            : new paypal.core.SandboxEnvironment(
-                process.env.PAYPAL_CLIENT_ID_TEST,
-                process.env.PAYPAL_SECRET_TEST
-            );
-
-    return new paypal.core.PayPalHttpClient(environment);
-
-
-}
-
-
-export const createOrderPaypalController = async (request, response) => {
-    try {
-
-        const req = new paypal.orders.OrdersCreateRequest();
-        req.prefer("return=representation");
-
-        const CURRENCY = (process.env.CURRENCY || 'USD').toUpperCase();
-        req.requestBody({
-            intent: "CAPTURE",
-            purchase_units: [{
-                amount: {
-                    currency_code: CURRENCY,
-                    value: request.query.totalAmount
-                }
-            }]
-        });
-
-
-        try {
-            const client = getPayPalClient();
-            const order = await client.execute(req);
-            response.json({ id: order.result.id });
-        } catch (error) {
-            console.error(error);
-            response.status(500).send("Error creating PayPal order");
-        }
-
-    } catch (error) {
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        })
-    }
-}
-
-
-
-
-export const captureOrderPaypalController = async (request, response) => {
-    try {
-        const { paymentId } = request.body;
-
-        const req = new paypal.orders.OrdersCaptureRequest(paymentId);
-        req.requestBody({});
-
-        const orderInfo = {
-            userId: request.body.userId,
-            products: request.body.products,
-            paymentId: request.body.paymentId,
-            payment_status: request.body.payment_status,
-            delivery_address: request.body.delivery_address,
-            totalAmt: request.body.totalAmount,
-            date: request.body.date
-        }
-
-        const order = new OrderModel(orderInfo);
-        await order.save();
-
-        const user = await UserModel.findOne({ _id: request.body.userId })
-
-        const recipients = [];
-        recipients.push(user?.email);
-
-        // Send verification email
-        await sendEmailFun({
-            sendTo: recipients,
-            subject: "Order Confirmation",
-            text: "",
-            html: OrderConfirmationEmail(user?.name, order)
-        })
-
-
-        for (let i = 0; i < request.body.products.length; i++) {
-
-            const product = await ProductModel.findOne({ _id: request.body.products[i].productId })
-
-            await ProductModel.findByIdAndUpdate(
-                request.body.products[i].productId,
-                {
-                    countInStock: parseInt(request.body.products[i].countInStock - request.body.products[i].quantity),
-                    sale: parseInt(product?.sale + request.body.products[i].quantity)
-                },
-                { new: true }
-            );
-        }
-
-
-        return response.status(200).json(
-            {
-                success: true,
-                error: false,
-                order: order,
-                message: "Order Placed"
-            }
-        );
-
-    } catch (error) {
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        })
-    }
-}
+// PayPal functions removed - using Stripe for payments
+// If you need PayPal support in the future, uncomment and configure these functions
 
 
 

@@ -61,12 +61,38 @@ export const errorHandler = (err, req, res, next) => {
 
 /**
  * 404 Not Found Handler
+ * Provides helpful error messages and available routes
  */
 export const notFoundHandler = (req, res, next) => {
+    console.warn(`⚠️ 404 - Route not found: ${req.method} ${req.originalUrl}`);
+    
+    // Provide helpful information about available routes
+    const availableRoutes = {
+        order: {
+            create: 'POST /api/order/create',
+            list: 'GET /api/order/order-list',
+            userOrders: 'GET /api/order/order-list/orders',
+            updateStatus: 'PUT /api/order/order-status/:id',
+            delete: 'DELETE /api/order/deleteOrder/:id'
+        },
+        stripe: {
+            createPaymentIntent: 'POST /api/stripe/create-payment-intent',
+            health: 'GET /api/stripe/health'
+        },
+        user: 'GET /api/user/*',
+        products: 'GET /api/product/*',
+        cart: 'GET, POST, PUT, DELETE /api/cart/*',
+        health: 'GET /api/health'
+    };
+    
     res.status(404).json({
         error: true,
         success: false,
         message: `Route ${req.method} ${req.path} not found`,
+        requestedPath: req.originalUrl,
+        method: req.method,
+        availableRoutes: availableRoutes,
+        hint: 'Check the availableRoutes object for correct endpoint paths'
     });
 };
 
