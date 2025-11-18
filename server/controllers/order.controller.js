@@ -209,18 +209,35 @@ export const createOrderController = async (request, response) => {
             
             // Send customer confirmation email
             if (userEmail) {
+                console.log('📧 Preparing to send order confirmation email to:', userEmail);
                 const recipients = [userEmail];
-                await sendEmailFun({
-                    sendTo: recipients,
-                    subject: "Order Confirmation - Zuba House",
-                    text: "",
-                    html: OrderConfirmationEmail(userName || 'Customer', order)
-                });
+                try {
+                    const emailResult = await sendEmailFun({
+                        sendTo: recipients,
+                        subject: "Order Confirmation - Zuba House",
+                        text: "",
+                        html: OrderConfirmationEmail(userName || 'Customer', order)
+                    });
+                    console.log('✅ Customer confirmation email sent successfully:', {
+                        to: userEmail,
+                        result: emailResult
+                    });
+                } catch (emailError) {
+                    console.error('❌ Failed to send customer confirmation email:', {
+                        to: userEmail,
+                        error: emailError.message,
+                        stack: emailError.stack
+                    });
+                    // Don't fail order creation if email fails
+                }
+            } else {
+                console.warn('⚠️ No user email found - skipping customer confirmation email');
             }
 
             // Send admin notification email
             try {
                 const adminEmail = process.env.ADMIN_EMAIL || 'sales@zubahouse.com';
+                console.log('📧 Preparing to send admin notification email to:', adminEmail);
                 
                 // Get shipping address if available
                 let shippingAddress = null;
@@ -232,15 +249,21 @@ export const createOrderController = async (request, response) => {
                     }
                 }
 
-                await sendEmailFun({
+                const adminEmailResult = await sendEmailFun({
                     sendTo: [adminEmail],
                     subject: `New Order #${order._id} - ${userName || 'Guest Customer'}`,
                     text: "",
                     html: AdminOrderNotificationEmail(order, userInfo, shippingAddress)
                 });
-                console.log('Admin notification email sent to:', adminEmail);
+                console.log('✅ Admin notification email sent successfully:', {
+                    to: adminEmail,
+                    result: adminEmailResult
+                });
             } catch (adminEmailError) {
-                console.error('Error sending admin notification email:', adminEmailError);
+                console.error('❌ Error sending admin notification email:', {
+                    error: adminEmailError.message,
+                    stack: adminEmailError.stack
+                });
                 // Don't fail order creation if admin email fails
             }
         }

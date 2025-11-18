@@ -1,15 +1,18 @@
 import nodemailer from 'nodemailer';
 
-// Configure the SMTP transporter with Hostinger settings
+// Configure the SMTP transporter with Gmail SMTP settings
 // Uses environment variables for flexibility
 // OPTIMIZED: Added connection pooling for faster email delivery
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.hostinger.com',  // Hostinger SMTP
-  port: Number(process.env.SMTP_PORT) || 465,          // 465 for SSL
-  secure: process.env.SMTP_SECURE === 'true' || true,   // true for SSL (port 465)
+  host: process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',  // Gmail SMTP
+  port: Number(process.env.EMAIL_PORT) || Number(process.env.SMTP_PORT) || 587,          // 587 for TLS (Gmail)
+  secure: process.env.EMAIL_SECURE === 'true' || process.env.SMTP_SECURE === 'true' || false,   // false for port 587, true for 465
   auth: {
-    user: process.env.EMAIL,                            // orders@zubahouse.com
-    pass: process.env.EMAIL_PASS,                       // Your email password
+    user: process.env.EMAIL_USER || process.env.EMAIL || 'orders.zubahouse@gmail.com',                            // Gmail address
+    pass: process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD,                       // Gmail app password
+  },
+  tls: {
+    rejectUnauthorized: false  // Allow self-signed certificates
   },
   // Connection pooling for faster email delivery
   pool: true, // Use connection pooling
@@ -47,12 +50,12 @@ async function sendEmail(to, subject, text, html) {
     }
     
     // Get sender email and display name from environment
-    const senderEmail = process.env.EMAIL || 'orders@zubahouse.com';
+    const senderEmail = process.env.EMAIL_USER || process.env.EMAIL || process.env.EMAIL_FROM || 'orders.zubahouse@gmail.com';
     const senderName = process.env.EMAIL_SENDER_NAME || 'Zuba House';
     
     if (!senderEmail) {
-      console.error('❌ EMAIL environment variable is not set');
-      return { success: false, error: 'EMAIL environment variable is not set' };
+      console.error('❌ EMAIL_USER or EMAIL environment variable is not set');
+      return { success: false, error: 'EMAIL_USER or EMAIL environment variable is not set' };
     }
     
     // Format: "Display Name <email@address.com>"

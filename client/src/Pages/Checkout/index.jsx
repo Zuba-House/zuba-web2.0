@@ -258,7 +258,6 @@ const Checkout = () => {
       
       if (isSuccess) {
         console.log('✅ Order created successfully!');
-        context.alertBox("success", res?.message || "Order placed successfully!");
         
         // Clear cart in background (don't wait for it)
         try {
@@ -271,21 +270,19 @@ const Checkout = () => {
         
         context?.getCartItems();
         
-        // Use window.location for more reliable redirect
-        // Small delay to ensure state is saved and user sees success message
-        console.log('✅ Redirecting to success page in 500ms...');
-        setTimeout(() => {
-          console.log('🔄 Executing redirect to /order/success');
-          window.location.href = "/order/success";
-        }, 500);
+        // IMMEDIATE redirect - don't wait for alertBox or other UI updates
+        console.log('✅ Order created! Redirecting immediately to success page...');
         
-        // FALLBACK: If redirect doesn't happen after 2 seconds, force it
+        // Redirect immediately - don't wait for alertBox
+        window.location.href = "/order/success";
+        
+        // If redirect somehow doesn't work, force it after 100ms
         setTimeout(() => {
           if (window.location.pathname !== '/order/success') {
             console.warn('⚠️ Redirect did not happen, forcing redirect...');
-            window.location.href = "/order/success";
+            window.location.replace("/order/success");
           }
-        }, 2000);
+        }, 100);
       } else {
         console.error('❌ Order creation failed:', res);
         console.error('❌ Response details:', JSON.stringify(res, null, 2));
