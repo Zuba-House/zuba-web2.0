@@ -28,6 +28,7 @@ import variationRouter from './route/variation.route.js';
 import mediaRouter from './route/media.route.js';
 import notificationRouter from './route/notification.route.js';
 import shippingRouter from './route/shipping.route.js';
+import testRouter from './route/test.route.js';
 import { transporter } from './config/emailService.js';
 
 // Validate environment variables at startup
@@ -152,41 +153,102 @@ app.get("/api/health", (request, response) => {
 // Test email endpoint (for testing SMTP configuration)
 app.get("/test-email", async (req, res) => {
     try {
-        const senderEmail = process.env.EMAIL || 'orders@zubahouse.com';
+        // Get test recipient from query or env
+        const testRecipient = req.query.to || process.env.TEST_EMAIL || 'olivier.niyo250@gmail.com';
+        
+        // Check environment variables
+        const emailConfig = {
+            EMAIL: process.env.EMAIL,
+            EMAIL_PASS: process.env.EMAIL_PASS ? '***' : 'NOT SET',
+            SMTP_HOST: process.env.SMTP_HOST || 'smtp.hostinger.com',
+            SMTP_PORT: process.env.SMTP_PORT || '465',
+            SMTP_SECURE: process.env.SMTP_SECURE || 'true',
+            EMAIL_SENDER_NAME: process.env.EMAIL_SENDER_NAME || 'Zuba House'
+        };
+        
+        console.log('🧪 Test email endpoint called');
+        console.log('📧 Email configuration:', emailConfig);
+        
+        if (!process.env.EMAIL) {
+            return res.status(500).json({
+                success: false,
+                message: "EMAIL environment variable is not set",
+                config: emailConfig
+            });
+        }
+        
+        if (!process.env.EMAIL_PASS) {
+            return res.status(500).json({
+                success: false,
+                message: "EMAIL_PASS environment variable is not set",
+                config: emailConfig
+            });
+        }
+        
+        const senderEmail = process.env.EMAIL;
         const senderName = process.env.EMAIL_SENDER_NAME || 'Zuba House';
         const fromAddress = `${senderName} <${senderEmail}>`;
-        const testRecipient = process.env.TEST_EMAIL || 'olivier.niyo250@gmail.com';
+        
+        console.log('📧 Attempting to send test email:', {
+            from: fromAddress,
+            to: testRecipient
+        });
         
         const info = await transporter.sendMail({
             from: fromAddress,
             to: testRecipient,
-            subject: "Zuba House SMTP Test",
+            subject: "Zuba House SMTP Test - " + new Date().toISOString(),
             text: "Hostinger SMTP is working perfectly!",
             html: `
                 <div style="font-family: Arial, sans-serif; padding: 20px;">
                     <h2 style="color: #2c3e50;">✅ SMTP Test Successful!</h2>
                     <p>Your Hostinger email configuration is working correctly.</p>
                     <p><strong>From:</strong> ${fromAddress}</p>
-                    <p><strong>SMTP Host:</strong> ${process.env.SMTP_HOST || 'smtp.hostinger.com'}</p>
-                    <p><strong>Port:</strong> ${process.env.SMTP_PORT || '465'}</p>
+                    <p><strong>To:</strong> ${testRecipient}</p>
+                    <p><strong>SMTP Host:</strong> ${emailConfig.SMTP_HOST}</p>
+                    <p><strong>Port:</strong> ${emailConfig.SMTP_PORT}</p>
+                    <p><strong>Secure:</strong> ${emailConfig.SMTP_SECURE}</p>
+                    <p><strong>Test Time:</strong> ${new Date().toLocaleString()}</p>
                     <p style="margin-top: 20px; color: #27ae60;">🎉 Email sending is ready for production!</p>
                 </div>
             `
         });
+        
+        console.log('✅ Test email sent successfully:', info.messageId);
         
         res.json({
             success: true,
             message: "Email sent successfully!",
             messageId: info.messageId,
             from: fromAddress,
-            to: testRecipient
+            to: testRecipient,
+            config: emailConfig,
+            response: info.response,
+            accepted: info.accepted,
+            rejected: info.rejected
         });
     } catch (error) {
-        console.error('Test email error:', error);
+        console.error('❌ Test email error:', error);
+        console.error('Error details:', {
+            code: error.code,
+            command: error.command,
+            response: error.response,
+            responseCode: error.responseCode
+        });
+        
         res.status(500).json({
             success: false,
             message: "Failed to send test email",
-            error: error.message
+            error: error.message,
+            errorCode: error.code,
+            errorResponse: error.response,
+            config: {
+                EMAIL: process.env.EMAIL ? 'SET' : 'NOT SET',
+                EMAIL_PASS: process.env.EMAIL_PASS ? 'SET' : 'NOT SET',
+                SMTP_HOST: process.env.SMTP_HOST || 'smtp.hostinger.com',
+                SMTP_PORT: process.env.SMTP_PORT || '465',
+                SMTP_SECURE: process.env.SMTP_SECURE || 'true'
+            }
         });
     }
 });
@@ -214,6 +276,7 @@ app.use("/api/products/:id/variations", variationRouter);
 app.use("/api/media", mediaRouter);
 app.use("/api", notificationRouter);
 app.use("/api/shipping", shippingRouter);
+app.use("/api", testRouter);
 
 // 404 handler (must be after all routes)
 app.use(notFoundHandler);
