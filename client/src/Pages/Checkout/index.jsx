@@ -161,7 +161,8 @@ const Checkout = () => {
         } else {
           context.alertBox("error", res?.message);
         }
-        history("/order/success");
+        // Use window.location for more reliable redirect
+        window.location.href = "/order/success";
       });
     } else {
       context.alertBox("error", "Please add a delivery address before proceeding");
