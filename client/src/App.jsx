@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Link } from "react-router-dom";
+import Button from "@mui/material/Button";
 import emailjs from '@emailjs/browser';
 import "./App.css";
 import "./responsive.css";
@@ -333,6 +334,16 @@ function App() {
             <Route path={"/address"} exact={true} element={<Address />} />
             <Route path={"/search"} exact={true} element={<SearchPage />} />
             <Route path={"/blog/:id"} exact={true} element={<BlogDetail />} />
+            {/* Catch-all route for 404 - must be last */}
+            <Route path="*" element={
+              <section className='w-full p-10 py-8 lg:py-20 flex items-center justify-center flex-col gap-2'>
+                <h3 className='mb-0 text-[20px] sm:text-[25px]'>Page Not Found</h3>
+                <p className='mt-0 text-center'>The page you're looking for doesn't exist.</p>
+                <Link to="/">
+                  <Button className="btn-org btn-border">Back to home</Button>
+                </Link>
+              </section>
+            } />
           </Routes>
           <Footer />
         </MyContext.Provider>

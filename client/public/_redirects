@@ -1,0 +1,5 @@
+# Vercel redirects fallback for SPA routing
+/order/success    /index.html   200
+/order/failed     /index.html   200
+/*                /index.html   200
+

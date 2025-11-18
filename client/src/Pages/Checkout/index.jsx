@@ -231,14 +231,15 @@ const Checkout = () => {
           // ignore cart empty errors but still proceed
         }
         context?.getCartItems();
-        history("/order/success");
+        // Use window.location for more reliable redirect
+        window.location.href = "/order/success";
       } else {
         context.alertBox("error", res?.message);
-        history("/order/failed");
+        window.location.href = "/order/failed";
       }
     } catch {
       context.alertBox("error", "Failed to record order");
-      history("/order/failed");
+      window.location.href = "/order/failed";
     }
   }
 
