@@ -74,7 +74,18 @@ function StripeForm({ amount, onPaid, onFailed, onProcessingChange, onReady }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!stripe || !elements) return;
+    
+    // Prevent double submission
+    if (processing || creatingIntent) {
+      console.log('⚠️ Payment already processing, please wait...');
+      return;
+    }
+    
+    if (!stripe || !elements) {
+      console.error('❌ Stripe not initialized');
+      return;
+    }
+    
     setProcessing(true);
 
     let secret = clientSecret;
@@ -82,9 +93,11 @@ function StripeForm({ amount, onPaid, onFailed, onProcessingChange, onReady }) {
       if (!secret) {
         setCreatingIntent(true);
         const api = import.meta.env.VITE_API_URL;
+        console.log('💳 Creating payment intent for amount:', amount);
         const res = await axios.post(`${api}/api/stripe/create-payment-intent`, { amount });
         secret = res?.data?.clientSecret || "";
         setClientSecret(secret);
+        console.log('✅ Payment intent created');
       }
     } catch (err) {
       console.error("Failed to create payment intent on submit:", err.response?.data || err.message);
@@ -101,13 +114,32 @@ function StripeForm({ amount, onPaid, onFailed, onProcessingChange, onReady }) {
         alert('Failed to initialize payment. Please try again or contact support.');
       }
       
-      window.location.href = "/order/failed";
+      // Call onFailed callback if provided
+      if (onFailed) {
+        try {
+          await onFailed(err);
+        } catch (callbackError) {
+          console.error('Error in onFailed callback:', callbackError);
+        }
+      }
+      
+      setTimeout(() => {
+        window.location.href = "/order/failed";
+      }, 500);
       return;
     } finally {
       setCreatingIntent(false);
     }
 
     const card = elements.getElement(CardElement);
+    if (!card) {
+      console.error('❌ Card element not found');
+      setProcessing(false);
+      alert('Card form not ready. Please try again.');
+      return;
+    }
+    
+    console.log('💳 Confirming payment with Stripe...');
     const result = await stripe.confirmCardPayment(secret, { payment_method: { card } });
     setProcessing(false);
 
@@ -128,15 +160,30 @@ function StripeForm({ amount, onPaid, onFailed, onProcessingChange, onReady }) {
     }
 
     if (paymentIntent) {
-      console.log('Stripe paymentIntent status:', paymentIntent.status);
+      console.log('✅ Payment Intent received:', {
+        id: paymentIntent.id,
+        status: paymentIntent.status,
+        amount: paymentIntent.amount
+      });
+      
       if (paymentIntent.status === 'succeeded') {
+        console.log('✅ Payment succeeded, calling onPaid handler...');
         try {
           const maybePromise = onPaid?.(paymentIntent);
           if (maybePromise && typeof maybePromise.then === 'function') {
             await maybePromise;
+            console.log('✅ onPaid handler completed');
+          } else if (onPaid) {
+            // If it's not a promise, just call it
+            onPaid(paymentIntent);
           }
         } catch (e) {
-          console.error('Error in onPaid handler:', e);
+          console.error('❌ Error in onPaid handler:', e);
+          // Even if handler fails, payment succeeded - redirect to success
+          console.log('⚠️ onPaid handler failed, but payment succeeded. Redirecting to success page...');
+          setTimeout(() => {
+            window.location.href = "/order/success";
+          }, 500);
         }
         // onPaid handler will redirect to success when it finishes
         return;

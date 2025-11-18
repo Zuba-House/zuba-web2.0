@@ -240,30 +240,57 @@ const Checkout = () => {
 
     try {
       console.log('📦 Creating order after successful payment...');
+      console.log('📦 Payment Intent ID:', paymentIntent?.id);
+      console.log('📦 Order payload:', { 
+        userId: user?._id, 
+        productCount: context?.cartData?.length,
+        totalAmt: finalTotal 
+      });
+      
       const res = await postData(`/api/order/create`, payLoad);
-      context.alertBox("success", res?.message);
+      
+      console.log('📦 Order creation response:', res);
+      
       if (res?.error === false) {
+        context.alertBox("success", res?.message || "Order placed successfully!");
+        
+        // Clear cart in background (don't wait for it)
         try {
-          await deleteData(`/api/cart/emptyCart/${user?._id}`);
+          deleteData(`/api/cart/emptyCart/${user?._id}`).catch(err => {
+            console.warn('⚠️ Cart clear failed (non-critical):', err);
+          });
         } catch {
           // ignore cart empty errors but still proceed
         }
+        
         context?.getCartItems();
+        
         // Use window.location for more reliable redirect
-        // Small delay to ensure state is saved
+        // Small delay to ensure state is saved and user sees success message
+        console.log('✅ Order created successfully, redirecting to success page...');
         setTimeout(() => {
           window.location.href = "/order/success";
-        }, 300);
+        }, 500);
       } else {
-        context.alertBox("error", res?.message);
+        console.error('❌ Order creation failed:', res);
+        context.alertBox("error", res?.message || "Failed to create order");
         setIsProcessingOrder(false); // Re-enable on error
-        window.location.href = "/order/failed";
+        setTimeout(() => {
+          window.location.href = "/order/failed";
+        }, 500);
       }
     } catch (error) {
       console.error('❌ Error creating order:', error);
-      context.alertBox("error", "Failed to record order");
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack,
+        paymentIntentId: paymentIntent?.id
+      });
+      context.alertBox("error", "Failed to record order. Please contact support.");
       setIsProcessingOrder(false); // Re-enable on error
-      window.location.href = "/order/failed";
+      setTimeout(() => {
+        window.location.href = "/order/failed";
+      }, 500);
     }
   }
 
