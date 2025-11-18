@@ -25,6 +25,7 @@ const Checkout = () => {
   const [isLoading, setIsloading] = useState(false);
   const [showStripeForm, setShowStripeForm] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
+  const [isProcessingOrder, setIsProcessingOrder] = useState(false); // Prevent double-click on order creation
   const [selectedShippingRate, setSelectedShippingRate] = useState(null);
   const context = useContext(MyContext);
 
@@ -129,6 +130,12 @@ const Checkout = () => {
       return;
     }
 
+    // Prevent double-click on COD orders
+    if (isLoading) {
+      console.log('⚠️ Order is already being processed, please wait...');
+      return;
+    }
+
     const user = context?.userData
     setIsloading(true);
 
@@ -174,6 +181,12 @@ const Checkout = () => {
   }
 
   const handleStripeSuccess = async (paymentIntent) => {
+    // Prevent double-click / multiple submissions
+    if (isProcessingOrder) {
+      console.log('⚠️ Order is already being processed, please wait...');
+      return;
+    }
+
     // Validate cart before proceeding
     if (!validateCartStock()) {
       return;
@@ -190,6 +203,9 @@ const Checkout = () => {
       context.alertBox("error", "Please add a delivery address before proceeding");
       return;
     }
+
+    // Set processing state to prevent double-click
+    setIsProcessingOrder(true);
 
     // Calculate total amount including shipping (use totalAmount state which already includes shipping)
     const subtotal = context.cartData?.length > 0
@@ -223,6 +239,7 @@ const Checkout = () => {
     };
 
     try {
+      console.log('📦 Creating order after successful payment...');
       const res = await postData(`/api/order/create`, payLoad);
       context.alertBox("success", res?.message);
       if (res?.error === false) {
@@ -233,13 +250,19 @@ const Checkout = () => {
         }
         context?.getCartItems();
         // Use window.location for more reliable redirect
-        window.location.href = "/order/success";
+        // Small delay to ensure state is saved
+        setTimeout(() => {
+          window.location.href = "/order/success";
+        }, 300);
       } else {
         context.alertBox("error", res?.message);
+        setIsProcessingOrder(false); // Re-enable on error
         window.location.href = "/order/failed";
       }
-    } catch {
+    } catch (error) {
+      console.error('❌ Error creating order:', error);
       context.alertBox("error", "Failed to record order");
+      setIsProcessingOrder(false); // Re-enable on error
       window.location.href = "/order/failed";
     }
   }

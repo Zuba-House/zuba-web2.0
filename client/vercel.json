@@ -1,13 +1,9 @@
 {
+  "version": 2,
+  "framework": "vite",
+  "buildCommand": "npm install && npm run build",
+  "outputDirectory": "dist",
   "rewrites": [
-    {
-      "source": "/order/success",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/order/failed",
-      "destination": "/index.html"
-    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
@@ -32,7 +28,7 @@
       ]
     },
     {
-      "source": "/static/(.*)",
+      "source": "/assets/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
