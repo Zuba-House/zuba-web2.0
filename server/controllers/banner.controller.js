@@ -298,22 +298,167 @@ export async function getPublicBanners(request, response) {
 }
 
 /**
- * Delete banner
- * DELETE /api/banners/:type
+ * Get banner by ID
+ * GET /api/banners/:id
  */
-export async function deleteBanner(request, response) {
+export async function getBannerById(request, response) {
     try {
-        const { type } = request.params;
+        const { id } = request.params;
 
-        if (!['desktop', 'mobile'].includes(type)) {
-            return response.status(400).json({
+        const banner = await Banner.findById(id);
+
+        if (!banner) {
+            return response.status(404).json({
                 success: false,
                 error: true,
-                message: 'Invalid banner type'
+                message: 'Banner not found'
             });
         }
 
-        const banner = await Banner.findOne({ type });
+        return response.status(200).json({
+            success: true,
+            error: false,
+            banner: {
+                _id: banner._id,
+                id: banner._id.toString(),
+                type: banner.type,
+                imageUrl: banner.imageUrl || '',
+                title: banner.title || '',
+                subtitle: banner.subtitle || '',
+                ctaText: banner.ctaText || '',
+                ctaLink: banner.ctaLink || '',
+                isActive: banner.isActive,
+                order: banner.order || 0,
+                backgroundColor: banner.backgroundColor || '',
+                textColor: banner.textColor || '',
+                ctaColor: banner.ctaColor || '',
+                ctaTextColor: banner.ctaTextColor || ''
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching banner:', error);
+        return response.status(500).json({
+            success: false,
+            error: true,
+            message: 'Failed to fetch banner',
+            details: error.message
+        });
+    }
+}
+
+/**
+ * Update banner by ID
+ * PUT /api/banners/:id
+ */
+export async function updateBanner(request, response) {
+    try {
+        const { id } = request.params;
+        const { title, subtitle, ctaText, ctaLink, order, isActive, backgroundColor, textColor, ctaColor, ctaTextColor } = request.body;
+
+        const banner = await Banner.findById(id);
+
+        if (!banner) {
+            return response.status(404).json({
+                success: false,
+                error: true,
+                message: 'Banner not found'
+            });
+        }
+
+        // If new image uploaded, update it
+        if (request.file) {
+            // Delete old image from Cloudinary
+            if (banner.cloudinaryId) {
+                try {
+                    await cloudinary.uploader.destroy(banner.cloudinaryId);
+                } catch (error) {
+                    console.error('Error deleting old banner image:', error);
+                }
+            }
+
+            // Upload new image
+            const options = {
+                use_filename: true,
+                unique_filename: true,
+                overwrite: false,
+                folder: 'banners',
+            };
+
+            const result = await cloudinary.uploader.upload(request.file.path, options);
+
+            // Delete local file
+            if (fs.existsSync(request.file.path)) {
+                fs.unlinkSync(request.file.path);
+            }
+
+            banner.imageUrl = result.secure_url;
+            banner.cloudinaryId = result.public_id;
+        }
+
+        // Update content
+        if (title !== undefined) banner.title = title;
+        if (subtitle !== undefined) banner.subtitle = subtitle;
+        if (ctaText !== undefined) banner.ctaText = ctaText;
+        if (ctaLink !== undefined) banner.ctaLink = ctaLink;
+        if (order !== undefined) banner.order = parseInt(order) || 0;
+        if (isActive !== undefined) banner.isActive = isActive === 'true' || isActive === true;
+        if (backgroundColor !== undefined) banner.backgroundColor = backgroundColor;
+        if (textColor !== undefined) banner.textColor = textColor;
+        if (ctaColor !== undefined) banner.ctaColor = ctaColor;
+        if (ctaTextColor !== undefined) banner.ctaTextColor = ctaTextColor;
+
+        banner.updatedAt = new Date();
+        await banner.save();
+
+        return response.status(200).json({
+            success: true,
+            error: false,
+            message: 'Banner updated successfully',
+            banner: {
+                _id: banner._id,
+                id: banner._id.toString(),
+                type: banner.type,
+                imageUrl: banner.imageUrl,
+                title: banner.title,
+                subtitle: banner.subtitle,
+                ctaText: banner.ctaText,
+                ctaLink: banner.ctaLink,
+                isActive: banner.isActive,
+                order: banner.order,
+                backgroundColor: banner.backgroundColor,
+                textColor: banner.textColor,
+                ctaColor: banner.ctaColor,
+                ctaTextColor: banner.ctaTextColor
+            }
+        });
+
+    } catch (error) {
+        console.error('Banner update error:', error);
+        
+        // Clean up uploaded file on error
+        if (request.file && fs.existsSync(request.file.path)) {
+            fs.unlinkSync(request.file.path);
+        }
+
+        return response.status(500).json({
+            success: false,
+            error: true,
+            message: 'Failed to update banner',
+            details: error.message
+        });
+    }
+}
+
+/**
+ * Delete banner by ID
+ * DELETE /api/banners/:id
+ */
+export async function deleteBanner(request, response) {
+    try {
+        const { id } = request.params;
+
+        const banner = await Banner.findById(id);
 
         if (!banner) {
             return response.status(404).json({
@@ -333,12 +478,12 @@ export async function deleteBanner(request, response) {
         }
 
         // Delete banner from database
-        await Banner.deleteOne({ type });
+        await Banner.deleteOne({ _id: id });
 
         return response.status(200).json({
             success: true,
             error: false,
-            message: `${type} banner deleted successfully`
+            message: 'Banner deleted successfully'
         });
 
     } catch (error) {

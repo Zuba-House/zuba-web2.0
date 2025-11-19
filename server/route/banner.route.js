@@ -6,6 +6,8 @@ import {
     updateBannerContent,
     getAllBanners,
     getPublicBanners,
+    getBannerById,
+    updateBanner,
     deleteBanner,
     toggleBannerStatus
 } from '../controllers/banner.controller.js';
@@ -19,7 +21,9 @@ bannerRouter.get('/public', getPublicBanners);
 bannerRouter.post('/upload', auth, upload.single('banner'), uploadBannerImage);
 bannerRouter.post('/content', auth, updateBannerContent);
 bannerRouter.get('/', auth, getAllBanners);
-bannerRouter.delete('/:type', auth, deleteBanner);
+bannerRouter.get('/:id', auth, getBannerById);
+bannerRouter.put('/:id', auth, upload.single('banner'), updateBanner);
+bannerRouter.delete('/:id', auth, deleteBanner);
 bannerRouter.put('/:type/toggle', auth, toggleBannerStatus);
 
 export default bannerRouter;
