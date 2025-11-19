@@ -29,6 +29,7 @@ import mediaRouter from './route/media.route.js';
 import notificationRouter from './route/notification.route.js';
 import shippingRouter from './route/shipping.route.js';
 import testRouter from './route/test.route.js';
+import bannerRouter from './route/banner.route.js';
 import { transporter } from './config/emailService.js';
 
 // Validate environment variables at startup
@@ -304,6 +305,7 @@ app.use("/api/media", mediaRouter);
 app.use("/api", notificationRouter);
 app.use("/api/shipping", shippingRouter);
 app.use("/api", testRouter);
+app.use("/api/banners", bannerRouter);
 
 // 404 handler (must be after all routes)
 app.use(notFoundHandler);

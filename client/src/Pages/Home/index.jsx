@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useState } from "react";
 import HomeSlider from "../../components/HomeSlider";
+import ResponsiveHeroBanner from "../../components/ResponsiveHeroBanner";
 import HomeCatSlider from "../../components/HomeCatSlider";
 import { LiaShippingFastSolid } from "react-icons/lia";
 import AdsBannerSlider from "../../components/AdsBannerSlider";
@@ -145,6 +146,11 @@ const Home = () => {
   return (
     <>
 
+      {/* Responsive Hero Banner - supports mobile/desktop banners */}
+      <ResponsiveHeroBanner />
+      
+      {/* Legacy Home Slider - kept for backward compatibility */}
+      {/* Uncomment if you want to use the old slider instead:
       {
         homeSlidesData?.length === 0 && <BannerLoading />
       }
@@ -152,6 +158,7 @@ const Home = () => {
       {
         homeSlidesData?.lengtn !== 0 && <HomeSlider data={homeSlidesData} />
       }
+      */}
 
       {
         context?.catData?.length !== 0 && <HomeCatSlider data={context?.catData} />

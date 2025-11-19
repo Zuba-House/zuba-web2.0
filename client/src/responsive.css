@@ -1,20 +1,25 @@
-
+/* ========================================
+   📱 MOBILE RESPONSIVE STYLES (320px - 992px)
+   ======================================== */
 @media only screen and (min-width:320px) and (max-width:992px){
     html,body{overflow-x: hidden;}
 
+    /* Button Sizes */
+    .btn-sm{padding: 8px 12px !important; font-size: 12px !important; min-height: 44px;}
+    .btn-lg{padding: 12px 20px !important; font-size: 16px !important; min-height: 48px;}
+    .btn{padding: 10px 16px !important; font-size: 14px !important; min-height: 44px;}
+    .btn svg{font-size: 18px !important;}
 
-    .btn-sm{padding: 3px 10px !important; font-size: 11px !important;}
-    .btn-lg{padding: 5px 10px !important; font-size: 14px !important;}
-    .btn{padding: 5px 10px !important; font-size: 12px !important;}
-    .btn svg{font-size: 15px !important;}
-
+    /* Navigation */
     .mobileNav a.active button{@apply !text-primary}
     .navigation ul{white-space: nowrap; overflow-x: scroll; overflow-y: hidden; display: block !important; text-align: center;}
     .navigation ul::-webkit-scrollbar{display: none !important;}
     .navigation ul li{display: inline-block !important; vertical-align: top !important;}
 
-    .container{width: 95% !important; max-width: 95% !important;}
+    /* Container */
+    .container{width: 95% !important; max-width: 95% !important; padding: 0 10px;}
 
+    /* Scrollable Boxes */
     .scrollableBox{white-space: nowrap; overflow-x: scroll; overflow-y: hidden; display: block !important;}
     .scrollableBox::-webkit-scrollbar{display: none !important;}
     .scrollableBox .box{display: inline-block !important; vertical-align: top !important; margin-right: 12px !important; width: 300px !important;}
@@ -29,16 +34,98 @@
     .resBannersSlider .swiper-slide{display: inline-block !important; vertical-align: top !important; margin-right: 12px !important; width: 300px !important;}
     .resBannersSlider .swiper-slide *{white-space: break-spaces !important;}
 
+    /* Footer */
     .footerBoxWrap{padding-left:20px !important ;}
     .footerBoxWrap .col{width: 180px !important;}
 
+    /* Sidebar */
     .sidebarWrapper.open{bottom: 0px !important; opacity: 1 !important;}
+
+    /* Product Items - Mobile Optimization */
+    .productItem {
+        min-height: auto !important;
+    }
     
+    .productItem .imgWrapper {
+        height: 200px !important;
+        min-height: 200px !important;
+    }
+    
+    .productItem .product-image {
+        height: 100% !important;
+        object-fit: cover !important;
+    }
+    
+    .productItem .info {
+        padding: 12px !important;
+        min-height: auto !important;
+        height: auto !important;
+        padding-bottom: 60px !important;
+    }
+    
+    .productItem .title {
+        font-size: 14px !important;
+        line-height: 1.4 !important;
+        margin-bottom: 8px !important;
+    }
+    
+    .productItem .price {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Order Pages - Mobile */
+    section.w-full {
+        padding: 30px 15px !important;
+        min-height: 50vh !important;
+    }
+    
+    section.w-full img {
+        width: 80px !important;
+        height: 80px !important;
+        margin-bottom: 20px !important;
+    }
+    
+    section.w-full h3 {
+        font-size: 22px !important;
+        font-weight: 600 !important;
+        margin-bottom: 12px !important;
+        text-align: center !important;
+    }
+    
+    section.w-full p {
+        font-size: 15px !important;
+        line-height: 1.6 !important;
+        text-align: center !important;
+        margin-bottom: 8px !important;
+    }
+    
+    /* Hero Banner - Mobile */
+    .homeSlider {
+        padding: 10px 0 !important;
+    }
+    
+    .homeSlider .sliderHome {
+        height: 250px !important;
+    }
+    
+    .homeSlider img {
+        height: 250px !important;
+        object-fit: cover !important;
+    }
 }
 
+/* ========================================
+   📱 SMALL MOBILE (320px - 767px)
+   ======================================== */
 @media only screen and (min-width:320px) and (max-width:767px){
-    .MuiTabs-flexContainer button{font-size: 13px !important;}
-    .productItem  .addToCartBtn{padding: 7px 13px !important;}
+    .MuiTabs-flexContainer button{font-size: 12px !important; padding: 8px 12px !important; min-height: 44px;}
+    .productItem .addToCartBtn{
+        padding: 10px 16px !important;
+        font-size: 14px !important;
+        min-height: 44px !important;
+        width: 100% !important;
+    }
 
     .part2_col1 li a,.part2_col2 li a{font-size: 13px !important;} 
 
@@ -47,15 +134,154 @@
 
     .zoomProductSliderThumbs.space .swiper-wrapper{padding-top: 0px !important;}
 
-   
+    /* Product Grid - 2 columns on mobile */
+    .productsSlider .swiper-slide {
+        width: calc(50% - 8px) !important;
+        margin-right: 8px !important;
+    }
+    
+    /* Text Sizes */
+    h1 { font-size: 24px !important; }
+    h2 { font-size: 20px !important; }
+    h3 { font-size: 18px !important; }
+    h4 { font-size: 16px !important; }
+    
+    /* Popular Products Section */
+    .leftSec h2 {
+        font-size: 18px !important;
+        margin-bottom: 8px !important;
+    }
+    
+    .leftSec p {
+        font-size: 13px !important;
+        line-height: 1.5 !important;
+    }
 }
 
-
-
+/* ========================================
+   📱 EXTRA SMALL MOBILE (320px - 575px)
+   ======================================== */
 @media only screen and (min-width:320px) and (max-width:575px){
     .cartPanel .MuiPaper-root,.addressPanel .MuiPaper-root{width: 300px !important;}
+    
+    /* Product Items - Smaller on very small screens */
+    .productItem .imgWrapper {
+        height: 180px !important;
+    }
+    
+    .productItem .info {
+        padding: 10px !important;
+        padding-bottom: 55px !important;
+    }
+    
+    .productItem .title {
+        font-size: 13px !important;
+    }
+    
+    /* Order Pages */
+    section.w-full {
+        padding: 25px 10px !important;
+    }
+    
+    section.w-full h3 {
+        font-size: 20px !important;
+    }
+    
+    section.w-full p {
+        font-size: 14px !important;
+    }
 }
 
+/* ========================================
+   📱 MEDIUM MOBILE (575px - 767px)
+   ======================================== */
 @media only screen and (min-width:575px) and (max-width:767px){
     .cartPanel .MuiPaper-root,.addressPanel .MuiPaper-root{width: 400px !important;}
+}
+
+/* ========================================
+   🖥️ TABLET & DESKTOP (768px+)
+   ======================================== */
+@media only screen and (min-width:768px){
+    /* Product Items - Desktop */
+    .productItem .imgWrapper {
+        height: 280px !important;
+    }
+    
+    .productItem .info {
+        padding: 15px !important;
+        height: 190px !important;
+    }
+    
+    /* Hero Banner - Desktop */
+    .homeSlider .sliderHome {
+        height: 400px !important;
+    }
+    
+    .homeSlider img {
+        height: 400px !important;
+    }
+}
+
+/* ========================================
+   🎯 TOUCH-FRIENDLY ELEMENTS
+   ======================================== */
+@media (max-width: 768px) {
+    /* Ensure all interactive elements are touch-friendly */
+    button, .btn, a[role="button"], input[type="button"], input[type="submit"] {
+        min-height: 44px !important;
+        min-width: 44px !important;
+        padding: 10px 16px !important;
+    }
+    
+    /* Input fields should be large enough */
+    input, textarea, select {
+        min-height: 44px !important;
+        font-size: 16px !important; /* Prevents zoom on iOS */
+    }
+    
+    /* Links should have adequate spacing */
+    a {
+        padding: 4px 0 !important;
+    }
+}
+
+/* ========================================
+   🖼️ IMAGE OPTIMIZATION
+   ======================================== */
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+.product-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.productItem:hover .product-image {
+    transform: scale(1.05);
+}
+
+/* ========================================
+   📦 PRODUCT STATUS BADGES
+   ======================================== */
+.productItem .absolute.top-2.left-2 {
+    font-size: 11px !important;
+    padding: 6px 10px !important;
+    font-weight: 700 !important;
+    border-radius: 4px !important;
+    z-index: 20 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+}
+
+@media (max-width: 767px) {
+    .productItem .absolute.top-2.left-2 {
+        font-size: 10px !important;
+        padding: 4px 8px !important;
+    }
 }
