@@ -1160,21 +1160,42 @@ export async function deleteProduct(request, response) {
 
     const images = product.images;
 
-    let img = "";
-    for (img of images) {
-        const imgUrl = img;
-        const urlArr = imgUrl.split("/");
-        const image = urlArr[urlArr.length - 1];
-
-        const imageName = image.split(".")[0];
-
-        if (imageName) {
-            cloudinary.uploader.destroy(imageName, (error, result) => {
-                // console.log(error, result);
-            });
+    // Helper function to safely extract image URL
+    const getImageUrl = (imgUrl) => {
+        if (!imgUrl) return '';
+        if (typeof imgUrl === 'string') return imgUrl;
+        if (imgUrl && typeof imgUrl === 'object' && imgUrl.url) return imgUrl.url;
+        if (Array.isArray(imgUrl) && imgUrl.length > 0) {
+            return typeof imgUrl[0] === 'string' ? imgUrl[0] : imgUrl[0]?.url || '';
         }
+        return '';
+    };
 
+    if (images && Array.isArray(images)) {
+        for (let img of images) {
+            const imageUrl = getImageUrl(img);
+            
+            if (imageUrl && typeof imageUrl === 'string' && imageUrl.includes('/')) {
+                try {
+                    const urlArr = imageUrl.split("/");
+                    const image = urlArr[urlArr.length - 1];
 
+                    if (image) {
+                        const imageName = image.split(".")[0];
+
+                        if (imageName) {
+                            cloudinary.uploader.destroy(imageName, (error, result) => {
+                                if (error) {
+                                    console.error('Error deleting image from Cloudinary:', error);
+                                }
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error processing image URL:', error, 'Image:', img);
+                }
+            }
+        }
     }
 
     const deletedProduct = await ProductModel.findByIdAndDelete(request.params.id);
@@ -1204,28 +1225,50 @@ export async function deleteMultipleProduct(request, response) {
     }
 
 
+    // Helper function to safely extract image URL
+    const getImageUrl = (imgUrl) => {
+        if (!imgUrl) return '';
+        if (typeof imgUrl === 'string') return imgUrl;
+        if (imgUrl && typeof imgUrl === 'object' && imgUrl.url) return imgUrl.url;
+        if (Array.isArray(imgUrl) && imgUrl.length > 0) {
+            return typeof imgUrl[0] === 'string' ? imgUrl[0] : imgUrl[0]?.url || '';
+        }
+        return '';
+    };
+
     for (let i = 0; i < ids?.length; i++) {
         const product = await ProductModel.findById(ids[i]);
 
+        if (!product) continue;
+
         const images = product.images;
 
-        let img = "";
-        for (img of images) {
-            const imgUrl = img;
-            const urlArr = imgUrl.split("/");
-            const image = urlArr[urlArr.length - 1];
+        if (images && Array.isArray(images)) {
+            for (let img of images) {
+                const imageUrl = getImageUrl(img);
+                
+                if (imageUrl && typeof imageUrl === 'string' && imageUrl.includes('/')) {
+                    try {
+                        const urlArr = imageUrl.split("/");
+                        const image = urlArr[urlArr.length - 1];
 
-            const imageName = image.split(".")[0];
+                        if (image) {
+                            const imageName = image.split(".")[0];
 
-            if (imageName) {
-                cloudinary.uploader.destroy(imageName, (error, result) => {
-                    // console.log(error, result);
-                });
+                            if (imageName) {
+                                cloudinary.uploader.destroy(imageName, (error, result) => {
+                                    if (error) {
+                                        console.error('Error deleting image from Cloudinary:', error);
+                                    }
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error processing image URL:', error, 'Image:', img);
+                    }
+                }
             }
-
-
         }
-
     }
 
     try {
@@ -1293,27 +1336,84 @@ export async function getProduct(request, response) {
 
 //delete images
 export async function removeImageFromCloudinary(request, response) {
+    try {
+        const imgUrl = request.query.img;
 
-    const imgUrl = request.query.img;
-
-
-    const urlArr = imgUrl.split("/");
-    const image = urlArr[urlArr.length - 1];
-
-    const imageName = image.split(".")[0];
-
-
-    if (imageName) {
-        const res = await cloudinary.uploader.destroy(
-            imageName,
-            (error, result) => {
-                // console.log(error, res)
-            }
-        );
-
-        if (res) {
-            response.status(200).send(res);
+        if (!imgUrl) {
+            return response.status(400).json({
+                success: false,
+                error: true,
+                message: 'Image URL is required'
+            });
         }
+
+        // Helper function to safely extract image URL
+        const getImageUrl = (imgUrl) => {
+            if (!imgUrl) return '';
+            if (typeof imgUrl === 'string') return imgUrl;
+            if (imgUrl && typeof imgUrl === 'object' && imgUrl.url) return imgUrl.url;
+            if (Array.isArray(imgUrl) && imgUrl.length > 0) {
+                return typeof imgUrl[0] === 'string' ? imgUrl[0] : imgUrl[0]?.url || '';
+            }
+            return '';
+        };
+
+        const imageUrl = getImageUrl(imgUrl);
+
+        if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.includes('/')) {
+            return response.status(400).json({
+                success: false,
+                error: true,
+                message: 'Invalid image URL format'
+            });
+        }
+
+        const urlArr = imageUrl.split("/");
+        const image = urlArr[urlArr.length - 1];
+
+        if (!image) {
+            return response.status(400).json({
+                success: false,
+                error: true,
+                message: 'Could not extract image name from URL'
+            });
+        }
+
+        const imageName = image.split(".")[0];
+
+        if (imageName) {
+            const res = await cloudinary.uploader.destroy(
+                imageName,
+                (error, result) => {
+                    if (error) {
+                        console.error('Error deleting image from Cloudinary:', error);
+                    }
+                }
+            );
+
+            if (res) {
+                return response.status(200).json({
+                    success: true,
+                    error: false,
+                    message: 'Image deleted successfully',
+                    result: res
+                });
+            }
+        }
+
+        return response.status(400).json({
+            success: false,
+            error: true,
+            message: 'Could not extract image name'
+        });
+    } catch (error) {
+        console.error('Error in removeImageFromCloudinary:', error);
+        return response.status(500).json({
+            success: false,
+            error: true,
+            message: 'Error deleting image',
+            details: error.message
+        });
     }
 }
 
