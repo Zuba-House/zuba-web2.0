@@ -1,7 +1,5 @@
-import React, { useContext, useEffect, useState } from "react";
-import HomeSlider from "../../components/HomeSlider";
+import { useContext, useEffect, useState } from "react";
 import ResponsiveHeroBanner from "../../components/ResponsiveHeroBanner";
-import MobileHeroBanner from "../../components/MobileHeroBanner";
 import HomeCatSlider from "../../components/HomeCatSlider";
 import { LiaShippingFastSolid } from "react-icons/lia";
 import AdsBannerSlider from "../../components/AdsBannerSlider";
@@ -23,7 +21,6 @@ import BannerBoxV2 from "../../components/bannerBoxV2";
 import { fetchDataFromApi } from "../../utils/api";
 import { MyContext } from "../../App";
 import ProductLoading from "../../components/ProductLoading";
-import BannerLoading from "../../components/LoadingSkeleton/bannerLoading";
 import { Button } from "@mui/material";
 import { MdArrowRightAlt } from "react-icons/md";
 import { Link } from "react-router-dom";
@@ -146,9 +143,6 @@ const Home = () => {
 
   return (
     <>
-      {/* Mobile-Only Hero Banner - Endless loop with admin controls (hidden on desktop) */}
-      <MobileHeroBanner />
-
       {/* Responsive Hero Banner - supports mobile/desktop banners */}
       <ResponsiveHeroBanner />
       

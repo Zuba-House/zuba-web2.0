@@ -55,13 +55,7 @@ const ResponsiveHeroBanner = () => {
 
   // Determine which banner to show based on screen size
   const isMobile = windowWidth <= 768;
-  
-  // Hide completely on mobile (MobileHeroBanner handles mobile)
-  if (isMobile) {
-    return null;
-  }
-  
-  const currentBanner = banners.desktop;
+  const currentBanner = isMobile ? banners.mobile : banners.desktop;
 
   // Fallback: use desktop banner if mobile banner doesn't exist
   const displayBanner = currentBanner;

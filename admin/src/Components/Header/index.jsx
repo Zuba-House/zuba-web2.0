@@ -35,6 +35,8 @@ import { AddBannerV1 } from "../../Pages/Banners/addBannerV1";
 import { EditBannerV1 } from "../../Pages/Banners/editBannerV1";
 import { BannerList2_AddBanner } from "../../Pages/Banners/bannerList2_AddBanner";
 import { BannerList2_Edit_Banner } from "../../Pages/Banners/bannerList2_Edit_Banner";
+import { AddResponsiveBanner } from "../../Pages/Banners/AddResponsiveBanner";
+import { EditResponsiveBanner } from "../../Pages/Banners/EditResponsiveBanner";
 import AddBlog from "../../Pages/Blog/addBlog";
 import EditBlog from "../../Pages/Blog/editBlog";
 import EditHomeSlide from "../../Pages/HomeSliderBanners/editHomeSlide";
@@ -348,6 +350,13 @@ const Header = () => {
           context?.isOpenFullScreenPanel?.model === "Edit bannerList2" && <BannerList2_Edit_Banner />
         }
 
+        {
+          context?.isOpenFullScreenPanel?.model === "Add Responsive Banner" && <AddResponsiveBanner />
+        }
+
+        {
+          context?.isOpenFullScreenPanel?.model === "Edit Responsive Banner" && <EditResponsiveBanner />
+        }
 
         {
           context?.isOpenFullScreenPanel?.model === "Add Blog" && <AddBlog />

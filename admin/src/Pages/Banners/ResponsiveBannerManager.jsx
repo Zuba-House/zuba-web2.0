@@ -88,13 +88,6 @@ export const ResponsiveBannerManager = () => {
         });
     };
 
-    const handleAdd = () => {
-        context.setIsOpenFullScreenPanel({
-            open: true,
-            model: 'Add Responsive Banner'
-        });
-    };
-
     if (loading) {
         return (
             <div className="flex items-center justify-center p-8">
@@ -114,7 +107,10 @@ export const ResponsiveBannerManager = () => {
                 <div className="col ml-auto flex items-center justify-end gap-3">
                     <Button 
                         className="btn-blue !text-white btn-sm" 
-                        onClick={handleAdd}
+                        onClick={() => context.setIsOpenFullScreenPanel({
+                            open: true,
+                            model: 'Add Responsive Banner'
+                        })}
                     >
                         Add Banner
                     </Button>
