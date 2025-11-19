@@ -70,11 +70,13 @@ export const AddResponsiveBanner = () => {
 
             const response = await uploadImages('/api/banners/upload', formDataObj);
 
-            if (response?.success) {
+            if (response?.success && !response?.error) {
                 context.alertBox("success", "Banner added successfully!");
                 context.setIsOpenFullScreenPanel({ open: false });
             } else {
-                context.alertBox("error", response?.message || "Failed to add banner");
+                const errorMsg = response?.message || response?.details || "Failed to add banner";
+                context.alertBox("error", errorMsg);
+                console.error('Upload response:', response);
             }
         } catch (error) {
             console.error('Error adding banner:', error);

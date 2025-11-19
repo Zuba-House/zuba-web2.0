@@ -96,17 +96,23 @@ export async function uploadBannerImage(request, response) {
 
     } catch (error) {
         console.error('Banner upload error:', error);
+        console.error('Error stack:', error.stack);
         
         // Clean up uploaded file on error
-        if (request.file && fs.existsSync(request.file.path)) {
-            fs.unlinkSync(request.file.path);
+        if (request.file && request.file.path && fs.existsSync(request.file.path)) {
+            try {
+                fs.unlinkSync(request.file.path);
+            } catch (unlinkError) {
+                console.error('Error deleting uploaded file:', unlinkError);
+            }
         }
 
         return response.status(500).json({
             success: false,
             error: true,
             message: 'Failed to upload banner',
-            details: error.message
+            details: error.message || 'Unknown error occurred',
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 }

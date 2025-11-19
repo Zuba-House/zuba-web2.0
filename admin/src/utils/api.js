@@ -164,16 +164,26 @@ export const uploadImage = async (url, updatedData ) => {
 
 
 export const uploadImages = async (url, formData ) => {
-    const params={
-        headers: {
-            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`, // Include your API key in the Authorization header
-            // DO NOT set Content-Type for FormData - axios will set it automatically with boundary
-          },
-    
-    } 
-    const res = await axios.post(apiUrl + url, formData, params);
-    return res.data;
-   
+    try {
+        const params={
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`, // Include your API key in the Authorization header
+                // DO NOT set Content-Type for FormData - axios will set it automatically with boundary
+              },
+        
+        } 
+        const res = await axios.post(apiUrl + url, formData, params);
+        return res.data;
+    } catch (error) {
+        console.error('Upload error:', error);
+        // Return error in the same format as success response
+        return {
+            success: false,
+            error: true,
+            message: error.response?.data?.message || error.message || 'Upload failed',
+            details: error.response?.data?.details
+        };
+    }
 }
 
 

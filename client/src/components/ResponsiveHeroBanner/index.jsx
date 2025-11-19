@@ -12,10 +12,7 @@ import { fetchDataFromApi } from "../../utils/api";
  * Fetches banners from /api/banners/public endpoint
  */
 const ResponsiveHeroBanner = () => {
-  const [banners, setBanners] = useState({
-    desktop: null,
-    mobile: null
-  });
+  const [allBanners, setAllBanners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
@@ -41,10 +38,22 @@ const ResponsiveHeroBanner = () => {
       const response = await fetchDataFromApi('/api/banners/public');
       
       if (response?.success && response?.banners) {
-        setBanners({
-          desktop: response.banners.desktop,
-          mobile: response.banners.mobile
-        });
+        // Get all banners from the response
+        let bannersList = [];
+        
+        if (response.banners.all && Array.isArray(response.banners.all)) {
+          bannersList = response.banners.all;
+        } else if (Array.isArray(response.banners)) {
+          bannersList = response.banners;
+        } else {
+          // Fallback to desktop/mobile format
+          if (response.banners.desktop) bannersList.push(response.banners.desktop);
+          if (response.banners.mobile) bannersList.push(response.banners.mobile);
+        }
+        
+        // Sort by order
+        bannersList.sort((a, b) => (a.order || 0) - (b.order || 0));
+        setAllBanners(bannersList);
       }
     } catch (error) {
       console.error('Error fetching banners:', error);
@@ -53,12 +62,16 @@ const ResponsiveHeroBanner = () => {
     }
   };
 
-  // Determine which banner to show based on screen size
+  // Determine which banners to show based on screen size
   const isMobile = windowWidth <= 768;
-  const currentBanner = isMobile ? banners.mobile : banners.desktop;
+  const filteredBanners = allBanners.filter(banner => 
+    isMobile ? banner.type === 'mobile' : banner.type === 'desktop'
+  );
 
-  // Fallback: use desktop banner if mobile banner doesn't exist
-  const displayBanner = currentBanner;
+  // Get the first banner or fallback to any banner
+  const displayBanner = filteredBanners.length > 0 
+    ? filteredBanners[0] 
+    : (allBanners.length > 0 ? allBanners[0] : null);
 
   if (loading) {
     return (
@@ -70,53 +83,105 @@ const ResponsiveHeroBanner = () => {
     );
   }
 
+  // If multiple banners, show slider
+  if (filteredBanners.length > 1) {
+    return (
+      <div className="homeSlider pb-3 pt-3 lg:pb-5 lg:pt-5 relative z-[99]">
+        <div className="container">
+          <Swiper
+            modules={[Navigation, Autoplay]}
+            navigation={true}
+            autoplay={{
+              delay: 5000,
+              disableOnInteraction: false,
+            }}
+            loop={true}
+            className="rounded-[10px] overflow-hidden"
+          >
+            {filteredBanners.map((banner, index) => {
+              const hasContent = banner.title || banner.subtitle || banner.ctaText;
+              return (
+                <SwiperSlide key={banner._id || banner.id || index}>
+                  <div className="item rounded-[10px] overflow-hidden relative">
+                    <img
+                      src={banner.imageUrl}
+                      alt={banner.title || "Banner"}
+                      className={`w-full ${isMobile ? 'h-[250px]' : 'h-[400px]'} object-cover`}
+                    />
+                    {hasContent && (
+                      <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-start p-4 sm:p-6 lg:p-8 lg:p-12">
+                        <div className={`max-w-2xl text-white ${isMobile ? 'max-w-sm' : ''}`}>
+                          {banner.title && (
+                            <h1 className={`${isMobile ? 'text-xl sm:text-2xl' : 'text-3xl lg:text-5xl'} font-bold mb-2 lg:mb-4 leading-tight`}>
+                              {banner.title}
+                            </h1>
+                          )}
+                          {banner.subtitle && (
+                            <p className={`${isMobile ? 'text-sm sm:text-base' : 'text-lg lg:text-xl'} mb-4 lg:mb-6 leading-relaxed`}>
+                              {banner.subtitle}
+                            </p>
+                          )}
+                          {banner.ctaText && banner.ctaLink && (
+                            <Link
+                              to={banner.ctaLink}
+                              className={`inline-block bg-[#eeb190] hover:bg-[#d99a7a] text-white ${isMobile ? 'px-4 py-2 text-sm' : 'px-6 py-3 text-base lg:text-lg'} rounded-lg font-semibold transition-colors`}
+                            >
+                              {banner.ctaText}
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </SwiperSlide>
+              );
+            })}
+          </Swiper>
+        </div>
+      </div>
+    );
+  }
+
+  // Single banner display
   if (!displayBanner || !displayBanner.imageUrl) {
-    // Fallback: show default banner or nothing
     return null;
   }
 
-  // If banner has text overlay content, show it
   const hasContent = displayBanner.title || displayBanner.subtitle || displayBanner.ctaText;
 
   return (
     <div className="homeSlider pb-3 pt-3 lg:pb-5 lg:pt-5 relative z-[99]">
       <div className="container">
         <div className="item rounded-[10px] overflow-hidden relative">
-          {/* Desktop Banner Only */}
-          {banners.desktop && banners.desktop.imageUrl && (
-            <div className="hidden md:block">
-              <img
-                src={banners.desktop.imageUrl}
-                alt={banners.desktop.title || "Banner"}
-                className="w-full h-[400px] object-cover"
-              />
-              {hasContent && (
-                <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-start p-8 lg:p-12">
-                  <div className="max-w-2xl text-white">
-                    {banners.desktop.title && (
-                      <h1 className="text-3xl lg:text-5xl font-bold mb-4 leading-tight">
-                        {banners.desktop.title}
+          <img
+            src={displayBanner.imageUrl}
+            alt={displayBanner.title || "Banner"}
+            className={`w-full ${isMobile ? 'h-[250px]' : 'h-[400px]'} object-cover`}
+          />
+          {hasContent && (
+                <div className={`absolute inset-0 bg-black bg-opacity-40 flex items-center justify-start ${isMobile ? 'p-4 sm:p-6' : 'p-8 lg:p-12'}`}>
+                  <div className={`${isMobile ? 'max-w-sm' : 'max-w-2xl'} text-white`}>
+                    {displayBanner.title && (
+                      <h1 className={`${isMobile ? 'text-xl sm:text-2xl' : 'text-3xl lg:text-5xl'} font-bold mb-2 lg:mb-4 leading-tight`}>
+                        {displayBanner.title}
                       </h1>
                     )}
-                    {banners.desktop.subtitle && (
-                      <p className="text-lg lg:text-xl mb-6 leading-relaxed">
-                        {banners.desktop.subtitle}
+                    {displayBanner.subtitle && (
+                      <p className={`${isMobile ? 'text-sm sm:text-base' : 'text-lg lg:text-xl'} mb-4 lg:mb-6 leading-relaxed`}>
+                        {displayBanner.subtitle}
                       </p>
                     )}
-                    {banners.desktop.ctaText && banners.desktop.ctaLink && (
+                    {displayBanner.ctaText && displayBanner.ctaLink && (
                       <Link
-                        to={banners.desktop.ctaLink}
-                        className="inline-block bg-[#eeb190] hover:bg-[#d99a7a] text-white px-6 py-3 rounded-lg font-semibold text-base lg:text-lg transition-colors"
+                        to={displayBanner.ctaLink}
+                        className={`inline-block bg-[#eeb190] hover:bg-[#d99a7a] text-white ${isMobile ? 'px-4 py-2 text-sm' : 'px-6 py-3 text-base lg:text-lg'} rounded-lg font-semibold transition-colors`}
                       >
-                        {banners.desktop.ctaText}
+                        {displayBanner.ctaText}
                       </Link>
                     )}
                   </div>
                 </div>
               )}
-            </div>
-          )}
-
         </div>
       </div>
     </div>
