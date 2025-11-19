@@ -55,32 +55,34 @@ export async function uploadBannerImage(request, response) {
             fs.unlinkSync(request.file.path);
         }
 
-        // Find existing banner or create new one
-        let banner = await Banner.findOne({ type });
+        // Extract form data
+        const { title, subtitle, ctaText, ctaLink, order, backgroundColor, textColor, ctaColor, ctaTextColor } = request.body;
 
-        if (banner) {
-            // Delete old image from Cloudinary if exists
-            if (banner.cloudinaryId) {
-                try {
-                    await cloudinary.uploader.destroy(banner.cloudinaryId);
-                } catch (error) {
-                    console.error('Error deleting old banner image:', error);
-                }
-            }
-
-            // Update existing banner
-            banner.imageUrl = result.secure_url;
-            banner.cloudinaryId = result.public_id;
-            banner.updatedAt = new Date();
+        // Calculate order: use provided order, or count existing banners
+        let orderValue = 0;
+        if (order !== undefined && order !== null && order !== '') {
+            orderValue = parseInt(order) || 0;
         } else {
-            // Create new banner
-            banner = new Banner({
-                type,
-                imageUrl: result.secure_url,
-                cloudinaryId: result.public_id,
-                isActive: true
-            });
+            const bannerCount = await Banner.countDocuments();
+            orderValue = bannerCount;
         }
+
+        // Always create a new banner (supports multiple banners)
+        const banner = new Banner({
+            type,
+            imageUrl: result.secure_url,
+            cloudinaryId: result.public_id,
+            title: title || '',
+            subtitle: subtitle || '',
+            ctaText: ctaText || '',
+            ctaLink: ctaLink || '',
+            backgroundColor: backgroundColor || '',
+            textColor: textColor || '',
+            ctaColor: ctaColor || '',
+            ctaTextColor: ctaTextColor || '',
+            isActive: true,
+            order: orderValue
+        });
 
         await banner.save();
 
@@ -221,11 +223,62 @@ export async function getAllBanners(request, response) {
  */
 export async function getPublicBanners(request, response) {
     try {
-        const activeBanners = await Banner.find({ isActive: true }).select('-__v -cloudinaryId');
+        const activeBanners = await Banner.find({ isActive: true })
+            .select('-__v -cloudinaryId')
+            .sort({ order: 1, createdAt: -1 });
 
+        // Support array format for mobile endless loop
+        if (request.query.format === 'array') {
+            const bannersArray = activeBanners.map(banner => ({
+                _id: banner._id,
+                id: banner._id.toString(),
+                title: banner.title || '',
+                subtitle: banner.subtitle || '',
+                ctaText: banner.ctaText || '',
+                ctaLink: banner.ctaLink || '',
+                imageUrl: banner.imageUrl || '',
+                mobileImage: banner.type === 'mobile' ? banner.imageUrl : null,
+                desktopImage: banner.type === 'desktop' ? banner.imageUrl : null,
+                altText: banner.title || 'Banner',
+                isActive: banner.isActive,
+                order: banner.order || 0,
+                type: banner.type,
+                backgroundColor: banner.backgroundColor || '',
+                textColor: banner.textColor || '',
+                ctaColor: banner.ctaColor || '',
+                ctaTextColor: banner.ctaTextColor || ''
+            }));
+
+            return response.status(200).json({
+                success: true,
+                error: false,
+                banners: bannersArray
+            });
+        }
+
+        // Default format (backward compatible)
         const responseData = {
             desktop: activeBanners.find(b => b.type === 'desktop') || null,
-            mobile: activeBanners.find(b => b.type === 'mobile') || null
+            mobile: activeBanners.find(b => b.type === 'mobile') || null,
+            all: activeBanners.map(banner => ({
+                _id: banner._id,
+                id: banner._id.toString(),
+                title: banner.title || '',
+                subtitle: banner.subtitle || '',
+                ctaText: banner.ctaText || '',
+                ctaLink: banner.ctaLink || '',
+                imageUrl: banner.imageUrl || '',
+                mobileImage: banner.type === 'mobile' ? banner.imageUrl : null,
+                desktopImage: banner.type === 'desktop' ? banner.imageUrl : null,
+                altText: banner.title || 'Banner',
+                isActive: banner.isActive,
+                order: banner.order || 0,
+                type: banner.type,
+                backgroundColor: banner.backgroundColor || '',
+                textColor: banner.textColor || '',
+                ctaColor: banner.ctaColor || '',
+                ctaTextColor: banner.ctaTextColor || ''
+            }))
         };
 
         return response.status(200).json({

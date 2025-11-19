@@ -5,12 +5,12 @@ import mongoose from 'mongoose';
  * Stores banner information for desktop and mobile displays
  */
 const bannerSchema = new mongoose.Schema({
-  // Banner type: 'desktop' or 'mobile'
+  // Banner type: 'desktop' or 'mobile' (can have multiple of each)
   type: {
     type: String,
     required: true,
-    enum: ['desktop', 'mobile'],
-    unique: true // Only one banner per type
+    enum: ['desktop', 'mobile']
+    // Removed unique constraint to allow multiple banners
   },
   
   // Image details (stored in Cloudinary)
@@ -56,10 +56,31 @@ const bannerSchema = new mongoose.Schema({
     default: true
   },
   
-  // Display order (for future use if multiple banners)
+  // Display order (for sorting multiple banners)
   order: {
     type: Number,
     default: 0
+  },
+  
+  // Color customization
+  backgroundColor: {
+    type: String,
+    default: ''
+  },
+  
+  textColor: {
+    type: String,
+    default: ''
+  },
+  
+  ctaColor: {
+    type: String,
+    default: ''
+  },
+  
+  ctaTextColor: {
+    type: String,
+    default: ''
   },
   
   // Metadata

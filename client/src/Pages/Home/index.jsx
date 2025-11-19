@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useState } from "react";
 import HomeSlider from "../../components/HomeSlider";
 import ResponsiveHeroBanner from "../../components/ResponsiveHeroBanner";
+import MobileHeroBanner from "../../components/MobileHeroBanner";
 import HomeCatSlider from "../../components/HomeCatSlider";
 import { LiaShippingFastSolid } from "react-icons/lia";
 import AdsBannerSlider from "../../components/AdsBannerSlider";
@@ -145,6 +146,8 @@ const Home = () => {
 
   return (
     <>
+      {/* Mobile-Only Hero Banner - Endless loop with admin controls (hidden on desktop) */}
+      <MobileHeroBanner />
 
       {/* Responsive Hero Banner - supports mobile/desktop banners */}
       <ResponsiveHeroBanner />
