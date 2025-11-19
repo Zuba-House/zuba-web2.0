@@ -2,7 +2,47 @@
    📱 MOBILE RESPONSIVE STYLES (320px - 992px)
    ======================================== */
 @media only screen and (min-width:320px) and (max-width:992px){
-    html,body{overflow-x: hidden;}
+    html,body{
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+    }
+    
+    /* Ensure cart button and hamburger are visible on mobile */
+    header .col3 {
+        width: auto !important;
+        min-width: auto !important;
+        padding-left: 8px !important;
+    }
+    
+    header .col3 ul {
+        gap: 8px !important;
+    }
+    
+    /* Hamburger menu - ensure it's visible */
+    button[aria-label*="menu"],
+    .hamburger-menu,
+    [class*="menu-toggle"] {
+        min-width: 44px !important;
+        min-height: 44px !important;
+        width: 44px !important;
+        height: 44px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    
+    /* Cart button - ensure it's visible and touchable */
+    button[aria-label="cart"],
+    .MuiIconButton-root[aria-label="cart"] {
+        min-width: 44px !important;
+        min-height: 44px !important;
+        width: 44px !important;
+        height: 44px !important;
+        padding: 8px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
 
     /* Button Sizes */
     .btn-sm{padding: 8px 12px !important; font-size: 12px !important; min-height: 44px;}

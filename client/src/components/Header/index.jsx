@@ -141,7 +141,9 @@ const Header = () => {
           <div className="container flex items-center justify-between">
             {
               context?.windowWidth < 992 &&
-              <Button className="!w-[35px] !min-w-[35px] !h-[35px] !rounded-full !text-[#e5e2db] hover:!text-[#efb291]" onClick={() => setIsOpenCatPanel(true)}><HiOutlineMenu size={22} /></Button>
+              <Button className="!w-[44px] !min-w-[44px] !h-[44px] !rounded-full !text-[#e5e2db] hover:!text-[#efb291] !p-0 !flex !items-center !justify-center" onClick={() => setIsOpenCatPanel(true)}>
+                <HiOutlineMenu size={24} />
+              </Button>
             }
 
             <div className="col1 w-[40%] lg:w-[25%]">
@@ -154,8 +156,8 @@ const Header = () => {
               <Search />
             </div>
 
-            <div className="col3 w-[10%] lg:w-[30%] flex items-center pl-7">
-              <ul className="flex items-center justify-end gap-0 lg:gap-3 w-full">
+            <div className="col3 w-auto lg:w-[30%] flex items-center pl-2 lg:pl-7">
+              <ul className="flex items-center justify-end gap-2 lg:gap-3 w-full">
                 {context.isLogin === false && context?.windowWidth > 992 ? (
                   <li className="list-none">
                     <Link
@@ -305,16 +307,24 @@ const Header = () => {
                 }
 
 
-                <li>
+                <li className="list-none">
                   <Tooltip title="Cart">
                     <IconButton
                       aria-label="cart"
                       onClick={() => context.setOpenCartPanel(true)}
-                      className="hover:!text-[#efb291]"
+                      className="hover:!text-[#efb291] !w-[44px] !min-w-[44px] !h-[44px] lg:!w-auto lg:!h-auto"
+                      sx={{
+                        '@media (max-width: 992px)': {
+                          minWidth: '44px',
+                          minHeight: '44px',
+                          width: '44px',
+                          height: '44px',
+                          padding: '8px'
+                        }
+                      }}
                     >
-
                       <StyledBadge badgeContent={context?.cartData?.length !== 0 ? context?.cartData?.length : 0} color="secondary">
-                        <MdOutlineShoppingCart className="text-[#e5e2db]" />
+                        <MdOutlineShoppingCart className="text-[#e5e2db] text-[20px] lg:text-[24px]" />
                       </StyledBadge>
                     </IconButton>
                   </Tooltip>
