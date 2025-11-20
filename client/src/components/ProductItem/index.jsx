@@ -271,12 +271,12 @@ const ProductItem = (props) => {
       <div className="group imgWrapper w-[100%]  overflow-hidden  rounded-md rounded-bl-none rounded-br-none relative">
         {/* Out of Stock Badge */}
         {isOutOfStock() && (
-          <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded text-[10px] font-bold z-20">
+          <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded text-[8px] lg:text-[10px] font-bold z-20">
             OUT OF STOCK
           </div>
         )}
         {isLowStock() && !isOutOfStock() && (
-          <div className="absolute top-2 left-2 bg-yellow-400 text-black px-2 py-1 rounded text-[10px] font-bold z-20">
+          <div className="absolute top-2 left-2 bg-yellow-400 text-black px-2 py-1 rounded text-[8px] lg:text-[10px] font-bold z-20">
             Only {getProductStock()} left
           </div>
         )}
@@ -381,13 +381,13 @@ const ProductItem = (props) => {
         </div>
       </div>
 
-      <div className="info p-3 py-5 relative pb-[50px] h-[190px]">
-        <h6 className="text-[13px] !font-[400]">
+      <div className="info p-3 py-5 relative pb-[50px] lg:h-[190px] h-auto">
+        <h6 className="text-[10px] lg:text-[13px] !font-[400]">
           <span className="link transition-all">
             {item?.brand}
           </span>
         </h6>
-        <h3 className="text-[12px] lg:text-[13px] title mt-1 font-[500] mb-1 text-[#000]">
+        <h3 className="text-[11px] lg:text-[13px] title mt-1 font-[500] mb-1 text-[#000]">
           <Link to={`/product/${item?._id}`} className="link transition-all">
             {item?.name?.substring(0, 25) + (item?.name?.length > 25 ? '...' : '')}
           </Link>
@@ -444,9 +444,10 @@ const ProductItem = (props) => {
                   cursor: isOutOfStock() ? 'not-allowed' : 'pointer',
                   backgroundColor: isOutOfStock() ? '#ccc' : undefined
                 }}
+                title={isOutOfStock() ? 'Out of Stock' : 'Add to Cart'}
               >
-                <MdOutlineShoppingCart className="text-[18px]" /> 
-                {isOutOfStock() ? 'Out of Stock' : 'Add to Cart'}
+                <MdOutlineShoppingCart className="text-[18px] lg:text-[18px]" /> 
+                <span className="hidden lg:inline">{isOutOfStock() ? 'Out of Stock' : 'Add to Cart'}</span>
               </Button>
 
               :

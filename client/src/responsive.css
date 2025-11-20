@@ -84,34 +84,117 @@
     /* Product Items - Mobile Optimization */
     .productItem {
         min-height: auto !important;
+        margin-bottom: 12px !important;
     }
     
     .productItem .imgWrapper {
-        height: 200px !important;
-        min-height: 200px !important;
+        height: 180px !important;
+        min-height: 180px !important;
+        max-height: 180px !important;
+    }
+    
+    .productItem .product-image-container {
+        height: 180px !important;
+        padding-bottom: 0 !important;
     }
     
     .productItem .product-image {
         height: 100% !important;
+        width: 100% !important;
         object-fit: cover !important;
     }
     
     .productItem .info {
-        padding: 12px !important;
+        padding: 10px 8px !important;
         min-height: auto !important;
         height: auto !important;
-        padding-bottom: 60px !important;
+        padding-bottom: 50px !important;
     }
     
+    /* Brand text - smaller on mobile */
+    .productItem .info h6 {
+        font-size: 10px !important;
+        margin-bottom: 4px !important;
+        line-height: 1.2 !important;
+    }
+    
+    /* Product title - smaller and better line height */
     .productItem .title {
-        font-size: 14px !important;
-        line-height: 1.4 !important;
-        margin-bottom: 8px !important;
+        font-size: 11px !important;
+        line-height: 1.3 !important;
+        margin-bottom: 6px !important;
+        min-height: 28px !important;
+        max-height: 28px !important;
+        overflow: hidden !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
     }
     
+    /* Rating - smaller on mobile */
+    .productItem .MuiRating-root {
+        font-size: 14px !important;
+        margin-bottom: 6px !important;
+    }
+    
+    /* Price - smaller on mobile */
     .productItem .price {
-        font-size: 16px !important;
+        font-size: 13px !important;
         font-weight: 600 !important;
+        line-height: 1.2 !important;
+    }
+    
+    .productItem .oldPrice {
+        font-size: 11px !important;
+        margin-right: 4px !important;
+    }
+    
+    /* Add to Cart Button - Icon only on mobile */
+    .productItem .addToCartBtn {
+        padding: 8px !important;
+        min-height: 36px !important;
+        height: 36px !important;
+        width: 100% !important;
+        font-size: 0 !important; /* Hide text */
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    
+    .productItem .addToCartBtn svg {
+        font-size: 18px !important;
+        margin: 0 !important;
+    }
+    
+    /* Out of Stock Badge - Smaller but visible */
+    .productItem .absolute.top-2.left-2 {
+        font-size: 8px !important;
+        padding: 3px 6px !important;
+        line-height: 1.2 !important;
+        font-weight: 700 !important;
+        top: 4px !important;
+        left: 4px !important;
+        z-index: 20 !important;
+    }
+    
+    /* Discount badge - smaller */
+    .productItem .discount {
+        font-size: 10px !important;
+        padding: 4px 6px !important;
+        top: 4px !important;
+        right: 4px !important;
+    }
+    
+    /* Price and button container - better spacing */
+    .productItem .info > div.flex.items-center.gap-4 {
+        margin-bottom: 8px !important;
+        flex-wrap: wrap !important;
+    }
+    
+    /* Button container at bottom */
+    .productItem .info > div.absolute.bottom {
+        bottom: 8px !important;
+        padding: 0 8px !important;
     }
     
     /* Order Pages - Mobile */
@@ -172,15 +255,72 @@
 }
 
 /* ========================================
+   📱 TABLET OPTIMIZATION (768px - 992px)
+   ======================================== */
+@media only screen and (min-width:768px) and (max-width:992px){
+    /* Product Items - Tablet */
+    .productItem .imgWrapper {
+        height: 220px !important;
+        min-height: 220px !important;
+        max-height: 220px !important;
+    }
+    
+    .productItem .product-image-container {
+        height: 220px !important;
+    }
+    
+    .productItem .info {
+        padding: 12px 10px !important;
+        padding-bottom: 60px !important;
+    }
+    
+    .productItem .info h6 {
+        font-size: 11px !important;
+    }
+    
+    .productItem .title {
+        font-size: 12px !important;
+        min-height: 32px !important;
+        max-height: 32px !important;
+    }
+    
+    .productItem .price {
+        font-size: 14px !important;
+    }
+    
+    .productItem .addToCartBtn {
+        min-height: 40px !important;
+        height: 40px !important;
+    }
+    
+    .productItem .addToCartBtn span {
+        display: none !important; /* Hide text on tablet */
+    }
+    
+    .productItem .addToCartBtn svg {
+        font-size: 20px !important;
+    }
+}
+
+/* ========================================
    📱 SMALL MOBILE (320px - 767px)
    ======================================== */
 @media only screen and (min-width:320px) and (max-width:767px){
     .MuiTabs-flexContainer button{font-size: 12px !important; padding: 8px 12px !important; min-height: 44px;}
     .productItem .addToCartBtn{
-        padding: 10px 16px !important;
-        font-size: 14px !important;
-        min-height: 44px !important;
+        padding: 8px !important;
+        font-size: 0 !important; /* Hide text, show icon only */
+        min-height: 36px !important;
+        height: 36px !important;
         width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    
+    .productItem .addToCartBtn svg {
+        font-size: 18px !important;
+        margin: 0 !important;
     }
 
     .part2_col1 li a,.part2_col2 li a{font-size: 13px !important;} 
