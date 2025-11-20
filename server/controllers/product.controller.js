@@ -1435,7 +1435,10 @@ export async function updateProduct(request, response) {
 
         // Handle images - transform to new format if needed
         let imagesFormatted = [];
-        if (request.body.images && Array.isArray(request.body.images) && request.body.images.length > 0) {
+        let featuredImageUrl = '';
+        
+        // Check if images array is explicitly provided (even if empty)
+        if (request.body.images !== undefined && Array.isArray(request.body.images)) {
             // Filter out any null/undefined/empty entries
             const validImages = request.body.images.filter(img => img != null && img !== '');
             
@@ -1459,6 +1462,61 @@ export async function updateProduct(request, response) {
                     isFeatured: index === 0
                 };
             }).filter(img => img.url && img.url !== ''); // Filter out any with empty URLs
+            
+            // Set featuredImage from first image
+            if (imagesFormatted.length > 0) {
+                featuredImageUrl = imagesFormatted[0].url;
+            } else {
+                // No images - clear featuredImage
+                featuredImageUrl = '';
+            }
+        } else {
+            // Images not provided in request - keep existing or use featuredImage from request
+            if (request.body.featuredImage !== undefined) {
+                featuredImageUrl = request.body.featuredImage || '';
+            } else if (existingProduct.images && existingProduct.images.length > 0) {
+                // Use existing first image as featured
+                const firstImg = existingProduct.images[0];
+                featuredImageUrl = typeof firstImg === 'string' ? firstImg : (firstImg?.url || '');
+            }
+        }
+        
+        // Find and delete removed images from Cloudinary
+        if (existingProduct.images && Array.isArray(existingProduct.images)) {
+            const existingImageUrls = existingProduct.images.map(img => {
+                if (typeof img === 'string') return img;
+                if (typeof img === 'object' && img.url) return img.url;
+                return '';
+            }).filter(url => url !== '');
+            
+            const newImageUrls = imagesFormatted.map(img => img.url).filter(url => url !== '');
+            
+            // Find images that were removed
+            const removedImages = existingImageUrls.filter(url => !newImageUrls.includes(url));
+            
+            // Delete removed images from Cloudinary
+            for (const imageUrl of removedImages) {
+                if (imageUrl && typeof imageUrl === 'string' && imageUrl.includes('/')) {
+                    try {
+                        const urlArr = imageUrl.split("/");
+                        const image = urlArr[urlArr.length - 1];
+                        if (image) {
+                            const imageName = image.split(".")[0];
+                            if (imageName) {
+                                cloudinary.uploader.destroy(imageName, (error, result) => {
+                                    if (error) {
+                                        console.error('Error deleting removed image from Cloudinary:', error);
+                                    } else {
+                                        console.log('Successfully deleted removed image from Cloudinary:', imageName);
+                                    }
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error processing removed image URL:', error, 'Image:', imageUrl);
+                    }
+                }
+            }
         }
 
         // Handle banner images
@@ -1486,8 +1544,9 @@ export async function updateProduct(request, response) {
             status: request.body.status || existingProduct.status || 'draft',
             visibility: request.body.visibility || existingProduct.visibility || 'visible',
             isFeatured: request.body.isFeatured !== undefined ? request.body.isFeatured : existingProduct.isFeatured || false,
-            // Images
-            images: imagesFormatted.length > 0 ? imagesFormatted : undefined,
+            // Images - always update (even if empty array)
+            images: request.body.images !== undefined ? imagesFormatted : undefined,
+            featuredImage: featuredImageUrl || (request.body.featuredImage !== undefined ? request.body.featuredImage : undefined),
             bannerimages: bannerImages.length > 0 ? bannerImages : undefined,
             bannerTitleName: request.body.bannerTitleName || '',
             isDisplayOnHomeBanner: request.body.isDisplayOnHomeBanner || false,
@@ -1605,6 +1664,12 @@ export async function updateProduct(request, response) {
             updateData = ensureAttributesFromVariations(updateData);
         }
 
+        // Handle empty images array - explicitly set to empty array and clear featuredImage
+        if (request.body.images !== undefined && Array.isArray(request.body.images) && imagesFormatted.length === 0) {
+            updateData.images = [];
+            updateData.featuredImage = '';
+        }
+        
         // Remove undefined fields to avoid overwriting with undefined
         Object.keys(updateData).forEach(key => {
             if (updateData[key] === undefined) {

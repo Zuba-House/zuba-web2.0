@@ -510,6 +510,8 @@ const EditProductEnhanced = () => {
         
         // Ensure images are set from previews (convert to string array for API)
         images: previews.map(url => typeof url === 'string' ? url : url.url || url),
+        // Explicitly set featuredImage from first image or empty string
+        featuredImage: previews.length > 0 ? (typeof previews[0] === 'string' ? previews[0] : previews[0]?.url || previews[0] || '') : '',
         bannerimages: bannerPreviews.map(url => typeof url === 'string' ? url : url.url || url),
         
         // Map new structure to legacy fields for backward compatibility

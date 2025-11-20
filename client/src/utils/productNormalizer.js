@@ -34,7 +34,10 @@ export const normalizeProduct = (product) => {
 
   // Get featured image
   const getFeaturedImage = () => {
-    if (product.featuredImage) return product.featuredImage;
+    // If featuredImage is explicitly set (even if empty string), use it
+    if (product.featuredImage !== undefined && product.featuredImage !== null) {
+      return product.featuredImage || '';
+    }
     
     // Check if there's a featured image in the images array
     if (product.images && product.images.length > 0) {

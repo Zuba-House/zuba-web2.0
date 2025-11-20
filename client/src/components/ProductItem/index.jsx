@@ -284,10 +284,14 @@ const ProductItem = (props) => {
         <Link to={`/product/${item?._id}`}>
           <div className="img product-image-container">
             <img
-              src={item?.featuredImage || (item?.images && item?.images[0] ? (typeof item.images[0] === 'string' ? item.images[0] : item.images[0].url) : '')}
+              src={item?.featuredImage || (item?.images && item?.images.length > 0 && item?.images[0] ? (typeof item.images[0] === 'string' ? item.images[0] : item.images[0].url) : '') || 'https://via.placeholder.com/400x400?text=No+Image'}
               className="product-image"
               alt={item?.name || ''}
               loading="lazy"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = 'https://via.placeholder.com/400x400?text=No+Image';
+              }}
             />
 
             {
