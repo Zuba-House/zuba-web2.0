@@ -101,10 +101,17 @@ bannerSchema.pre('save', function(next) {
   next();
 });
 
-// Index for better performance
-bannerSchema.index({ type: 1, isActive: 1 });
+// Index for better performance (NOT unique - allows multiple banners per type)
+bannerSchema.index({ type: 1, isActive: 1 }, { unique: false });
 
 const Banner = mongoose.model('Banner', bannerSchema);
+
+// Drop unique index on type if it exists (run once on model load)
+Banner.collection.dropIndex('type_1').catch(() => {
+  // Index doesn't exist or already dropped, that's fine
+});
+
+export default Banner;
 
 export default Banner;
 

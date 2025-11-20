@@ -15,6 +15,20 @@ cloudinary.config({
  */
 export async function uploadBannerImage(request, response) {
     try {
+        // Drop unique index on type field if it exists (allows multiple banners per type)
+        // This needs to happen before we try to save
+        try {
+            const indexes = await Banner.collection.indexes();
+            const typeIndex = indexes.find(idx => idx.name === 'type_1' && idx.unique === true);
+            if (typeIndex) {
+                await Banner.collection.dropIndex('type_1');
+                console.log('✅ Dropped unique index on type field');
+            }
+        } catch (indexError) {
+            // Index doesn't exist or already dropped, that's fine
+            // Continue with upload
+        }
+
         if (!request.file) {
             return response.status(400).json({
                 success: false,
@@ -97,6 +111,30 @@ export async function uploadBannerImage(request, response) {
     } catch (error) {
         console.error('Banner upload error:', error);
         console.error('Error stack:', error.stack);
+        
+        // Check if it's a duplicate key error (unique index still exists)
+        if (error.code === 11000 || error.message?.includes('duplicate key')) {
+            // Try to drop the index one more time
+            try {
+                await Banner.collection.dropIndex('type_1');
+                console.log('✅ Dropped unique index after duplicate key error');
+                // Return a helpful error message
+                return response.status(500).json({
+                    success: false,
+                    error: true,
+                    message: 'Failed to upload banner: Unique index still exists. Please try again.',
+                    details: 'The database still has a unique constraint on the type field. The index has been dropped - please try uploading again.',
+                    retry: true
+                });
+            } catch (dropError) {
+                return response.status(500).json({
+                    success: false,
+                    error: true,
+                    message: 'Failed to upload banner: Database constraint error',
+                    details: 'Please contact support to remove the unique index on the banner type field.',
+                });
+            }
+        }
         
         // Clean up uploaded file on error
         if (request.file && request.file.path && fs.existsSync(request.file.path)) {

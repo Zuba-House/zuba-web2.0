@@ -16,7 +16,7 @@ export const EditResponsiveBanner = () => {
         backgroundColor: '#d4af37',
         textColor: '#2c3e50',
         ctaColor: '#ff6b35',
-        ctaTextColor: 'white'
+        ctaTextColor: '#ffffff'
     });
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState('');
@@ -44,10 +44,10 @@ export const EditResponsiveBanner = () => {
                         ctaLink: banner.ctaLink || '',
                         order: banner.order || 0,
                         isActive: banner.isActive !== false,
-                        backgroundColor: banner.backgroundColor || '#d4af37',
-                        textColor: banner.textColor || '#2c3e50',
-                        ctaColor: banner.ctaColor || '#ff6b35',
-                        ctaTextColor: banner.ctaTextColor || 'white'
+                    backgroundColor: banner.backgroundColor || '#d4af37',
+                    textColor: banner.textColor || '#2c3e50',
+                    ctaColor: banner.ctaColor || '#ff6b35',
+                    ctaTextColor: banner.ctaTextColor || '#ffffff'
                     });
                     setCurrentImageUrl(banner.imageUrl || '');
                     setImagePreview(banner.imageUrl || '');
@@ -107,10 +107,33 @@ export const EditResponsiveBanner = () => {
             formDataObj.append('ctaText', formData.ctaText);
             formDataObj.append('ctaLink', formData.ctaLink);
             formDataObj.append('order', formData.order.toString());
-            formDataObj.append('backgroundColor', formData.backgroundColor);
-            formDataObj.append('textColor', formData.textColor);
-            formDataObj.append('ctaColor', formData.ctaColor);
-            formDataObj.append('ctaTextColor', formData.ctaTextColor);
+            
+            // Convert color names to hex if needed
+            const toHexColor = (color) => {
+                if (!color) return '';
+                // If already hex, return as is
+                if (color.startsWith('#')) return color;
+                // Convert common color names to hex
+                const colorMap = {
+                    'white': '#ffffff',
+                    'black': '#000000',
+                    'red': '#ff0000',
+                    'green': '#008000',
+                    'blue': '#0000ff',
+                    'yellow': '#ffff00',
+                    'orange': '#ffa500',
+                    'purple': '#800080',
+                    'pink': '#ffc0cb',
+                    'gray': '#808080',
+                    'grey': '#808080'
+                };
+                return colorMap[color.toLowerCase()] || color;
+            };
+            
+            formDataObj.append('backgroundColor', toHexColor(formData.backgroundColor));
+            formDataObj.append('textColor', toHexColor(formData.textColor));
+            formDataObj.append('ctaColor', toHexColor(formData.ctaColor));
+            formDataObj.append('ctaTextColor', toHexColor(formData.ctaTextColor));
             formDataObj.append('isActive', formData.isActive.toString());
 
             const response = await uploadImage(`/api/banners/${id}`, formDataObj);
