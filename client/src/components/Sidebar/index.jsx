@@ -17,6 +17,10 @@ import { MdOutlineFilterAlt } from "react-icons/md";
 
 export const Sidebar = (props) => {
   const [isOpenCategoryFilter, setIsOpenCategoryFilter] = useState(true);
+  const [isOpenBrandFilter, setIsOpenBrandFilter] = useState(false);
+  const [isOpenStockFilter, setIsOpenStockFilter] = useState(false);
+  const [isOpenTypeFilter, setIsOpenTypeFilter] = useState(false);
+  const [availableBrands, setAvailableBrands] = useState([]);
 
   const [filters, setFilters] = useState({
     catId: [],
@@ -24,7 +28,10 @@ export const Sidebar = (props) => {
     thirdsubCatId: [],
     minPrice: '',
     maxPrice: '',
-    rating: '',
+    rating: [],
+    brand: [],
+    stockStatus: [],
+    productType: [],
     page: 1,
     limit: 25
   })
@@ -36,6 +43,16 @@ export const Sidebar = (props) => {
   const context = useContext(MyContext);
 
   const location = useLocation();
+
+  // Fetch available brands
+  useEffect(() => {
+    fetchDataFromApi('/api/product/getAllProducts?page=1&limit=1000').then((res) => {
+      if (res?.products && Array.isArray(res.products)) {
+        const brands = [...new Set(res.products.map(p => p.brand).filter(b => b && b.trim() !== ''))].sort();
+        setAvailableBrands(brands);
+      }
+    }).catch(err => console.error('Error fetching brands:', err));
+  }, []);
 
 
   const handleCheckboxChange = (field, value) => {
@@ -71,46 +88,63 @@ export const Sidebar = (props) => {
 
     if (url.includes("catId")) {
       const categoryId = queryParameters.get("catId");
-      const catArr = [];
-      catArr.push(categoryId);
-      filters.catId = catArr;
-      filters.subCatId = [];
-      filters.thirdsubCatId = [];
-      filters.rating = [];
-      context?.setSearchData([]);
+      if (categoryId) {
+        const catArr = [categoryId];
+        setFilters((prev) => ({
+          ...prev,
+          catId: catArr,
+          subCatId: [],
+          thirdsubCatId: [],
+          rating: [],
+          page: 1
+        }));
+        context?.setSearchData([]);
+      }
     }
 
     if (url.includes("subCatId")) {
       const subcategoryId = queryParameters.get("subCatId");
-      const subcatArr = [];
-      subcatArr.push(subcategoryId);
-      filters.subCatId = subcatArr;
-      filters.catId = [];
-      filters.thirdsubCatId = [];
-      filters.rating = [];
-      context?.setSearchData([]);
+      if (subcategoryId) {
+        const subcatArr = [subcategoryId];
+        setFilters((prev) => ({
+          ...prev,
+          subCatId: subcatArr,
+          catId: [],
+          thirdsubCatId: [],
+          rating: [],
+          page: 1
+        }));
+        context?.setSearchData([]);
+      }
     }
 
 
     if (url.includes("thirdLavelCatId")) {
       const thirdcategoryId = queryParameters.get("thirdLavelCatId");
-      const thirdcatArr = [];
-      thirdcatArr.push(thirdcategoryId);
-      filters.subCatId = [];
-      filters.catId = [];
-      filters.thirdsubCatId = thirdcatArr;
-      filters.rating = [];
-      context?.setSearchData([]);
+      if (thirdcategoryId) {
+        const thirdcatArr = [thirdcategoryId];
+        setFilters((prev) => ({
+          ...prev,
+          thirdsubCatId: thirdcatArr,
+          subCatId: [],
+          catId: [],
+          rating: [],
+          page: 1
+        }));
+        context?.setSearchData([]);
+      }
     }
 
-    filters.page = 1;
-
-    setTimeout(() => {
-      filtesData();
-    }, 200);
-
-
-
+    // If no category in URL, reset filters
+    if (!url.includes("catId") && !url.includes("subCatId") && !url.includes("thirdLavelCatId")) {
+      setFilters((prev) => ({
+        ...prev,
+        catId: [],
+        subCatId: [],
+        thirdsubCatId: [],
+        page: 1
+      }));
+    }
 
   }, [location]);
 
@@ -308,6 +342,101 @@ export const Sidebar = (props) => {
 
         </div>
 
+        {/* Brand Filter */}
+        {availableBrands.length > 0 && (
+          <div className="box mt-4">
+            <h3 className="w-full mb-3 text-[16px] font-[600] flex items-center pr-5">
+              Filter By Brand
+              <Button
+                className="!w-[30px] !h-[30px] !min-w-[30px] !rounded-full !ml-auto !text-[#000]"
+                onClick={() => setIsOpenBrandFilter(!isOpenBrandFilter)}
+              >
+                {isOpenBrandFilter === true ? <FaAngleUp /> : <FaAngleDown />}
+              </Button>
+            </h3>
+            <Collapse isOpened={isOpenBrandFilter}>
+              <div className="scroll px-4 relative -left-[13px] max-h-[200px] overflow-y-auto">
+                {availableBrands.map((brand, index) => (
+                  <FormControlLabel
+                    key={index}
+                    value={brand}
+                    control={<Checkbox />}
+                    checked={filters?.brand?.includes(brand)}
+                    label={brand}
+                    onChange={() => handleCheckboxChange('brand', brand)}
+                    className="w-full"
+                  />
+                ))}
+              </div>
+            </Collapse>
+          </div>
+        )}
+
+        {/* Stock Status Filter */}
+        <div className="box mt-4">
+          <h3 className="w-full mb-3 text-[16px] font-[600] flex items-center pr-5">
+            Filter By Stock
+            <Button
+              className="!w-[30px] !h-[30px] !min-w-[30px] !rounded-full !ml-auto !text-[#000]"
+              onClick={() => setIsOpenStockFilter(!isOpenStockFilter)}
+            >
+              {isOpenStockFilter === true ? <FaAngleUp /> : <FaAngleDown />}
+            </Button>
+          </h3>
+          <Collapse isOpened={isOpenStockFilter}>
+            <div className="scroll px-4 relative -left-[13px]">
+              <FormControlLabel
+                value="in_stock"
+                control={<Checkbox />}
+                checked={filters?.stockStatus?.includes('in_stock')}
+                label="In Stock"
+                onChange={() => handleCheckboxChange('stockStatus', 'in_stock')}
+                className="w-full"
+              />
+              <FormControlLabel
+                value="out_of_stock"
+                control={<Checkbox />}
+                checked={filters?.stockStatus?.includes('out_of_stock')}
+                label="Out of Stock"
+                onChange={() => handleCheckboxChange('stockStatus', 'out_of_stock')}
+                className="w-full"
+              />
+            </div>
+          </Collapse>
+        </div>
+
+        {/* Product Type Filter */}
+        <div className="box mt-4">
+          <h3 className="w-full mb-3 text-[16px] font-[600] flex items-center pr-5">
+            Filter By Type
+            <Button
+              className="!w-[30px] !h-[30px] !min-w-[30px] !rounded-full !ml-auto !text-[#000]"
+              onClick={() => setIsOpenTypeFilter(!isOpenTypeFilter)}
+            >
+              {isOpenTypeFilter === true ? <FaAngleUp /> : <FaAngleDown />}
+            </Button>
+          </h3>
+          <Collapse isOpened={isOpenTypeFilter}>
+            <div className="scroll px-4 relative -left-[13px]">
+              <FormControlLabel
+                value="simple"
+                control={<Checkbox />}
+                checked={filters?.productType?.includes('simple')}
+                label="Simple Products"
+                onChange={() => handleCheckboxChange('productType', 'simple')}
+                className="w-full"
+              />
+              <FormControlLabel
+                value="variable"
+                control={<Checkbox />}
+                checked={filters?.productType?.includes('variable')}
+                label="Variable Products"
+                onChange={() => handleCheckboxChange('productType', 'variable')}
+                className="w-full"
+              />
+            </div>
+          </Collapse>
+        </div>
 
       </div>
       <br />

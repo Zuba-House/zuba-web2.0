@@ -2135,7 +2135,7 @@ export async function getProductSizeById(request, response) {
 
 
 export async function filters(request, response) {
-    const { catId, subCatId, thirdsubCatId, minPrice, maxPrice, rating, page, limit } = request.body;
+    const { catId, subCatId, thirdsubCatId, minPrice, maxPrice, rating, brand, stockStatus, productType, page, limit } = request.body;
 
     const filters = {}
 
@@ -2157,16 +2157,83 @@ export async function filters(request, response) {
     }
 
     if (minPrice || maxPrice) {
-        filters.price = { $gte: +minPrice || 0, $lte: +maxPrice || Infinity };
+        // Use pricing.price for new model, fallback to price for legacy
+        const priceFilter = {
+            $or: [
+                { 'pricing.price': { $gte: +minPrice || 0, $lte: +maxPrice || Infinity } },
+                { price: { $gte: +minPrice || 0, $lte: +maxPrice || Infinity } }
+            ]
+        };
+        
+        // If we already have $or for categories, combine with $and
+        if (filters.$or && filters.$or.length > 0) {
+            const existingOr = filters.$or;
+            filters.$and = [
+                { $or: existingOr },
+                priceFilter
+            ];
+            delete filters.$or;
+        } else {
+            // No existing $or, just add price filter directly
+            Object.assign(filters, priceFilter);
+        }
     }
 
     if (rating?.length) {
         filters.rating = { $in: rating }
     }
 
-    try {
+    if (brand?.length) {
+        filters.brand = { $in: brand }
+    }
 
-        const products = await ProductModel.find(filters).populate("category").skip((page - 1) * limit).limit(parseInt(limit));
+    if (productType?.length) {
+        filters.productType = { $in: productType }
+    }
+
+    if (stockStatus?.length) {
+        // Handle stock status filtering
+        const stockFilters = [];
+        stockStatus.forEach(status => {
+            if (status === 'in_stock') {
+                stockFilters.push({
+                    $or: [
+                        { 'inventory.stockStatus': 'in_stock' },
+                        { 'inventory.stock': { $gt: 0 } },
+                        { countInStock: { $gt: 0 } },
+                        { stock: { $gt: 0 } }
+                    ]
+                });
+            } else if (status === 'out_of_stock') {
+                stockFilters.push({
+                    $or: [
+                        { 'inventory.stockStatus': 'out_of_stock' },
+                        { 'inventory.stock': 0 },
+                        { countInStock: 0 },
+                        { stock: 0 }
+                    ]
+                });
+            }
+        });
+        if (stockFilters.length > 0) {
+            if (filters.$and) {
+                filters.$and.push({ $or: stockFilters });
+            } else {
+                filters.$or = filters.$or || [];
+                filters.$and = [
+                    ...(filters.$or.length > 0 ? [{ $or: filters.$or }] : []),
+                    { $or: stockFilters }
+                ];
+                if (filters.$or.length > 0) delete filters.$or;
+            }
+        }
+    }
+
+    // Always filter by published status
+    filters.status = 'published';
+
+    try {
+        const products = await ProductModel.find(filters).populate("category").populate("categories").skip((page - 1) * limit).limit(parseInt(limit));
 
         const total = await ProductModel.countDocuments(filters);
 
