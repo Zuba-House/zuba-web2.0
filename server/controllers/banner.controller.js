@@ -16,17 +16,19 @@ cloudinary.config({
 export async function uploadBannerImage(request, response) {
     try {
         // Drop unique index on type field if it exists (allows multiple banners per type)
-        // This needs to happen before we try to save
-        try {
-            const indexes = await Banner.collection.indexes();
-            const typeIndex = indexes.find(idx => idx.name === 'type_1' && idx.unique === true);
-            if (typeIndex) {
-                await Banner.collection.dropIndex('type_1');
-                console.log('✅ Dropped unique index on type field');
+        // This needs to happen before we try to save, but only if connection is ready
+        if (Banner.db.readyState === 1) {
+            try {
+                const indexes = await Banner.collection.indexes();
+                const typeIndex = indexes.find(idx => idx.name === 'type_1' && idx.unique === true);
+                if (typeIndex) {
+                    await Banner.collection.dropIndex('type_1');
+                    console.log('✅ Dropped unique index on type field');
+                }
+            } catch (indexError) {
+                // Index doesn't exist or already dropped, that's fine
+                // Continue with upload
             }
-        } catch (indexError) {
-            // Index doesn't exist or already dropped, that's fine
-            // Continue with upload
         }
 
         if (!request.file) {
