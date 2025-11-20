@@ -197,11 +197,17 @@
         padding: 0 8px !important;
     }
     
-    /* Action Buttons - Always visible on mobile, larger size */
+    /* Action Buttons - Show on hover (same as desktop) */
     .productItem .actions {
+        opacity: 0 !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .productItem:hover .actions,
+    .productItem:active .actions,
+    .productItem.group:hover .actions {
         opacity: 1 !important;
-        top: 8px !important;
-        right: 8px !important;
+        top: 15px !important;
     }
     
     .productItem .actions button {
@@ -227,6 +233,25 @@
     
     .productItem .discount {
         z-index: 20 !important;
+    }
+    
+    /* Category Icons - Smaller on mobile */
+    .homeCatSlider .item {
+        min-height: 80px !important;
+        padding: 12px 8px !important;
+    }
+    
+    .homeCatSlider .item img {
+        width: 35px !important;
+        height: 35px !important;
+        max-width: 35px !important;
+        max-height: 35px !important;
+    }
+    
+    .homeCatSlider .item h3 {
+        font-size: 10px !important;
+        margin-top: 6px !important;
+        line-height: 1.2 !important;
     }
     
     /* Order Pages - Mobile */
@@ -290,6 +315,23 @@
    📱 TABLET OPTIMIZATION (768px - 992px)
    ======================================== */
 @media only screen and (min-width:768px) and (max-width:992px){
+    /* Category Icons - Medium size on tablet */
+    .homeCatSlider .item {
+        min-height: 90px !important;
+        padding: 14px 10px !important;
+    }
+    
+    .homeCatSlider .item img {
+        width: 45px !important;
+        height: 45px !important;
+        max-width: 45px !important;
+        max-height: 45px !important;
+    }
+    
+    .homeCatSlider .item h3 {
+        font-size: 11px !important;
+        margin-top: 8px !important;
+    }
     /* Product Items - Tablet */
     .productItem .imgWrapper {
         height: 220px !important;

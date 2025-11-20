@@ -54,18 +54,18 @@ const HomeCatSlider = (props) => {
               return (
                 <SwiperSlide key={index}>
                   <Link to={`/products?catId=${cat?._id}`}>
-                    <div className="item py-4 lg:py-7 px-2 lg:px-3 bg-white rounded-sm text-center flex items-center justify-center flex-col hover:bg-gray-50 transition-all min-h-[100px] lg:min-h-[120px]">
-                      <div className="flex items-center justify-center mb-2">
+                    <div className="item py-3 lg:py-7 px-2 lg:px-3 bg-white rounded-sm text-center flex items-center justify-center flex-col hover:bg-gray-50 transition-all min-h-[80px] lg:min-h-[120px]">
+                      <div className="flex items-center justify-center mb-1 lg:mb-2">
                         <img
                           src={cat?.images?.[0]}
-                          className="w-[45px] h-[45px] lg:w-[60px] lg:h-[60px] object-contain transition-all"
+                          className="w-[35px] h-[35px] sm:w-[40px] sm:h-[40px] lg:w-[60px] lg:h-[60px] object-contain transition-all"
                           alt={cat?.name}
                           onError={(e) => {
                             e.target.src = 'https://via.placeholder.com/60?text=Category';
                           }}
                         />
                       </div>
-                      <h3 className="text-[11px] sm:text-[12px] lg:text-[15px] font-[600] mt-2 text-gray-800 line-clamp-2">{cat?.name}</h3>
+                      <h3 className="text-[10px] sm:text-[11px] lg:text-[15px] font-[600] mt-1 lg:mt-2 text-gray-800 line-clamp-2">{cat?.name}</h3>
                     </div>
                   </Link>
                 </SwiperSlide>

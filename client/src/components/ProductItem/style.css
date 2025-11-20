@@ -28,11 +28,19 @@
     transition: color 0.2s ease !important;
 }
 
-/* Mobile - Always show action buttons */
+/* Mobile & Tablet - Show on hover/touch (same as desktop) */
 @media (max-width: 992px) {
     .productItem .actions {
-        opacity: 1 !important;
-        top: 10px !important;
+        opacity: 0;
+        transition: all 0.3s ease;
+    }
+    
+    /* Show on hover for touch devices */
+    .productItem:hover .actions,
+    .productItem:active .actions,
+    .productItem.group:hover .actions {
+        opacity: 1;
+        top: 15px !important;
     }
     
     .productItem .actions button {

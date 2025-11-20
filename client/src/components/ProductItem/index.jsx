@@ -361,7 +361,7 @@ const ProductItem = (props) => {
           </span>
         )}
 
-        <div className="actions absolute top-[10px] lg:top-[-20px] right-[8px] lg:right-[5px] z-50 flex items-center gap-2 flex-col w-auto lg:w-[50px] transition-all duration-300 lg:group-hover:top-[15px] opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
+        <div className="actions absolute top-[-20px] right-[5px] z-50 flex items-center gap-2 flex-col w-[50px] transition-all duration-300 group-hover:top-[15px] opacity-0 group-hover:opacity-100">
 
           <Button 
             className="!w-[44px] !h-[44px] lg:!w-[42px] lg:!h-[42px] !min-w-[44px] lg:!min-w-[42px] !rounded-full !bg-white shadow-lg text-black hover:!bg-primary hover:text-white group transition-all duration-200 hover:scale-110" 
