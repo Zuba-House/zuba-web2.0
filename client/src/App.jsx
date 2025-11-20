@@ -290,7 +290,6 @@ function App() {
             <Route path={"/"} exact={true} element={<Home />} />
             <Route
               path={"/products"}
-              exact={true}
               element={<ProductListing />}
             />
             <Route

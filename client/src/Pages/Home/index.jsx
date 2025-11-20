@@ -27,7 +27,7 @@ import { Link } from "react-router-dom";
 
 const Home = () => {
   const [value, setValue] = useState(0);
-  const [homeSlidesData, setHomeSlidesData] = useState([]);
+  // const [homeSlidesData, setHomeSlidesData] = useState([]); // Unused - kept for future use
   const [popularProductsData, setPopularProductsData] = useState([]);
   const [productsData, setAllProductsData] = useState([]);
   const [productsBanners, setProductsBanners] = useState([]);
@@ -45,9 +45,9 @@ const Home = () => {
 
     window.scrollTo(0, 0);
 
-    fetchDataFromApi("/api/homeSlides").then((res) => {
-      setHomeSlidesData(res?.data)
-    })
+    // fetchDataFromApi("/api/homeSlides").then((res) => {
+    //   setHomeSlidesData(res?.data)
+    // })
     fetchDataFromApi("/api/product/getAllProducts?page=1&limit=12").then((res) => {
       setAllProductsData(res?.products)
     })
@@ -317,7 +317,7 @@ const Home = () => {
                     <h2 className="text-[20px] font-[600]">{productRow?.catName}</h2>
                     {
                       productRow?.data?.length > 6 &&
-                      <Link to={`products?catId=${productRow?.data[0]?.catId}`}>
+                      <Link to={`/products?catId=${productRow?.data[0]?.catId || productRow?.data[0]?.category?._id || productRow?.data[0]?.category}`}>
                         <Button className="!bg-gray-100 hover:!bg-gray-200 !text-gray-800 !capitalize !px-3 !border !border-[rgba(0,0,0,0.4)]" size="small" >View All <MdArrowRightAlt size={25} /></Button>
                       </Link>
                     }
