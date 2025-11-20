@@ -74,7 +74,7 @@ const ResponsiveHeroBanner = () => {
 
   if (loading) {
     return (
-      <div className={`homeSlider pb-3 pt-3 lg:pb-5 lg:pt-5 relative z-[99] ${isMobile ? 'mt-[115px] lg:mt-0' : ''}`}>
+      <div className={`homeSlider pb-3 pt-4 lg:pb-5 lg:pt-5 relative z-[99] ${isMobile ? 'mt-[130px] lg:mt-0' : ''}`}>
         <div className="container">
           <div className="item rounded-[10px] overflow-hidden bg-gray-200 animate-pulse" style={{ height: isMobile ? '250px' : '400px' }}></div>
         </div>
@@ -90,7 +90,7 @@ const ResponsiveHeroBanner = () => {
   // If multiple banners, show slider
   if (filteredBanners.length > 1) {
     return (
-      <div className={`homeSlider pb-3 pt-3 lg:pb-5 lg:pt-5 relative z-[99] ${isMobile ? 'mt-[115px] lg:mt-0' : ''}`}>
+      <div className={`homeSlider pb-3 pt-4 lg:pb-5 lg:pt-5 relative z-[99] ${isMobile ? 'mt-[130px] lg:mt-0' : ''}`}>
         <div className="container">
           <Swiper
             modules={[Navigation, Autoplay]}
@@ -113,25 +113,27 @@ const ResponsiveHeroBanner = () => {
                       className={`w-full ${isMobile ? 'h-[250px]' : 'h-[400px]'} object-cover`}
                     />
                     {hasContent && (
-                      <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-start p-4 sm:p-6 lg:p-8 lg:p-12">
-                        <div className={`max-w-2xl text-white ${isMobile ? 'max-w-sm' : ''}`}>
+                      <div className={`absolute inset-0 bg-black bg-opacity-40 flex items-center ${isMobile ? 'justify-center text-center' : 'justify-start'} p-4 sm:p-6 lg:p-8 lg:p-12`}>
+                        <div className={`text-white ${isMobile ? 'max-w-[90%]' : 'max-w-2xl'}`}>
                           {banner.title && (
-                            <h1 className={`${isMobile ? 'text-xl sm:text-2xl' : 'text-3xl lg:text-5xl'} font-bold mb-2 lg:mb-4 leading-tight`}>
+                            <h1 className={`${isMobile ? 'text-xl sm:text-2xl' : 'text-3xl lg:text-5xl'} font-bold mb-2 lg:mb-4 leading-tight ${isMobile ? 'text-center' : ''}`}>
                               {banner.title}
                             </h1>
                           )}
                           {banner.subtitle && (
-                            <p className={`${isMobile ? 'text-sm sm:text-base' : 'text-lg lg:text-xl'} mb-4 lg:mb-6 leading-relaxed`}>
+                            <p className={`${isMobile ? 'text-sm sm:text-base' : 'text-lg lg:text-xl'} mb-4 lg:mb-6 leading-relaxed ${isMobile ? 'text-center' : ''}`}>
                               {banner.subtitle}
                             </p>
                           )}
                           {banner.ctaText && banner.ctaLink && (
-                            <Link
-                              to={banner.ctaLink}
-                              className={`inline-block bg-[#eeb190] hover:bg-[#d99a7a] text-white ${isMobile ? 'px-4 py-2 text-sm' : 'px-6 py-3 text-base lg:text-lg'} rounded-lg font-semibold transition-colors`}
-                            >
-                              {banner.ctaText}
-                            </Link>
+                            <div className={isMobile ? 'flex justify-center' : ''}>
+                              <Link
+                                to={banner.ctaLink}
+                                className={`inline-block bg-[#eeb190] hover:bg-[#d99a7a] text-white ${isMobile ? 'px-6 py-3 text-base' : 'px-6 py-3 text-base lg:text-lg'} rounded-lg font-semibold transition-colors shadow-lg hover:shadow-xl transform hover:scale-105`}
+                              >
+                                {banner.ctaText}
+                              </Link>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -154,7 +156,7 @@ const ResponsiveHeroBanner = () => {
   const hasContent = displayBanner.title || displayBanner.subtitle || displayBanner.ctaText;
 
   return (
-    <div className={`homeSlider pb-3 pt-3 lg:pb-5 lg:pt-5 relative z-[99] ${isMobile ? 'mt-[115px] lg:mt-0' : ''}`}>
+    <div className={`homeSlider pb-3 pt-4 lg:pb-5 lg:pt-5 relative z-[99] ${isMobile ? 'mt-[130px] lg:mt-0' : ''}`}>
       <div className="container">
         <div className="item rounded-[10px] overflow-hidden relative">
           <img
@@ -163,25 +165,27 @@ const ResponsiveHeroBanner = () => {
             className={`w-full ${isMobile ? 'h-[250px]' : 'h-[400px]'} object-cover`}
           />
           {hasContent && (
-                <div className={`absolute inset-0 bg-black bg-opacity-40 flex items-center justify-start ${isMobile ? 'p-4 sm:p-6' : 'p-8 lg:p-12'}`}>
-                  <div className={`${isMobile ? 'max-w-sm' : 'max-w-2xl'} text-white`}>
+                <div className={`absolute inset-0 bg-black bg-opacity-40 flex items-center ${isMobile ? 'justify-center text-center' : 'justify-start'} ${isMobile ? 'p-4 sm:p-6' : 'p-8 lg:p-12'}`}>
+                  <div className={`text-white ${isMobile ? 'max-w-[90%]' : 'max-w-2xl'}`}>
                     {displayBanner.title && (
-                      <h1 className={`${isMobile ? 'text-xl sm:text-2xl' : 'text-3xl lg:text-5xl'} font-bold mb-2 lg:mb-4 leading-tight`}>
+                      <h1 className={`${isMobile ? 'text-xl sm:text-2xl' : 'text-3xl lg:text-5xl'} font-bold mb-2 lg:mb-4 leading-tight ${isMobile ? 'text-center' : ''}`}>
                         {displayBanner.title}
                       </h1>
                     )}
                     {displayBanner.subtitle && (
-                      <p className={`${isMobile ? 'text-sm sm:text-base' : 'text-lg lg:text-xl'} mb-4 lg:mb-6 leading-relaxed`}>
+                      <p className={`${isMobile ? 'text-sm sm:text-base' : 'text-lg lg:text-xl'} mb-4 lg:mb-6 leading-relaxed ${isMobile ? 'text-center' : ''}`}>
                         {displayBanner.subtitle}
                       </p>
                     )}
                     {displayBanner.ctaText && displayBanner.ctaLink && (
-                      <Link
-                        to={displayBanner.ctaLink}
-                        className={`inline-block bg-[#eeb190] hover:bg-[#d99a7a] text-white ${isMobile ? 'px-4 py-2 text-sm' : 'px-6 py-3 text-base lg:text-lg'} rounded-lg font-semibold transition-colors`}
-                      >
-                        {displayBanner.ctaText}
-                      </Link>
+                      <div className={isMobile ? 'flex justify-center' : ''}>
+                        <Link
+                          to={displayBanner.ctaLink}
+                          className={`inline-block bg-[#eeb190] hover:bg-[#d99a7a] text-white ${isMobile ? 'px-6 py-3 text-base' : 'px-6 py-3 text-base lg:text-lg'} rounded-lg font-semibold transition-colors shadow-lg hover:shadow-xl transform hover:scale-105`}
+                        >
+                          {displayBanner.ctaText}
+                        </Link>
+                      </div>
                     )}
                   </div>
                 </div>

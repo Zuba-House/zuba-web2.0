@@ -375,10 +375,11 @@
         margin-bottom: 8px !important;
     }
     
-    /* Hero Banner - Mobile */
+    /* Hero Banner - Mobile - Improved Spacing & UI */
     .homeSlider {
-        padding: 10px 0 !important;
-        margin-top: 115px !important; /* Account for fixed header on mobile */
+        padding: 12px 0 16px 0 !important;
+        margin-top: 130px !important; /* Increased spacing from header */
+        margin-bottom: 8px !important;
     }
     
     .homeSlider .sliderHome {
@@ -389,12 +390,44 @@
         height: 250px !important;
         width: 100% !important;
         object-fit: cover !important;
+        border-radius: 12px !important;
     }
     
     /* Ensure banner doesn't get hidden behind fixed header */
     .homeSlider .container {
         position: relative !important;
         z-index: 1 !important;
+        padding: 0 12px !important;
+    }
+    
+    /* Hero Banner Content - Centered on Mobile */
+    .homeSlider .item {
+        border-radius: 12px !important;
+        overflow: hidden !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+    }
+    
+    /* CTA Button - Centered and Enhanced */
+    .homeSlider a[class*="bg-[#eeb190]"] {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-width: 140px !important;
+        text-align: center !important;
+        box-shadow: 0 4px 12px rgba(238, 177, 144, 0.4) !important;
+    }
+    
+    /* Banner Text - Better Readability */
+    .homeSlider .absolute.inset-0 {
+        border-radius: 12px !important;
+    }
+    
+    .homeSlider h1 {
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7) !important;
+    }
+    
+    .homeSlider p {
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7) !important;
     }
     
     /* Fix for logo loading causing layout shift */
