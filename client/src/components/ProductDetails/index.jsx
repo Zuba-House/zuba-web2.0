@@ -12,6 +12,8 @@ import { IoMdHeart } from "react-icons/io";
 import { formatCurrency } from "../../utils/currency";
 import { normalizeProduct } from "../../utils/productNormalizer";
 import ProductVariations from "../ProductVariations";
+import { MdExpandMore, MdExpandLess } from "react-icons/md";
+import Collapse from "@mui/material/Collapse";
 
 
 
@@ -24,6 +26,7 @@ export const ProductDetailsComponent = (props) => {
   const [isAdded, setIsAdded] = useState(false);
   const [isAddedInMyList, setIsAddedInMyList] = useState(false);
   const [selectedVariation, setSelectedVariation] = useState(null);
+  const [showMoreInfo, setShowMoreInfo] = useState(false);
 
   // Handle variation change from ProductVariations component
   const handleVariationChange = (variation) => {
@@ -235,7 +238,7 @@ export const ProductDetailsComponent = (props) => {
       </div>
 
       {/* Pricing */}
-      <div className="mb-6">
+      <div className="mb-4">
         <div className="flex items-center gap-4 flex-wrap">
           {(() => {
             // Use variation price if selected, otherwise use product price
@@ -253,10 +256,10 @@ export const ProductDetailsComponent = (props) => {
               // Product is on sale - show regular price crossed out, sale price as current
               return (
                 <>
-                  <span className="oldPrice line-through text-gray-400 text-[22px] font-[500]">
+                  <span className="oldPrice line-through text-gray-400 text-[20px] sm:text-[22px] font-[500]">
                     {formatCurrency(regularPrice)}
                   </span>
-                  <span className="price text-primary text-[28px] font-[700]">
+                  <span className="price text-primary text-[24px] sm:text-[28px] font-[700]">
                     {formatCurrency(salePrice)}
                   </span>
                 </>
@@ -264,7 +267,7 @@ export const ProductDetailsComponent = (props) => {
             } else {
               // No sale - show regular price only
               return (
-                <span className="price text-primary text-[28px] font-[700]">
+                <span className="price text-primary text-[24px] sm:text-[28px] font-[700]">
                   {formatCurrency(regularPrice)}
                 </span>
               );
@@ -273,79 +276,17 @@ export const ProductDetailsComponent = (props) => {
         </div>
       </div>
 
-      {/* Short Description */}
+      {/* Short Description - Compact, visible without scrolling */}
       {product?.shortDescription && (
-        <div className="mb-4 bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
-          <p className="text-[14px] text-gray-800 font-medium leading-relaxed">
+        <div className="mb-4 bg-blue-50 border-l-4 border-blue-600 p-3 sm:p-4 rounded">
+          <p className="text-[13px] sm:text-[14px] text-gray-800 font-medium leading-relaxed line-clamp-3">
             {product?.shortDescription}
           </p>
         </div>
       )}
 
-      {/* Product Tags */}
-      {product?.tags && product.tags.length > 0 && (
-        <div className="mb-4">
-          <div className="flex flex-wrap gap-2">
-            {product.tags.map((tag, index) => (
-              <span
-                key={index}
-                className="inline-block bg-gray-100 text-gray-700 text-xs px-3 py-1 rounded-full hover:bg-blue-100 hover:text-blue-700 cursor-pointer transition"
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Product Specifications (Dimensions & Weight) */}
-      {(product?.shipping?.dimensions || product?.shipping?.weight) && (
-        <div className="mb-6 bg-gray-50 p-4 rounded-lg">
-          <h4 className="text-sm font-semibold mb-3 text-gray-800">Product Specifications</h4>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            {product.shipping?.dimensions && (
-              <div>
-                <span className="text-gray-600">Dimensions:</span>
-                <span className="ml-2 font-medium text-gray-800">
-                  {product.shipping.dimensions.length} × {product.shipping.dimensions.width} × {product.shipping.dimensions.height} {product.shipping.dimensions.unit || 'cm'}
-                </span>
-              </div>
-            )}
-            {product.shipping?.weight && (
-              <div>
-                <span className="text-gray-600">Weight:</span>
-                <span className="ml-2 font-medium text-gray-800">
-                  {product.shipping.weight} {product.shipping.weightUnit || 'kg'}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Full Description */}
-      {product?.description && (
-        <div className="mb-6">
-          <p className="text-[14px] text-gray-700 leading-relaxed pr-4">
-            {product?.description}
-          </p>
-        </div>
-      )}
-
-      {/* Product Variations */}
+      {/* Product Variations - Moved up for visibility */}
       {(() => {
-        // Debug: Log product data
-        if (product) {
-          console.log('ProductDetails - Product data check:', {
-            productType: product.productType,
-            hasVariations: !!product.variations,
-            variationsCount: product.variations?.length || 0,
-            hasAttributes: !!product.attributes,
-            attributesCount: product.attributes?.length || 0,
-            fullProduct: product
-          });
-        }
-
         // Show variations if product is variable OR has variations/attributes
         const shouldShowVariations = product?.productType === 'variable' || 
                                     (product?.variations && product.variations.length > 0) ||
@@ -353,50 +294,49 @@ export const ProductDetailsComponent = (props) => {
 
         if (shouldShowVariations) {
           return (
-            <ProductVariations 
-              product={product} 
-              onVariationSelect={handleVariationChange}
-              selectedVariation={selectedVariation}
-            />
+            <div className="mb-4">
+              <ProductVariations 
+                product={product} 
+                onVariationSelect={handleVariationChange}
+                selectedVariation={selectedVariation}
+              />
+            </div>
           );
         }
         
         return null;
       })()}
 
-      {/* Stock display - update based on selected variation */}
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[14px] font-[600] text-gray-700">
+      {/* Stock display - Compact, moved up */}
+      <div className="mb-4 p-3 sm:p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[13px] sm:text-[14px] font-[600] text-gray-700">
             Availability:
           </span>
-          <span className={`text-[14px] font-bold ${
+          <span className={`text-[13px] sm:text-[14px] font-bold ${
             (selectedVariation ? selectedVariation.stock : (product?.countInStock || product?.stock)) > 0 
               ? 'text-green-600' 
               : 'text-red-600'
           }`}>
             {selectedVariation 
               ? `${selectedVariation.stock} Items Available` 
-              : `${product?.countInStock || product?.stock} Items Available`}
+              : `${product?.countInStock || product?.stock || 0} Items Available`}
           </span>
         </div>
-        <p className="text-[13px] text-gray-600 mt-2">
-          📦 Shipping rates calculated at checkout based on your address
-        </p>
       </div>
 
-      {/* Quantity and Add to Cart */}
-      <div className="mb-6">
-        <div className="flex items-center gap-4 flex-wrap">
+      {/* Quantity and Add to Cart - Moved up, clearly visible */}
+      <div className="mb-4">
+        <div className="flex items-center gap-4 flex-wrap mb-3">
           <div className="qtyBoxWrapper">
             <label className="block text-[13px] font-[600] text-gray-700 mb-2">Quantity:</label>
             <QtyBox handleSelecteQty={handleSelecteQty} />
           </div>
         </div>
         
-        <div className="mt-4">
+        <div className="mt-3">
           <Button 
-            className="btn-org flex gap-2 !min-w-[200px] !py-3 !text-[16px] !font-[600]" 
+            className="btn-org flex gap-2 !min-w-[200px] !py-3 !text-[15px] sm:!text-[16px] !font-[600]" 
             onClick={() => addToCart(product, context?.userData?._id, quantity)}
             disabled={isLoading}
             fullWidth
@@ -420,11 +360,11 @@ export const ProductDetailsComponent = (props) => {
                   {
                     isAdded === true ? (
                       <>
-                        <FaCheckDouble className="text-[20px]" /> Added to Cart
+                        <FaCheckDouble className="text-[18px] sm:text-[20px]" /> Added to Cart
                       </>
                     ) : (
                       <>
-                        <MdOutlineShoppingCart className="text-[22px]" /> Add to Cart
+                        <MdOutlineShoppingCart className="text-[20px] sm:text-[22px]" /> Add to Cart
                       </>
                     )
                   }
@@ -435,22 +375,88 @@ export const ProductDetailsComponent = (props) => {
         </div>
       </div>
 
-      {/* Wishlist and Compare */}
-      <div className="flex items-center gap-6 pt-4 border-t border-gray-200">
+      {/* Wishlist - Compact */}
+      <div className="flex items-center gap-6 mb-4 pb-4 border-b border-gray-200">
         <span 
-          className="flex items-center gap-2 text-[14px] text-gray-700 cursor-pointer font-[500] hover:text-primary transition-colors" 
+          className="flex items-center gap-2 text-[13px] sm:text-[14px] text-gray-700 cursor-pointer font-[500] hover:text-primary transition-colors" 
           onClick={() => handleAddToMyList(product)}
         >
           {
             isAddedInMyList === true ? (
-              <IoMdHeart className="text-[20px] text-primary" />
+              <IoMdHeart className="text-[18px] sm:text-[20px] text-primary" />
             ) : (
-              <FaRegHeart className="text-[20px]" />
+              <FaRegHeart className="text-[18px] sm:text-[20px]" />
             )
           }
           Add to Wishlist
         </span>
+      </div>
 
+      {/* More Info - Collapsible Section */}
+      <div className="mt-4">
+        <Button
+          onClick={() => setShowMoreInfo(!showMoreInfo)}
+          className="!text-gray-700 !font-[600] !text-[14px] !capitalize !justify-start !p-0 !min-h-0"
+          endIcon={showMoreInfo ? <MdExpandLess /> : <MdExpandMore />}
+        >
+          {showMoreInfo ? 'Hide' : 'Show'} More Information
+        </Button>
+        
+        <Collapse in={showMoreInfo}>
+          <div className="mt-4 space-y-4">
+            {/* Full Description */}
+            {product?.description && (
+              <div className="mb-4">
+                <h3 className="text-[15px] font-[600] mb-2 text-gray-800">Full Description</h3>
+                <p className="text-[13px] sm:text-[14px] text-gray-700 leading-relaxed whitespace-pre-line">
+                  {product?.description}
+                </p>
+              </div>
+            )}
+
+            {/* Product Specifications */}
+            {(product?.shipping?.dimensions || product?.shipping?.weight) && (
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="text-[14px] font-[600] mb-3 text-gray-800">Product Specifications</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[13px] sm:text-[14px]">
+                  {product.shipping?.dimensions && (
+                    <div>
+                      <span className="text-gray-600">Dimensions:</span>
+                      <span className="ml-2 font-medium text-gray-800">
+                        {product.shipping.dimensions.length} × {product.shipping.dimensions.width} × {product.shipping.dimensions.height} {product.shipping.dimensions.unit || 'cm'}
+                      </span>
+                    </div>
+                  )}
+                  {product.shipping?.weight && (
+                    <div>
+                      <span className="text-gray-600">Weight:</span>
+                      <span className="ml-2 font-medium text-gray-800">
+                        {product.shipping.weight} {product.shipping.weightUnit || 'kg'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Product Tags */}
+            {product?.tags && product.tags.length > 0 && (
+              <div>
+                <h4 className="text-[14px] font-[600] mb-2 text-gray-800">Tags</h4>
+                <div className="flex flex-wrap gap-2">
+                  {product.tags.map((tag, index) => (
+                    <span
+                      key={index}
+                      className="inline-block bg-gray-100 text-gray-700 text-xs px-3 py-1 rounded-full hover:bg-blue-100 hover:text-blue-700 cursor-pointer transition"
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </Collapse>
       </div>
     </div>
   );
