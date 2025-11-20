@@ -175,28 +175,116 @@
         max-height: calc(100vh - 200px) !important;
         overflow-y: auto !important;
     }
+    
+    /* Filter Buttons - Mobile - Make them larger and touch-friendly */
+    .sidebar button {
+        min-width: 44px !important;
+        min-height: 44px !important;
+        width: 44px !important;
+        height: 44px !important;
+        padding: 10px !important;
+    }
+    
+    .sidebar .MuiButton-root {
+        min-width: 44px !important;
+        min-height: 44px !important;
+        padding: 10px !important;
+    }
+    
+    /* Filter Section Headers - Larger touch targets */
+    .sidebar .box h3 {
+        font-size: 16px !important;
+        padding: 8px 0 !important;
+        min-height: 44px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    
+    /* Checkbox Labels - Larger touch targets */
+    .sidebar .MuiFormControlLabel-root {
+        min-height: 44px !important;
+        padding: 4px 0 !important;
+        margin: 0 !important;
+    }
+    
+    .sidebar .MuiCheckbox-root {
+        min-width: 44px !important;
+        min-height: 44px !important;
+        padding: 10px !important;
+    }
+    
+    .sidebar .MuiFormControlLabel-label {
+        font-size: 14px !important;
+        padding-left: 4px !important;
+    }
+    
+    /* Price Range Slider - Larger touch targets */
+    .sidebar .range-slider {
+        margin: 16px 0 !important;
+        height: 6px !important;
+    }
+    
+    .sidebar .range-slider .range-slider__thumb {
+        width: 20px !important;
+        height: 20px !important;
+        min-width: 20px !important;
+        min-height: 20px !important;
+    }
+    
+    /* Rating Stars - Larger on mobile */
+    .sidebar .MuiRating-root {
+        font-size: 20px !important;
+        min-height: 44px !important;
+    }
+    
+    /* Filter Section Boxes - Better spacing */
+    .sidebar .box {
+        padding: 12px 0 !important;
+        margin-bottom: 8px !important;
+    }
+    
+    /* Price Range Text - Larger */
+    .sidebar .priceRange {
+        font-size: 14px !important;
+        padding: 8px 0 !important;
+    }
+    
+    .sidebar .priceRange strong {
+        font-size: 15px !important;
+    }
 
-    /* Product Items - Mobile Optimization */
+    /* Product Items - Mobile Optimization (TEMU-style) */
     .productItem {
         min-height: auto !important;
         margin-bottom: 12px !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
+        background: white !important;
     }
     
     .productItem .imgWrapper {
-        height: 180px !important;
-        min-height: 180px !important;
-        max-height: 180px !important;
+        height: 160px !important;
+        min-height: 160px !important;
+        max-height: 160px !important;
+        background: #f8f9fa !important;
+        border-radius: 8px 8px 0 0 !important;
     }
     
     .productItem .product-image-container {
-        height: 180px !important;
+        height: 160px !important;
+        min-height: 160px !important;
+        max-height: 160px !important;
         padding-bottom: 0 !important;
+        border-radius: 8px 8px 0 0 !important;
+        background: #f8f9fa !important;
     }
     
     .productItem .product-image {
         height: 100% !important;
         width: 100% !important;
-        object-fit: cover !important;
+        object-fit: contain !important; /* Changed from cover to contain for better visibility */
+        object-position: center !important;
+        padding: 4px !important;
     }
     
     .productItem .info {
@@ -460,15 +548,24 @@
         font-size: 11px !important;
         margin-top: 8px !important;
     }
-    /* Product Items - Tablet */
+    /* Product Items - Tablet (TEMU-style) */
     .productItem .imgWrapper {
-        height: 220px !important;
-        min-height: 220px !important;
-        max-height: 220px !important;
+        height: 200px !important;
+        min-height: 200px !important;
+        max-height: 200px !important;
+        background: #f8f9fa !important;
     }
     
     .productItem .product-image-container {
-        height: 220px !important;
+        height: 200px !important;
+        min-height: 200px !important;
+        max-height: 200px !important;
+        background: #f8f9fa !important;
+    }
+    
+    .productItem .product-image {
+        object-fit: contain !important;
+        padding: 8px !important;
     }
     
     .productItem .info {
@@ -505,9 +602,34 @@
 }
 
 /* ========================================
-   📱 SMALL MOBILE (320px - 767px)
+   📱 SMALL MOBILE (320px - 767px) - TEMU Style
    ======================================== */
 @media only screen and (min-width:320px) and (max-width:767px){
+    /* Product Image Containers - TEMU-style optimization */
+    .productItem .imgWrapper {
+        height: 150px !important;
+        min-height: 150px !important;
+        max-height: 150px !important;
+        background: #f8f9fa !important;
+        border-radius: 8px 8px 0 0 !important;
+    }
+    
+    .productItem .product-image-container {
+        height: 150px !important;
+        min-height: 150px !important;
+        max-height: 150px !important;
+        padding-bottom: 0 !important;
+        background: #f8f9fa !important;
+        border-radius: 8px 8px 0 0 !important;
+    }
+    
+    .productItem .product-image {
+        object-fit: contain !important;
+        padding: 6px !important;
+        position: relative !important;
+        height: 100% !important;
+        width: 100% !important;
+    }
     .MuiTabs-flexContainer button{font-size: 12px !important; padding: 8px 12px !important; min-height: 44px;}
     .productItem .addToCartBtn{
         padding: 8px !important;
@@ -557,14 +679,30 @@
 }
 
 /* ========================================
-   📱 EXTRA SMALL MOBILE (320px - 575px)
+   📱 EXTRA SMALL MOBILE (320px - 575px) - TEMU Style
    ======================================== */
 @media only screen and (min-width:320px) and (max-width:575px){
     .cartPanel .MuiPaper-root,.addressPanel .MuiPaper-root{width: 300px !important;}
     
-    /* Product Items - Smaller on very small screens */
+    /* Product Items - TEMU-style on very small screens */
     .productItem .imgWrapper {
-        height: 180px !important;
+        height: 140px !important;
+        min-height: 140px !important;
+        max-height: 140px !important;
+        background: #f8f9fa !important;
+    }
+    
+    .productItem .product-image-container {
+        height: 140px !important;
+        min-height: 140px !important;
+        max-height: 140px !important;
+        padding-bottom: 0 !important;
+        background: #f8f9fa !important;
+    }
+    
+    .productItem .product-image {
+        object-fit: contain !important;
+        padding: 8px !important;
     }
     
     .productItem .info {

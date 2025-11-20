@@ -196,7 +196,7 @@ export const Sidebar = (props) => {
           <h3 className="w-full mb-3 text-[16px] font-[600] flex items-center pr-5">
             Shop by Category
             <Button
-              className="!w-[30px] !h-[30px] !min-w-[30px] !rounded-full !ml-auto !text-[#000]"
+              className="!w-[44px] !h-[44px] !min-w-[44px] !min-h-[44px] !rounded-full !ml-auto !text-[#000] lg:!w-[30px] lg:!h-[30px] lg:!min-w-[30px]"
               onClick={() => setIsOpenCategoryFilter(!isOpenCategoryFilter)}
             >
               {isOpenCategoryFilter === true ? <FaAngleUp /> : <FaAngleDown />}
@@ -348,8 +348,8 @@ export const Sidebar = (props) => {
             <h3 className="w-full mb-3 text-[16px] font-[600] flex items-center pr-5">
               Filter By Brand
               <Button
-                className="!w-[30px] !h-[30px] !min-w-[30px] !rounded-full !ml-auto !text-[#000]"
-                onClick={() => setIsOpenBrandFilter(!isOpenBrandFilter)}
+              className="!w-[44px] !h-[44px] !min-w-[44px] !min-h-[44px] !rounded-full !ml-auto !text-[#000] lg:!w-[30px] lg:!h-[30px] lg:!min-w-[30px]"
+              onClick={() => setIsOpenBrandFilter(!isOpenBrandFilter)}
               >
                 {isOpenBrandFilter === true ? <FaAngleUp /> : <FaAngleDown />}
               </Button>
@@ -377,7 +377,7 @@ export const Sidebar = (props) => {
           <h3 className="w-full mb-3 text-[16px] font-[600] flex items-center pr-5">
             Filter By Stock
             <Button
-              className="!w-[30px] !h-[30px] !min-w-[30px] !rounded-full !ml-auto !text-[#000]"
+              className="!w-[44px] !h-[44px] !min-w-[44px] !min-h-[44px] !rounded-full !ml-auto !text-[#000] lg:!w-[30px] lg:!h-[30px] lg:!min-w-[30px]"
               onClick={() => setIsOpenStockFilter(!isOpenStockFilter)}
             >
               {isOpenStockFilter === true ? <FaAngleUp /> : <FaAngleDown />}
@@ -410,7 +410,7 @@ export const Sidebar = (props) => {
           <h3 className="w-full mb-3 text-[16px] font-[600] flex items-center pr-5">
             Filter By Type
             <Button
-              className="!w-[30px] !h-[30px] !min-w-[30px] !rounded-full !ml-auto !text-[#000]"
+              className="!w-[44px] !h-[44px] !min-w-[44px] !min-h-[44px] !rounded-full !ml-auto !text-[#000] lg:!w-[30px] lg:!h-[30px] lg:!min-w-[30px]"
               onClick={() => setIsOpenTypeFilter(!isOpenTypeFilter)}
             >
               {isOpenTypeFilter === true ? <FaAngleUp /> : <FaAngleDown />}

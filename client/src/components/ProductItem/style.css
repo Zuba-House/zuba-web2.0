@@ -98,9 +98,43 @@
   transform: scale(1.05);
 }
 
-/* Responsive adjustments */
+/* Mobile - TEMU-style image containers */
 @media (max-width: 768px) {
   .product-image-container {
-    border-radius: 6px;
+    border-radius: 8px;
+    padding-bottom: 0 !important;
+    height: 160px !important;
+    background: #f8f9fa !important;
+  }
+  
+  .product-image {
+    object-fit: contain !important;
+    padding: 4px !important;
+    position: relative !important;
+    height: 100% !important;
+  }
+}
+
+/* Very Small Mobile */
+@media (max-width: 480px) {
+  .product-image-container {
+    height: 150px !important;
+  }
+  
+  .product-image {
+    padding: 6px !important;
+  }
+}
+
+/* Tablet */
+@media (min-width: 481px) and (max-width: 992px) {
+  .product-image-container {
+    height: 200px !important;
+    padding-bottom: 0 !important;
+  }
+  
+  .product-image {
+    object-fit: contain !important;
+    padding: 8px !important;
   }
 }
