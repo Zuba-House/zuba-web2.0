@@ -163,6 +163,18 @@
 
     /* Sidebar */
     .sidebarWrapper.open{bottom: 0px !important; opacity: 1 !important;}
+    
+    /* Sidebar - Mobile - Ensure it doesn't overlap footer */
+    .sidebar {
+        max-height: calc(100vh - 200px) !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+    }
+    
+    .sidebar > div {
+        max-height: calc(100vh - 200px) !important;
+        overflow-y: auto !important;
+    }
 
     /* Product Items - Mobile Optimization */
     .productItem {
