@@ -146,9 +146,16 @@ const Header = () => {
               </Button>
             }
 
-            <div className="col1 w-[40%] lg:w-[25%]">
-              <Link to={"/"}>
-                <img src={localStorage.getItem('logo')} className="max-w-[140px] lg:max-w-[200px]" />
+            <div className="col1 w-[40%] lg:w-[25%] flex items-center">
+              <Link to={"/"} className="flex items-center">
+                <img 
+                  src={localStorage.getItem('logo') || '/logo.png'} 
+                  className="max-w-[140px] lg:max-w-[200px] max-h-[60px] lg:max-h-[80px] object-contain" 
+                  alt="Zuba House Logo"
+                  onError={(e) => {
+                    e.target.src = '/logo.png';
+                  }}
+                />
               </Link>
             </div>
 

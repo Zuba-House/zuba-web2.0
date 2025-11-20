@@ -64,18 +64,17 @@ const ResponsiveHeroBanner = () => {
 
   // Determine which banners to show based on screen size
   const isMobile = windowWidth <= 768;
+  // Strict filtering - only show banners of the correct type (no fallback)
   const filteredBanners = allBanners.filter(banner => 
     isMobile ? banner.type === 'mobile' : banner.type === 'desktop'
   );
 
-  // Get the first banner or fallback to any banner
-  const displayBanner = filteredBanners.length > 0 
-    ? filteredBanners[0] 
-    : (allBanners.length > 0 ? allBanners[0] : null);
+  // Get the first banner - NO FALLBACK to other type
+  const displayBanner = filteredBanners.length > 0 ? filteredBanners[0] : null;
 
   if (loading) {
     return (
-      <div className="homeSlider pb-3 pt-3 lg:pb-5 lg:pt-5 relative z-[99]">
+      <div className={`homeSlider pb-3 pt-3 lg:pb-5 lg:pt-5 relative z-[99] ${isMobile ? 'mt-[115px] lg:mt-0' : ''}`}>
         <div className="container">
           <div className="item rounded-[10px] overflow-hidden bg-gray-200 animate-pulse" style={{ height: isMobile ? '250px' : '400px' }}></div>
         </div>
@@ -83,10 +82,15 @@ const ResponsiveHeroBanner = () => {
     );
   }
 
+  // If no banners of the correct type, don't show anything
+  if (filteredBanners.length === 0) {
+    return null;
+  }
+
   // If multiple banners, show slider
   if (filteredBanners.length > 1) {
     return (
-      <div className="homeSlider pb-3 pt-3 lg:pb-5 lg:pt-5 relative z-[99]">
+      <div className={`homeSlider pb-3 pt-3 lg:pb-5 lg:pt-5 relative z-[99] ${isMobile ? 'mt-[115px] lg:mt-0' : ''}`}>
         <div className="container">
           <Swiper
             modules={[Navigation, Autoplay]}
@@ -150,7 +154,7 @@ const ResponsiveHeroBanner = () => {
   const hasContent = displayBanner.title || displayBanner.subtitle || displayBanner.ctaText;
 
   return (
-    <div className="homeSlider pb-3 pt-3 lg:pb-5 lg:pt-5 relative z-[99]">
+    <div className={`homeSlider pb-3 pt-3 lg:pb-5 lg:pt-5 relative z-[99] ${isMobile ? 'mt-[115px] lg:mt-0' : ''}`}>
       <div className="container">
         <div className="item rounded-[10px] overflow-hidden relative">
           <img

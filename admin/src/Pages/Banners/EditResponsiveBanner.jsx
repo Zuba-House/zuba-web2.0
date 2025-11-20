@@ -115,11 +115,13 @@ export const EditResponsiveBanner = () => {
 
             const response = await uploadImage(`/api/banners/${id}`, formDataObj);
 
-            if (response?.success) {
+            if (response?.success && !response?.error) {
                 context.alertBox("success", "Banner updated successfully!");
                 context.setIsOpenFullScreenPanel({ open: false });
             } else {
-                context.alertBox("error", response?.message || "Failed to update banner");
+                const errorMsg = response?.message || response?.details || "Failed to update banner";
+                context.alertBox("error", errorMsg);
+                console.error('Update response:', response);
             }
         } catch (error) {
             console.error('Error updating banner:', error);

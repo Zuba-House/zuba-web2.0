@@ -143,6 +143,7 @@
     /* Hero Banner - Mobile */
     .homeSlider {
         padding: 10px 0 !important;
+        margin-top: 115px !important; /* Account for fixed header on mobile */
     }
     
     .homeSlider .sliderHome {
@@ -151,7 +152,22 @@
     
     .homeSlider img {
         height: 250px !important;
+        width: 100% !important;
         object-fit: cover !important;
+    }
+    
+    /* Ensure banner doesn't get hidden behind fixed header */
+    .homeSlider .container {
+        position: relative !important;
+        z-index: 1 !important;
+    }
+    
+    /* Fix for logo loading causing layout shift */
+    header .col1 img {
+        max-height: 60px !important;
+        width: auto !important;
+        object-fit: contain !important;
+        display: block !important;
     }
 }
 
