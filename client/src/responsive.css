@@ -197,6 +197,38 @@
         padding: 0 8px !important;
     }
     
+    /* Action Buttons - Always visible on mobile, larger size */
+    .productItem .actions {
+        opacity: 1 !important;
+        top: 8px !important;
+        right: 8px !important;
+    }
+    
+    .productItem .actions button {
+        width: 44px !important;
+        height: 44px !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+    }
+    
+    .productItem .actions button svg {
+        font-size: 20px !important;
+    }
+    
+    /* Ensure buttons don't overlap with badges */
+    .productItem .actions {
+        z-index: 25 !important;
+    }
+    
+    .productItem .absolute.top-2.left-2 {
+        z-index: 20 !important;
+    }
+    
+    .productItem .discount {
+        z-index: 20 !important;
+    }
+    
     /* Order Pages - Mobile */
     section.w-full {
         padding: 30px 15px !important;
@@ -407,6 +439,34 @@
     .productItem .info {
         padding: 15px !important;
         height: 190px !important;
+    }
+    
+    /* Action Buttons - Desktop hover effect */
+    .productItem .actions {
+        opacity: 0;
+        transition: all 0.3s ease;
+    }
+    
+    .productItem:hover .actions,
+    .productItem.group:hover .actions {
+        opacity: 1;
+    }
+    
+    .productItem .actions button {
+        width: 42px !important;
+        height: 42px !important;
+        min-width: 42px !important;
+        min-height: 42px !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    .productItem .actions button:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+        transform: scale(1.1) !important;
+    }
+    
+    .productItem .actions button svg {
+        font-size: 18px !important;
     }
     
     /* Hero Banner - Desktop */

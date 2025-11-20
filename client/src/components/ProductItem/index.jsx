@@ -361,22 +361,28 @@ const ProductItem = (props) => {
           </span>
         )}
 
-        <div className="actions absolute top-[-20px] right-[5px] z-50 flex items-center gap-2 flex-col w-[50px] transition-all duration-300 group-hover:top-[15px] opacity-0 group-hover:opacity-100">
+        <div className="actions absolute top-[10px] lg:top-[-20px] right-[8px] lg:right-[5px] z-50 flex items-center gap-2 flex-col w-auto lg:w-[50px] transition-all duration-300 lg:group-hover:top-[15px] opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
 
-          <Button className="!w-[35px] !h-[35px] !min-w-[35px] !rounded-full !bg-white  text-black hover:!bg-primary hover:text-white group" onClick={() => context.handleOpenProductDetailsModal(true, item)}>
-            <MdZoomOutMap className="text-[18px] !text-black group-hover:text-white hover:!text-white" />
+          <Button 
+            className="!w-[44px] !h-[44px] lg:!w-[42px] lg:!h-[42px] !min-w-[44px] lg:!min-w-[42px] !rounded-full !bg-white shadow-lg text-black hover:!bg-primary hover:text-white group transition-all duration-200 hover:scale-110" 
+            onClick={() => context.handleOpenProductDetailsModal(true, item)}
+            title="Quick View"
+            aria-label="Quick View Product"
+          >
+            <MdZoomOutMap className="text-[20px] lg:text-[18px] !text-black group-hover:text-white hover:!text-white" />
           </Button>
 
 
-          <Button className={`!w-[35px] !h-[35px] !min-w-[35px] !rounded-full !bg-white  text-black hover:!bg-primary hover:text-white group`}
+          <Button 
+            className={`!w-[44px] !h-[44px] lg:!w-[42px] lg:!h-[42px] !min-w-[44px] lg:!min-w-[42px] !rounded-full !bg-white shadow-lg text-black hover:!bg-primary hover:text-white group transition-all duration-200 hover:scale-110`}
             onClick={() => handleAddToMyList(item)}
+            title={isAddedInMyList ? "Remove from Wishlist" : "Add to Wishlist"}
+            aria-label={isAddedInMyList ? "Remove from Wishlist" : "Add to Wishlist"}
           >
             {
-              isAddedInMyList === true ? <IoMdHeart className="text-[18px] !text-primary group-hover:text-white hover:!text-white" /> :
-                <FaRegHeart className="text-[18px] !text-black group-hover:text-white hover:!text-white" />
-
+              isAddedInMyList === true ? <IoMdHeart className="text-[20px] lg:text-[18px] !text-primary group-hover:text-white hover:!text-white" /> :
+                <FaRegHeart className="text-[20px] lg:text-[18px] !text-black group-hover:text-white hover:!text-white" />
             }
-
           </Button>
         </div>
       </div>

@@ -1,6 +1,63 @@
 .productItem .title{line-height: 18px;}
-.productItem .actions button:hover svg{color: #fff !important;}
-.productItem .actions button svg{pointer-events:none !important;}
+
+/* Product Action Buttons - Hover Actions */
+.productItem .actions {
+    transition: all 0.3s ease;
+}
+
+.productItem .actions button {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+    transition: all 0.2s ease !important;
+}
+
+.productItem .actions button:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+    transform: scale(1.1) !important;
+}
+
+.productItem .actions button:active {
+    transform: scale(0.95) !important;
+}
+
+.productItem .actions button:hover svg {
+    color: #fff !important;
+}
+
+.productItem .actions button svg {
+    pointer-events: none !important;
+    transition: color 0.2s ease !important;
+}
+
+/* Mobile - Always show action buttons */
+@media (max-width: 992px) {
+    .productItem .actions {
+        opacity: 1 !important;
+        top: 10px !important;
+    }
+    
+    .productItem .actions button {
+        width: 44px !important;
+        height: 44px !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
+    }
+    
+    .productItem .actions button svg {
+        font-size: 20px !important;
+    }
+}
+
+/* Desktop - Show on hover */
+@media (min-width: 993px) {
+    .productItem .actions {
+        opacity: 0;
+    }
+    
+    .productItem:hover .actions,
+    .productItem.group:hover .actions {
+        opacity: 1;
+    }
+}
 
 /* Product Image Container - 4:5 Aspect Ratio (1080x1350px) */
 .product-image-container {
