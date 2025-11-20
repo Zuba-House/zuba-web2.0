@@ -11,7 +11,7 @@ import "react-range-slider-input/dist/style.css";
 import Rating from "@mui/material/Rating";
 import { MyContext } from "../../App";
 import { useLocation } from "react-router-dom";
-import { postData } from "../../utils/api";
+import { postData, fetchDataFromApi } from "../../utils/api";
 import { MdOutlineFilterAlt } from "react-icons/md";
 
 
