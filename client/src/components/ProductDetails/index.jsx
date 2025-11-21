@@ -418,30 +418,53 @@ export const ProductDetailsComponent = (props) => {
               </div>
             )}
 
-            {/* Product Specifications */}
-            {(product?.shipping?.dimensions || product?.shipping?.weight) && (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="text-[14px] font-[600] mb-3 text-gray-800">Product Specifications</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[13px] sm:text-[14px]">
-                  {product.shipping?.dimensions && (
-                    <div>
-                      <span className="text-gray-600">Dimensions:</span>
-                      <span className="ml-2 font-medium text-gray-800">
-                        {product.shipping.dimensions.length} × {product.shipping.dimensions.width} × {product.shipping.dimensions.height} {product.shipping.dimensions.unit || 'cm'}
-                      </span>
+            {/* Product Specifications - Check variation first, then product */}
+            {(() => {
+              // Get dimensions and weight from variation if selected, otherwise from product
+              const dimensions = selectedVariation?.dimensions || 
+                               product?.shipping?.dimensions || 
+                               product?.dimensions ||
+                               product?.inventory?.dimensions;
+              const weight = selectedVariation?.weight || 
+                           product?.shipping?.weight || 
+                           product?.weight ||
+                           product?.inventory?.weight;
+              const weightUnit = selectedVariation?.weightUnit || 
+                               product?.shipping?.weightUnit || 
+                               product?.weightUnit ||
+                               product?.inventory?.weightUnit ||
+                               'kg';
+              
+              if (dimensions || weight) {
+                return (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h4 className="text-[14px] font-[600] mb-3 text-gray-800">
+                      Product Specifications
+                      {selectedVariation && <span className="text-xs text-gray-500 ml-2 font-normal">(Selected Variation)</span>}
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[13px] sm:text-[14px]">
+                      {dimensions && dimensions.length && dimensions.width && dimensions.height && (
+                        <div>
+                          <span className="text-gray-600">Dimensions:</span>
+                          <span className="ml-2 font-medium text-gray-800">
+                            {dimensions.length} × {dimensions.width} × {dimensions.height} {dimensions.unit || 'cm'}
+                          </span>
+                        </div>
+                      )}
+                      {weight && (
+                        <div>
+                          <span className="text-gray-600">Weight:</span>
+                          <span className="ml-2 font-medium text-gray-800">
+                            {weight} {weightUnit}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {product.shipping?.weight && (
-                    <div>
-                      <span className="text-gray-600">Weight:</span>
-                      <span className="ml-2 font-medium text-gray-800">
-                        {product.shipping.weight} {product.shipping.weightUnit || 'kg'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             {/* Product Tags */}
             {product?.tags && product.tags.length > 0 && (

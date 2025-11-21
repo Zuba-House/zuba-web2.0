@@ -256,24 +256,53 @@ export const ProductDetails = () => {
                               <td className="py-3 px-4 text-gray-800">{productData.category.name}</td>
                             </tr>
                           )}
-                          {/* Dimensions */}
-                          {productData?.shipping?.dimensions && (
-                            <tr className="border-b">
-                              <td className="py-3 px-4 bg-gray-50 font-medium text-gray-700">Dimensions (L×W×H)</td>
-                              <td className="py-3 px-4 text-gray-800">
-                                {productData.shipping.dimensions.length} × {productData.shipping.dimensions.width} × {productData.shipping.dimensions.height} {productData.shipping.dimensions.unit || 'cm'}
-                              </td>
-                            </tr>
-                          )}
-                          {/* Weight */}
-                          {productData?.shipping?.weight && (
-                            <tr className="border-b">
-                              <td className="py-3 px-4 bg-gray-50 font-medium text-gray-700">Weight</td>
-                              <td className="py-3 px-4 text-gray-800">
-                                {productData.shipping.weight} {productData.shipping.weightUnit || 'kg'}
-                              </td>
-                            </tr>
-                          )}
+                          {/* Dimensions - Check variation first, then product */}
+                          {(() => {
+                            const dimensions = selectedVariation?.dimensions || 
+                                             productData?.shipping?.dimensions || 
+                                             productData?.dimensions ||
+                                             productData?.inventory?.dimensions;
+                            if (dimensions && dimensions.length && dimensions.width && dimensions.height) {
+                              return (
+                                <tr className="border-b">
+                                  <td className="py-3 px-4 bg-gray-50 font-medium text-gray-700">
+                                    Dimensions (L×W×H)
+                                    {selectedVariation && <span className="text-xs text-gray-500 ml-2">(Selected Variation)</span>}
+                                  </td>
+                                  <td className="py-3 px-4 text-gray-800">
+                                    {dimensions.length} × {dimensions.width} × {dimensions.height} {dimensions.unit || 'cm'}
+                                  </td>
+                                </tr>
+                              );
+                            }
+                            return null;
+                          })()}
+                          {/* Weight - Check variation first, then product */}
+                          {(() => {
+                            const weight = selectedVariation?.weight || 
+                                         productData?.shipping?.weight || 
+                                         productData?.weight ||
+                                         productData?.inventory?.weight;
+                            const weightUnit = selectedVariation?.weightUnit || 
+                                             productData?.shipping?.weightUnit || 
+                                             productData?.weightUnit ||
+                                             productData?.inventory?.weightUnit ||
+                                             'kg';
+                            if (weight) {
+                              return (
+                                <tr className="border-b">
+                                  <td className="py-3 px-4 bg-gray-50 font-medium text-gray-700">
+                                    Weight
+                                    {selectedVariation && <span className="text-xs text-gray-500 ml-2">(Selected Variation)</span>}
+                                  </td>
+                                  <td className="py-3 px-4 text-gray-800">
+                                    {weight} {weightUnit}
+                                  </td>
+                                </tr>
+                              );
+                            }
+                            return null;
+                          })()}
                           {/* Tags */}
                           {productData?.tags && productData.tags.length > 0 && (
                             <tr className="border-b">
