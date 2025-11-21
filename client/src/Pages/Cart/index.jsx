@@ -87,6 +87,14 @@ const CartPage = () => {
         postalCode: shippingAddress.postal_code
       };
 
+      // 🔍 DEBUG: Log address being sent
+      console.log('🔍 [SHIPPING DEBUG] Address being sent to API:', {
+        original: shippingAddress,
+        processed: addressForCalc,
+        countryCode: addressForCalc.countryCode,
+        province: addressForCalc.province
+      });
+
       // Fetch product data for cart items to get category and weight
       const cartItemsWithProducts = await Promise.all(
         context.cartData.map(async (item) => {
@@ -115,9 +123,24 @@ const CartPage = () => {
         })
       );
 
+      // 🔍 DEBUG: Log cart items
+      console.log('🔍 [SHIPPING DEBUG] Cart items with products:', cartItemsWithProducts.map(item => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        category: item.product?.category?.name || item.product?.category || 'N/A',
+        weight: item.product?.shipping?.weight || item.product?.inventory?.weight || 'N/A'
+      })));
+
       const response = await postData('/api/shipping/calculate', {
         cartItems: cartItemsWithProducts,
         shippingAddress: addressForCalc
+      });
+
+      // 🔍 DEBUG: Log API response
+      console.log('🔍 [SHIPPING DEBUG] API Response:', {
+        success: response?.success,
+        options: response?.options,
+        calculation: response?.calculation
       });
 
       if (response?.success && response?.options && response.options.length > 0) {

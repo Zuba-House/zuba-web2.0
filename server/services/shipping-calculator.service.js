@@ -2,12 +2,13 @@
  * ZUBA HOUSE - Complete Shipping Calculator Service
  * 
  * Features:
- * - Base Pricing: $10 USD first item, +$3 per additional item
+ * - Base Pricing: $10 USD Standard (first item) + $3 per additional, $17 Express (first item) + $5 per additional
  * - Distance-Based: Zones from Ottawa (ON/QC→Western→USA→International)
- * - Weight Considered: Canada Post-style weight brackets
- * - Category-Based: Clothing 1.0x, Art 1.3x, Electronics 1.4x
+ * - Weight Considered: Detailed weight brackets (0-1kg, 1-3kg, 3-5kg, 5-10kg, 10-20kg, 20+kg)
+ * - Category-Based: Clothing 1.0x, Accessories 1.1x, Footwear 1.2x, Art 1.3x, Electronics 1.4x, Oversized 1.6x
+ * - Maximum Caps: $30 Standard per item, $35 Express per item
  * - Two Tiers: Standard (5-12 days) & Express (3-7 days)
- * - Worldwide Shipping: Canada, USA, International
+ * - Worldwide Shipping: All countries supported
  */
 
 /**
@@ -93,67 +94,94 @@ export const calculateShipping = (cartItems, shippingAddress) => {
       originalProvince: shippingAddress.province || shippingAddress.provinceCode
     });
 
-    // Calculate base shipping cost
-    let baseCost = 10; // $10 for first item
-    let additionalItems = cartItems.length - 1;
-    if (additionalItems > 0) {
-      baseCost += additionalItems * 3; // +$3 per additional item
-    }
-
     // Determine shipping zone
     const zone = getShippingZone(countryCode, province);
-    
-    console.log('Shipping calculation - Zone:', zone);
-    
-    // Add zone-based cost
     const zoneCost = getZoneCost(zone);
-    baseCost += zoneCost;
+    
+    console.log('Shipping calculation - Zone:', zone, 'Zone Cost:', zoneCost);
 
-    // Calculate total weight
-    let totalWeight = 0;
-    let highestCategoryMultiplier = 1.0;
+    // Calculate shipping PER ITEM (with caps), then sum for order
+    // Track total units across all items to determine first vs additional
+    let totalUnitsProcessed = 0;
+    let totalStandardCost = 0;
+    let totalExpressCost = 0;
+    let itemCalculations = [];
 
-    cartItems.forEach(item => {
+    cartItems.forEach((item, index) => {
       const product = item.product || item.productId || {};
       const quantity = item.quantity || 1;
       
-      // Get weight (convert to kg)
-      const weight = getProductWeight(product);
-      totalWeight += weight * quantity;
-
+      // Get weight per item (convert to kg)
+      const itemWeight = getProductWeight(product);
+      
       // Get category multiplier
       const categoryMultiplier = getCategoryMultiplier(product);
-      if (categoryMultiplier > highestCategoryMultiplier) {
-        highestCategoryMultiplier = categoryMultiplier;
+      
+      // Get weight cost for this item
+      const itemWeightCost = getWeightCost(itemWeight);
+      
+      // Calculate cost for each unit of this item
+      // First unit in entire order: $10 Standard / $17 Express
+      // Additional units: +$3 Standard / +$5 Express
+      let itemStandardTotal = 0;
+      let itemExpressTotal = 0;
+      
+      for (let unit = 0; unit < quantity; unit++) {
+        const isFirstUnit = totalUnitsProcessed === 0;
+        const standardBase = isFirstUnit ? 10 : 3;
+        const expressBase = isFirstUnit ? 17 : 5;
+        
+        // Calculate cost per unit (before multiplier and cap)
+        const standardUnitCost = (standardBase + zoneCost + itemWeightCost) * categoryMultiplier;
+        const expressUnitCost = (expressBase + zoneCost + itemWeightCost) * categoryMultiplier;
+        
+        // Apply maximum caps per item
+        const MAX_STANDARD_PER_ITEM = 30;
+        const MAX_EXPRESS_PER_ITEM = 35;
+        
+        const cappedStandardCost = Math.min(standardUnitCost, MAX_STANDARD_PER_ITEM);
+        const cappedExpressCost = Math.min(expressUnitCost, MAX_EXPRESS_PER_ITEM);
+        
+        itemStandardTotal += cappedStandardCost;
+        itemExpressTotal += cappedExpressCost;
+        
+        totalUnitsProcessed++;
       }
+      
+      totalStandardCost += itemStandardTotal;
+      totalExpressCost += itemExpressTotal;
+      
+      // Calculate average per unit for display
+      const avgStandardPerUnit = itemStandardTotal / quantity;
+      const avgExpressPerUnit = itemExpressTotal / quantity;
+      
+      itemCalculations.push({
+        itemIndex: index,
+        productId: item.productId,
+        quantity: quantity,
+        weight: itemWeight,
+        categoryMultiplier: categoryMultiplier,
+        zoneCost: zoneCost,
+        weightCost: itemWeightCost,
+        standardPerUnit: Math.round(avgStandardPerUnit * 100) / 100,
+        expressPerUnit: Math.round(avgExpressPerUnit * 100) / 100,
+        standardTotal: Math.round(itemStandardTotal * 100) / 100,
+        expressTotal: Math.round(itemExpressTotal * 100) / 100
+      });
     });
-
-    // Add weight-based cost
-    const weightCost = getWeightCost(totalWeight);
-    baseCost += weightCost;
-
-    // Apply category multiplier
-    const finalCost = baseCost * highestCategoryMultiplier;
     
-    console.log('Shipping calculation - Costs:', {
-      baseCost: 10,
-      additionalItems,
-      additionalItemsCost: additionalItems * 3,
+    console.log('Shipping calculation - Item Breakdown:', itemCalculations);
+    console.log('Shipping calculation - Final Costs:', {
+      totalStandardCost: totalStandardCost.toFixed(2),
+      totalExpressCost: totalExpressCost.toFixed(2),
       zone,
       zoneCost,
-      totalWeight: totalWeight.toFixed(2),
-      weightCost,
-      categoryMultiplier: highestCategoryMultiplier,
-      finalCost: finalCost.toFixed(2),
-      expressCost: (finalCost * 1.5).toFixed(2)
+      itemCount: cartItems.length
     });
 
     // Calculate delivery estimates
     const standardEstimate = getDeliveryEstimate(zone, 'standard');
     const expressEstimate = getDeliveryEstimate(zone, 'express');
-
-    // Calculate express cost (1.5x standard)
-    const expressCost = finalCost * 1.5;
 
     // Format delivery dates
     const standardDates = formatDeliveryDates(standardEstimate.minDays, standardEstimate.maxDays);
@@ -166,37 +194,38 @@ export const calculateShipping = (cartItems, shippingAddress) => {
           id: 'standard',
           name: 'Standard Shipping',
           description: `${standardEstimate.estimate}`,
-          price: Math.round(finalCost * 100) / 100,
+          price: Math.round(totalStandardCost * 100) / 100,
           currency: 'USD',
           deliveryDays: `${standardEstimate.minDays}-${standardEstimate.maxDays} business days`,
           estimatedDelivery: standardDates,
           minDays: standardEstimate.minDays,
           maxDays: standardEstimate.maxDays,
-          icon: '📦'
+          icon: '📦',
+          type: 'standard'
         },
         {
           id: 'express',
           name: 'Express Shipping',
           description: `${expressEstimate.estimate}`,
-          price: Math.round(expressCost * 100) / 100,
+          price: Math.round(totalExpressCost * 100) / 100,
           currency: 'USD',
           deliveryDays: `${expressEstimate.minDays}-${expressEstimate.maxDays} business days`,
           estimatedDelivery: expressDates,
           minDays: expressEstimate.minDays,
           maxDays: expressEstimate.maxDays,
-          icon: '🚀'
+          icon: '🚀',
+          type: 'express'
         }
       ],
       calculation: {
-        baseCost: 10,
-        additionalItems: additionalItems,
-        additionalItemsCost: additionalItems * 3,
         zone: zone,
         zoneCost: zoneCost,
-        weight: totalWeight.toFixed(2),
-        weightCost: weightCost,
-        categoryMultiplier: highestCategoryMultiplier,
-        finalCost: Math.round(finalCost * 100) / 100
+        itemCount: cartItems.length,
+        itemCalculations: itemCalculations,
+        totalStandardCost: Math.round(totalStandardCost * 100) / 100,
+        totalExpressCost: Math.round(totalExpressCost * 100) / 100,
+        maxStandardPerItem: 30,
+        maxExpressPerItem: 35
       }
     };
   } catch (error) {
@@ -243,23 +272,24 @@ const getShippingZone = (countryCode, province) => {
 const getZoneCost = (zone) => {
   const zoneCosts = {
     'local': 0,      // ON/QC - no additional cost
-    'western': 5,     // Other Canadian provinces
+    'western': 5,     // Other Canadian provinces (BC, AB, SK, MB, etc.)
     'usa': 8,        // United States
-    'international': 15 // International
+    'international': 15 // International (all other countries)
   };
   return zoneCosts[zone] || 15;
 };
 
 /**
- * Get weight-based cost (Canada Post style)
+ * Get weight-based cost (per item)
+ * Updated brackets based on guide
  */
 const getWeightCost = (weightInKg) => {
-  if (weightInKg <= 0.5) return 0;
-  if (weightInKg <= 1.0) return 2;
-  if (weightInKg <= 2.0) return 4;
-  if (weightInKg <= 5.0) return 6;
-  if (weightInKg <= 10.0) return 10;
-  return 15; // Over 10kg
+  if (weightInKg <= 1.0) return 0;      // 0-1kg: $0
+  if (weightInKg <= 3.0) return 4;      // 1-3kg: $4
+  if (weightInKg <= 5.0) return 8;     // 3-5kg: $8
+  if (weightInKg <= 10.0) return 15;   // 5-10kg: $15
+  if (weightInKg <= 20.0) return 25;   // 10-20kg: $25
+  return 40;                            // 20+kg: $40
 };
 
 /**
@@ -307,6 +337,7 @@ const getProductWeight = (product) => {
 
 /**
  * Get category multiplier
+ * Updated multipliers based on guide
  */
 const getCategoryMultiplier = (product) => {
   if (!product) return 1.0;
@@ -315,12 +346,27 @@ const getCategoryMultiplier = (product) => {
                    product.categoryName?.toLowerCase() || 
                    product.category?.toLowerCase() || '';
   
-  // Clothing categories (1.0x)
+  // Clothing categories (1.0x) - no increase
   if (category.includes('clothing') || 
       category.includes('jersey') || 
       category.includes('apparel') ||
       category.includes('fashion')) {
     return 1.0;
+  }
+  
+  // Accessories (1.1x)
+  if (category.includes('accessor') || 
+      category.includes('jewelry') ||
+      category.includes('watch')) {
+    return 1.1;
+  }
+  
+  // Footwear (1.2x)
+  if (category.includes('footwear') || 
+      category.includes('shoe') ||
+      category.includes('sneaker') ||
+      category.includes('boot')) {
+    return 1.2;
   }
   
   // Art categories (1.3x)
@@ -334,11 +380,20 @@ const getCategoryMultiplier = (product) => {
   // Electronics categories (1.4x)
   if (category.includes('electronic') || 
       category.includes('tech') || 
-      category.includes('device')) {
+      category.includes('device') ||
+      category.includes('gadget')) {
     return 1.4;
   }
   
-  return 1.0; // Default
+  // Oversized items (1.6x)
+  if (category.includes('oversized') || 
+      category.includes('large') ||
+      category.includes('furniture') ||
+      category.includes('bulk')) {
+    return 1.6;
+  }
+  
+  return 1.0; // Default - clothing rate
 };
 
 /**
