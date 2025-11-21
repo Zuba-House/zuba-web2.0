@@ -168,39 +168,70 @@ const SimpleProduct = ({ formData, setFormData, errors, handleChange }) => {
         </div>
 
         {formData.inventory?.manageStock !== false && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block mb-2 font-semibold" style={{ color: '#e5e2db' }}>
-                Stock Quantity
-              </label>
-              <input
-                type="number"
-                name="inventory.stock"
-                value={formData.inventory?.stock || formData.countInStock || ''}
-                onChange={(e) => {
-                  const value = parseInt(e.target.value) || 0;
-                  setFormData(prev => ({
-                    ...prev,
-                    inventory: {
-                      stock: value,
-                      stockStatus: value > 0 ? 'in_stock' : 'out_of_stock',
-                      manageStock: prev.inventory?.manageStock !== false,
-                      allowBackorders: prev.inventory?.allowBackorders || 'no',
-                      lowStockThreshold: prev.inventory?.lowStockThreshold || 5,
-                      soldIndividually: prev.inventory?.soldIndividually || false
-                    },
-                    countInStock: value // Legacy support
-                  }));
-                }}
-                placeholder="0"
-                min="0"
-                className="w-full px-4 py-3 rounded-lg outline-none"
-                style={{ backgroundColor: '#0b2735', color: '#e5e2db', border: '1px solid rgba(239, 178, 145, 0.2)' }}
-              />
-              {errors.stock && (
-                <p className="text-red-500 text-sm mt-1">{errors.stock}</p>
-              )}
+          <>
+            <div className="mb-4">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="endlessStock"
+                  checked={formData.inventory?.endlessStock || false}
+                  onChange={(e) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      inventory: {
+                        ...prev.inventory,
+                        endlessStock: e.target.checked,
+                        stockStatus: e.target.checked ? 'in_stock' : prev.inventory?.stockStatus || 'in_stock'
+                      }
+                    }));
+                  }}
+                  className="w-5 h-5"
+                  style={{ accentColor: '#efb291' }}
+                />
+                <label htmlFor="endlessStock" className="font-semibold" style={{ color: '#e5e2db' }}>
+                  Endless Stock (Unlimited - Always Available)
+                </label>
+              </div>
+              <p className="text-sm mt-1 ml-8" style={{ color: '#e5e2db', opacity: 0.6 }}>
+                When enabled, customers will see "Available" instead of stock count
+              </p>
             </div>
+
+            {!formData.inventory?.endlessStock && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block mb-2 font-semibold" style={{ color: '#e5e2db' }}>
+                    Stock Quantity
+                  </label>
+                  <input
+                    type="number"
+                    name="inventory.stock"
+                    value={formData.inventory?.stock || formData.countInStock || ''}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value) || 0;
+                      setFormData(prev => ({
+                        ...prev,
+                        inventory: {
+                          stock: value,
+                          stockStatus: value > 0 ? 'in_stock' : 'out_of_stock',
+                          manageStock: prev.inventory?.manageStock !== false,
+                          allowBackorders: prev.inventory?.allowBackorders || 'no',
+                          lowStockThreshold: prev.inventory?.lowStockThreshold || 5,
+                          soldIndividually: prev.inventory?.soldIndividually || false,
+                          endlessStock: prev.inventory?.endlessStock || false
+                        },
+                        countInStock: value // Legacy support
+                      }));
+                    }}
+                    placeholder="0"
+                    min="0"
+                    className="w-full px-4 py-3 rounded-lg outline-none"
+                    style={{ backgroundColor: '#0b2735', color: '#e5e2db', border: '1px solid rgba(239, 178, 145, 0.2)' }}
+                  />
+                  {errors.stock && (
+                    <p className="text-red-500 text-sm mt-1">{errors.stock}</p>
+                  )}
+                </div>
 
             <div>
               <label className="block mb-2 font-semibold" style={{ color: '#e5e2db' }}>
@@ -227,6 +258,8 @@ const SimpleProduct = ({ formData, setFormData, errors, handleChange }) => {
               </select>
             </div>
           </div>
+            )}
+          </>
         )}
 
         <div className="mb-4">

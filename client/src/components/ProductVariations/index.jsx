@@ -272,6 +272,8 @@ const ProductVariations = ({ product, onVariationSelect, selectedVariation }) =>
   const isVariationAvailable = (variation) => {
     if (!variation) return false;
     if (variation.isActive === false) return false;
+    // Endless stock is always available
+    if (variation.endlessStock) return true;
     const stock = Number(variation.stock || 0);
     const stockStatus = variation.stockStatus || (stock > 0 ? 'in_stock' : 'out_of_stock');
     return stockStatus === 'in_stock' && stock > 0;
@@ -505,9 +507,11 @@ const ProductVariations = ({ product, onVariationSelect, selectedVariation }) =>
               <span className={`text-[14px] font-[600] ml-2 ${
                 isVariationAvailable(currentVariation) ? 'text-green-600' : 'text-red-600'
               }`}>
-                {isVariationAvailable(currentVariation) 
-                  ? `${currentVariation.stock} available` 
-                  : 'Out of stock'}
+                {currentVariation?.endlessStock 
+                  ? 'Available (Unlimited)' 
+                  : (isVariationAvailable(currentVariation) 
+                    ? `${currentVariation.stock} available` 
+                    : 'Out of stock')}
               </span>
             </div>
           </div>

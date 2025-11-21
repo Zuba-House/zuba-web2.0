@@ -117,16 +117,16 @@ export const ProductDetailsComponent = (props) => {
 
     // Determine stock: use selected variation stock if available
     const stock = selectedVariation 
-      ? selectedVariation.stock 
-      : (product?.countInStock || product?.stock);
+      ? (selectedVariation.endlessStock ? null : selectedVariation.stock)
+      : (product?.inventory?.endlessStock ? null : (product?.countInStock || product?.stock));
 
-    // Check stock availability
-    if (stock <= 0) {
+    // Check stock availability (null means endless/unlimited stock)
+    if (stock !== null && stock <= 0) {
       context?.alertBox("error", "This product is out of stock");
       return false;
     }
     
-    if (stock < quantity) {
+    if (stock !== null && stock < quantity) {
       context?.alertBox("error", `Only ${stock} items available in stock`);
       return false;
     }
@@ -314,13 +314,17 @@ export const ProductDetailsComponent = (props) => {
             Availability:
           </span>
           <span className={`text-[13px] sm:text-[14px] font-bold ${
-            (selectedVariation ? selectedVariation.stock : (product?.countInStock || product?.stock)) > 0 
+            (selectedVariation 
+              ? (selectedVariation.endlessStock || (selectedVariation.stock > 0))
+              : (product?.inventory?.endlessStock || (product?.countInStock || product?.stock) > 0)) 
               ? 'text-green-600' 
               : 'text-red-600'
           }`}>
             {selectedVariation 
               ? `${selectedVariation.stock} Items Available` 
-              : `${product?.countInStock || product?.stock || 0} Items Available`}
+              : (product?.inventory?.endlessStock 
+                ? 'Available (Unlimited)' 
+                : `${product?.countInStock || product?.stock || 0} Items Available`)}
           </span>
         </div>
       </div>

@@ -337,8 +337,9 @@ export async function createProduct(request, response) {
         let inventoryData = {};
         if (request.body.inventory && typeof request.body.inventory === 'object') {
             inventoryData = {
-                stock: request.body.inventory.stock || request.body.countInStock || 0,
-                stockStatus: request.body.inventory.stockStatus || ((request.body.inventory.stock || request.body.countInStock || 0) > 0 ? 'in_stock' : 'out_of_stock'),
+                stock: request.body.inventory.endlessStock ? 999999 : (request.body.inventory.stock || request.body.countInStock || 0),
+                stockStatus: request.body.inventory.endlessStock ? 'in_stock' : (request.body.inventory.stockStatus || ((request.body.inventory.stock || request.body.countInStock || 0) > 0 ? 'in_stock' : 'out_of_stock')),
+                endlessStock: request.body.inventory.endlessStock || false,
                 manageStock: request.body.inventory.manageStock !== false,
                 allowBackorders: request.body.inventory.allowBackorders || 'no',
                 lowStockThreshold: request.body.inventory.lowStockThreshold || 5,
@@ -477,9 +478,10 @@ export async function createProduct(request, response) {
                     regularPrice: regularPrice || currentPrice,
                     price: currentPrice,
                     salePrice: salePrice || null,
-                    stock: variation.stock || 0,
-                    stockStatus: variation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock'),
+                    stock: variation.endlessStock ? 999999 : (variation.stock || 0),
+                    stockStatus: variation.endlessStock ? 'in_stock' : (variation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock')),
                     manageStock: variation.manageStock !== false,
+                    endlessStock: variation.endlessStock || false,
                     isActive: variation.isActive !== false,
                     isDefault: variation.isDefault || false,
                 // Normalize variation attributes to ensure proper structure
@@ -1617,8 +1619,9 @@ export async function updateProduct(request, response) {
         // Update inventory structure (new format)
         if (request.body.inventory || request.body.countInStock !== undefined) {
             updateData.inventory = {
-                stock: request.body.inventory?.stock || request.body.countInStock !== undefined ? request.body.countInStock : existingProduct.inventory?.stock || 0,
-                stockStatus: request.body.inventory?.stockStatus || ((request.body.inventory?.stock || request.body.countInStock || 0) > 0 ? 'in_stock' : 'out_of_stock'),
+                stock: request.body.inventory?.endlessStock ? 999999 : (request.body.inventory?.stock || request.body.countInStock !== undefined ? request.body.countInStock : existingProduct.inventory?.stock || 0),
+                stockStatus: request.body.inventory?.endlessStock ? 'in_stock' : (request.body.inventory?.stockStatus || ((request.body.inventory?.stock || request.body.countInStock || 0) > 0 ? 'in_stock' : 'out_of_stock')),
+                endlessStock: request.body.inventory?.endlessStock !== undefined ? request.body.inventory.endlessStock : (existingProduct.inventory?.endlessStock || false),
                 manageStock: request.body.inventory?.manageStock !== undefined ? request.body.inventory.manageStock : (existingProduct.inventory?.manageStock !== undefined ? existingProduct.inventory.manageStock : true),
                 allowBackorders: request.body.inventory?.allowBackorders || existingProduct.inventory?.allowBackorders || 'no',
                 lowStockThreshold: request.body.inventory?.lowStockThreshold || existingProduct.inventory?.lowStockThreshold || 5,
@@ -1697,9 +1700,10 @@ export async function updateProduct(request, response) {
                                     regularPrice: existingRegularPrice,
                                     price: existingRegularPrice,
                                     salePrice: existingVariation.salePrice && existingVariation.salePrice > 0 ? Number(existingVariation.salePrice) : null,
-                                    stock: variation.stock !== undefined ? variation.stock : existingVariation.stock || 0,
-                                    stockStatus: variation.stockStatus || existingVariation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock'),
+                                    stock: variation.endlessStock ? 999999 : (variation.stock !== undefined ? variation.stock : existingVariation.stock || 0),
+                                    stockStatus: variation.endlessStock ? 'in_stock' : (variation.stockStatus || existingVariation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock')),
                                     manageStock: variation.manageStock !== undefined ? variation.manageStock : existingVariation.manageStock !== false,
+                                    endlessStock: variation.endlessStock !== undefined ? variation.endlessStock : (existingVariation.endlessStock || false),
                                     isActive: variation.isActive !== undefined ? variation.isActive : existingVariation.isActive !== false,
                                     isDefault: variation.isDefault || existingVariation.isDefault || false,
                                     attributes: (variation.attributes || existingVariation.attributes || []).map(attr => ({
@@ -1736,11 +1740,12 @@ export async function updateProduct(request, response) {
                         regularPrice: regularPrice || currentPrice,
                         price: currentPrice,
                         salePrice: salePrice || null,
-                        stock: variation.stock || 0,
-                        stockStatus: variation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock'),
-                        manageStock: variation.manageStock !== false,
-                        isActive: variation.isActive !== false,
-                        isDefault: variation.isDefault || false,
+                    stock: variation.endlessStock ? 999999 : (variation.stock || 0),
+                    stockStatus: variation.endlessStock ? 'in_stock' : (variation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock')),
+                    manageStock: variation.manageStock !== false,
+                    endlessStock: variation.endlessStock || false,
+                    isActive: variation.isActive !== false,
+                    isDefault: variation.isDefault || false,
                         attributes: (variation.attributes || []).map(attr => ({
                             name: attr.name || attr,
                             slug: attr.slug || (attr.name || attr).toLowerCase().replace(/[^a-z0-9]+/g, '-'),

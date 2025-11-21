@@ -246,9 +246,16 @@ const ProductItem = (props) => {
 
   // Helper functions for stock status
   const getProductStock = () => {
+    // Check for endless stock first
+    if (item?.inventory?.endlessStock) return null; // null indicates endless/unlimited
+    
     // For variable products, get total stock from all active variations
     if (item?.productType === 'variable' || item?.type === 'variable') {
       if (Array.isArray(item?.variations) && item.variations.length > 0) {
+        // Check if any variation has endless stock
+        const hasEndlessStock = item.variations.some(v => v && v.endlessStock && (v.isActive !== false));
+        if (hasEndlessStock) return null; // null indicates endless/unlimited
+        
         // Return total stock across all ACTIVE variations
         return item.variations
           .filter(v => v && (v.isActive !== false))
@@ -262,12 +269,17 @@ const ProductItem = (props) => {
   };
 
   const isOutOfStock = () => {
+    // Check for endless stock first
+    if (item?.inventory?.endlessStock) return false; // Endless stock is always in stock
+    
     // For variable products, check if ANY variation is in stock
     if (item?.productType === 'variable' || item?.type === 'variable') {
       if (item?.variations && Array.isArray(item.variations) && item.variations.length > 0) {
         // Product is out of stock only if ALL variations are out of stock
         const hasInStockVariation = item.variations.some(v => {
           if (!v || v.isActive === false) return false;
+          // Endless stock is always in stock
+          if (v.endlessStock) return true;
           const stock = Number(v.stock || 0);
           const stockStatus = v.stockStatus || (stock > 0 ? 'in_stock' : 'out_of_stock');
           return stockStatus === 'in_stock' && stock > 0;
@@ -277,8 +289,9 @@ const ProductItem = (props) => {
       // If no variations, consider it out of stock
       return true;
     }
-    // For simple products, check total stock
-    return getProductStock() <= 0;
+    // For simple products, check total stock (null means endless/unlimited)
+    const stock = getProductStock();
+    return stock !== null && stock <= 0;
   };
 
   const isLowStock = () => {
@@ -295,7 +308,7 @@ const ProductItem = (props) => {
             OUT OF STOCK
           </div>
         )}
-        {isLowStock() && !isOutOfStock() && (
+        {isLowStock() && !isOutOfStock() && getProductStock() !== null && (
           <div className="absolute top-2 left-2 bg-yellow-400 text-black px-2 py-1 rounded text-[8px] lg:text-[10px] font-bold z-20">
             Only {getProductStock()} left
           </div>

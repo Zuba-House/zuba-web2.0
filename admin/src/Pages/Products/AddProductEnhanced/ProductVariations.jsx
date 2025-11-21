@@ -54,6 +54,7 @@ const ProductVariations = ({ formData, setFormData, errors }) => {
       stock: 0,
       stockStatus: 'in_stock',
       manageStock: true,
+      endlessStock: false,
       sku: `${formData.sku || 'VAR'}-${index + 1}`,
       isActive: true,
       isDefault: index === 0
@@ -81,9 +82,10 @@ const ProductVariations = ({ formData, setFormData, errors }) => {
       regularPrice: parseFloat(variationData.regularPrice) || 0,
       salePrice: variationData.salePrice ? parseFloat(variationData.salePrice) : null,
       price: variationData.salePrice ? parseFloat(variationData.salePrice) : parseFloat(variationData.regularPrice) || 0,
-      stock: parseInt(variationData.stock) || 0,
-      stockStatus: parseInt(variationData.stock) > 0 ? 'in_stock' : 'out_of_stock',
+      stock: variationData.endlessStock ? 999999 : (parseInt(variationData.stock) || 0),
+      stockStatus: variationData.endlessStock ? 'in_stock' : (parseInt(variationData.stock) > 0 ? 'in_stock' : 'out_of_stock'),
       manageStock: true,
+      endlessStock: variationData.endlessStock || false,
       sku: variationData.sku || '',
       image: variationData.image || '',
       isActive: true,
@@ -112,8 +114,9 @@ const ProductVariations = ({ formData, setFormData, errors }) => {
       regularPrice: parseFloat(variationData.regularPrice) || updated[index].regularPrice,
       salePrice: variationData.salePrice ? parseFloat(variationData.salePrice) : null,
       price: variationData.salePrice ? parseFloat(variationData.salePrice) : parseFloat(variationData.regularPrice) || updated[index].price,
-      stock: parseInt(variationData.stock) || updated[index].stock,
-      stockStatus: parseInt(variationData.stock) > 0 ? 'in_stock' : 'out_of_stock',
+      stock: variationData.endlessStock ? 999999 : (parseInt(variationData.stock) || updated[index].stock),
+      stockStatus: variationData.endlessStock ? 'in_stock' : (parseInt(variationData.stock) > 0 ? 'in_stock' : 'out_of_stock'),
+      endlessStock: variationData.endlessStock || false,
       sku: variationData.sku || updated[index].sku,
       image: variationData.image || updated[index].image
     };
@@ -129,6 +132,7 @@ const ProductVariations = ({ formData, setFormData, errors }) => {
       regularPrice: '',
       salePrice: '',
       stock: 0,
+      endlessStock: false,
       sku: '',
       image: ''
     });
@@ -153,6 +157,7 @@ const ProductVariations = ({ formData, setFormData, errors }) => {
       regularPrice: variation.regularPrice,
       salePrice: variation.salePrice || '',
       stock: variation.stock,
+      endlessStock: variation.endlessStock || false,
       sku: variation.sku || '',
       image: variation.image || ''
     });
@@ -243,7 +248,9 @@ const ProductVariations = ({ formData, setFormData, errors }) => {
                 </div>
                 <div>
                   <span style={{ color: '#e5e2db', opacity: 0.7 }}>Stock: </span>
-                  <span style={{ color: '#e5e2db' }}>{variation.stock}</span>
+                  <span style={{ color: '#e5e2db' }}>
+                    {variation.endlessStock ? 'Unlimited (Available)' : variation.stock}
+                  </span>
                 </div>
                 <div>
                   <span style={{ color: '#e5e2db', opacity: 0.7 }}>SKU: </span>
@@ -342,18 +349,37 @@ const ProductVariations = ({ formData, setFormData, errors }) => {
             />
           </div>
           <div>
-            <label className="block mb-2 font-semibold text-sm" style={{ color: '#e5e2db' }}>
-              Stock Quantity
-            </label>
-            <input
-              type="number"
-              value={variationData.stock}
-              onChange={(e) => setVariationData(prev => ({ ...prev, stock: e.target.value }))}
-              placeholder="0"
-              min="0"
-              className="w-full px-4 py-2 rounded-lg outline-none"
-              style={{ backgroundColor: '#1a3d52', color: '#e5e2db', border: '1px solid rgba(239, 178, 145, 0.2)' }}
-            />
+            <div className="mb-2">
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="checkbox"
+                  id="variationEndlessStock"
+                  checked={variationData.endlessStock || false}
+                  onChange={(e) => setVariationData(prev => ({ ...prev, endlessStock: e.target.checked }))}
+                  className="w-4 h-4"
+                  style={{ accentColor: '#efb291' }}
+                />
+                <label htmlFor="variationEndlessStock" className="font-semibold text-sm" style={{ color: '#e5e2db' }}>
+                  Endless Stock (Unlimited)
+                </label>
+              </div>
+            </div>
+            {!variationData.endlessStock && (
+              <>
+                <label className="block mb-2 font-semibold text-sm" style={{ color: '#e5e2db' }}>
+                  Stock Quantity
+                </label>
+                <input
+                  type="number"
+                  value={variationData.stock}
+                  onChange={(e) => setVariationData(prev => ({ ...prev, stock: e.target.value }))}
+                  placeholder="0"
+                  min="0"
+                  className="w-full px-4 py-2 rounded-lg outline-none"
+                  style={{ backgroundColor: '#1a3d52', color: '#e5e2db', border: '1px solid rgba(239, 178, 145, 0.2)' }}
+                />
+              </>
+            )}
           </div>
           <div>
             <label className="block mb-2 font-semibold text-sm" style={{ color: '#e5e2db' }}>
@@ -381,6 +407,7 @@ const ProductVariations = ({ formData, setFormData, errors }) => {
                   regularPrice: '',
                   salePrice: '',
                   stock: 0,
+                  endlessStock: false,
                   sku: '',
                   image: ''
                 });

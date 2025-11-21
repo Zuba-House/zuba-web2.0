@@ -135,6 +135,10 @@ const VariationSchema = new mongoose.Schema({
     default: 5,
     min: 0
   },
+  endlessStock: {
+    type: Boolean,
+    default: false
+  },
   weight: {
     type: Number,
     default: null,
@@ -245,6 +249,10 @@ const InventorySchema = new mongoose.Schema({
   soldIndividually: { 
     type: Boolean, 
     default: false 
+  },
+  endlessStock: {
+    type: Boolean,
+    default: false
   }
 }, { _id: false });
 

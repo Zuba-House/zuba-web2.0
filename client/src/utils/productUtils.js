@@ -151,6 +151,8 @@ export const isInStock = (product, variationId = null) => {
       v._id === variationId || v.id === variationId
     );
     if (variation) {
+      // Endless stock is always in stock
+      if (variation.endlessStock) return true;
       const stock = Number(variation.stock || 0);
       const stockStatus = variation.stockStatus || (stock > 0 ? 'in_stock' : 'out_of_stock');
       return stockStatus === 'in_stock' && stock > 0 && (variation.isActive !== false);
@@ -163,6 +165,8 @@ export const isInStock = (product, variationId = null) => {
     if (Array.isArray(product.variations) && product.variations.length > 0) {
       return product.variations.some(v => {
         if (!v || v.isActive === false) return false;
+        // Endless stock is always in stock
+        if (v.endlessStock) return true;
         const stock = Number(v.stock || 0);
         const stockStatus = v.stockStatus || (stock > 0 ? 'in_stock' : 'out_of_stock');
         return stockStatus === 'in_stock' && stock > 0;
@@ -171,8 +175,11 @@ export const isInStock = (product, variationId = null) => {
     return false;
   }
 
-  // For simple products
-  return getProductStock(product, variationId) > 0;
+  // For simple products - check endless stock first
+  if (product.inventory?.endlessStock) return true;
+  
+  const stock = getProductStock(product, variationId);
+  return stock !== null && stock > 0;
 };
 
 /**
