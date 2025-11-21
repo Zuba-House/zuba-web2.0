@@ -443,16 +443,45 @@ export async function createProduct(request, response) {
                 variation: attr.variation !== false
             })),
             // Normalize variations to ensure proper structure
-            variations: (request.body.variations || []).map(variation => ({
-                ...variation,
-                // Ensure required fields have defaults
-                regularPrice: variation.regularPrice || variation.price || 0,
-                price: variation.price || variation.regularPrice || variation.salePrice || 0,
-                stock: variation.stock || 0,
-                stockStatus: variation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock'),
-                manageStock: variation.manageStock !== false,
-                isActive: variation.isActive !== false,
-                isDefault: variation.isDefault || false,
+            variations: (request.body.variations || []).map(variation => {
+                // Validate that at least one price field exists and is > 0
+                const regularPrice = variation.regularPrice && variation.regularPrice > 0 
+                    ? Number(variation.regularPrice) 
+                    : (variation.price && variation.price > 0 ? Number(variation.price) : null);
+                const salePrice = variation.salePrice && variation.salePrice > 0 
+                    ? Number(variation.salePrice) 
+                    : null;
+                
+                // Ensure we have a valid price - don't default to 0
+                if (!regularPrice && !salePrice) {
+                    throw new Error(`Variation must have a valid price (regularPrice or price). Variation attributes: ${JSON.stringify(variation.attributes || [])}`);
+                }
+                
+                // Calculate current price (sale price if active, otherwise regular price)
+                let currentPrice = regularPrice;
+                if (salePrice && regularPrice && salePrice < regularPrice) {
+                    // Check if sale is active
+                    const now = new Date();
+                    const saleStart = variation.saleStartDate ? new Date(variation.saleStartDate) : null;
+                    const saleEnd = variation.saleEndDate ? new Date(variation.saleEndDate) : null;
+                    const isSaleActive = (!saleStart || saleStart <= now) && (!saleEnd || saleEnd >= now);
+                    
+                    if (isSaleActive) {
+                        currentPrice = salePrice;
+                    }
+                }
+                
+                return {
+                    ...variation,
+                    // Ensure required fields have valid values
+                    regularPrice: regularPrice || currentPrice,
+                    price: currentPrice,
+                    salePrice: salePrice || null,
+                    stock: variation.stock || 0,
+                    stockStatus: variation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock'),
+                    manageStock: variation.manageStock !== false,
+                    isActive: variation.isActive !== false,
+                    isDefault: variation.isDefault || false,
                 // Normalize variation attributes to ensure proper structure
                 attributes: (variation.attributes || []).map(attr => ({
                     name: attr.name || attr,
@@ -460,7 +489,8 @@ export async function createProduct(request, response) {
                     value: attr.value || attr.label || attr,
                     valueSlug: attr.valueSlug || (attr.value || attr.label || attr).toLowerCase().replace(/[^a-z0-9]+/g, '-')
                 }))
-            })),
+                };
+            }),
             // Legacy fields for backward compatibility
             price: pricingData.price,
             oldPrice: pricingData.regularPrice,
@@ -1642,22 +1672,83 @@ export async function updateProduct(request, response) {
 
             // Normalize variations
             if (request.body.variations && Array.isArray(request.body.variations)) {
-                updateData.variations = request.body.variations.map(variation => ({
-                    ...variation,
-                    regularPrice: variation.regularPrice || variation.price || 0,
-                    price: variation.price || variation.regularPrice || variation.salePrice || 0,
-                    stock: variation.stock || 0,
-                    stockStatus: variation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock'),
-                    manageStock: variation.manageStock !== false,
-                    isActive: variation.isActive !== false,
-                    isDefault: variation.isDefault || false,
-                    attributes: (variation.attributes || []).map(attr => ({
-                        name: attr.name || attr,
-                        slug: attr.slug || (attr.name || attr).toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-                        value: attr.value || attr.label || attr,
-                        valueSlug: attr.valueSlug || (attr.value || attr.label || attr).toLowerCase().replace(/[^a-z0-9]+/g, '-')
-                    }))
-                }));
+                updateData.variations = request.body.variations.map(variation => {
+                    // Validate that at least one price field exists and is > 0
+                    const regularPrice = variation.regularPrice && variation.regularPrice > 0 
+                        ? Number(variation.regularPrice) 
+                        : (variation.price && variation.price > 0 ? Number(variation.price) : null);
+                    const salePrice = variation.salePrice && variation.salePrice > 0 
+                        ? Number(variation.salePrice) 
+                        : null;
+                    
+                    // If updating existing variation, try to preserve existing price if new price is missing
+                    if (!regularPrice && !salePrice) {
+                        const existingVariation = existingProduct.variations?.find(v => 
+                            v._id?.toString() === variation._id?.toString() || 
+                            v.id?.toString() === variation._id?.toString()
+                        );
+                        if (existingVariation) {
+                            const existingRegularPrice = existingVariation.regularPrice && existingVariation.regularPrice > 0 
+                                ? Number(existingVariation.regularPrice) 
+                                : (existingVariation.price && existingVariation.price > 0 ? Number(existingVariation.price) : null);
+                            if (existingRegularPrice) {
+                                return {
+                                    ...variation,
+                                    regularPrice: existingRegularPrice,
+                                    price: existingRegularPrice,
+                                    salePrice: existingVariation.salePrice && existingVariation.salePrice > 0 ? Number(existingVariation.salePrice) : null,
+                                    stock: variation.stock !== undefined ? variation.stock : existingVariation.stock || 0,
+                                    stockStatus: variation.stockStatus || existingVariation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock'),
+                                    manageStock: variation.manageStock !== undefined ? variation.manageStock : existingVariation.manageStock !== false,
+                                    isActive: variation.isActive !== undefined ? variation.isActive : existingVariation.isActive !== false,
+                                    isDefault: variation.isDefault || existingVariation.isDefault || false,
+                                    attributes: (variation.attributes || existingVariation.attributes || []).map(attr => ({
+                                        name: attr.name || attr,
+                                        slug: attr.slug || (attr.name || attr).toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                                        value: attr.value || attr.label || attr,
+                                        valueSlug: attr.valueSlug || (attr.value || attr.label || attr).toLowerCase().replace(/[^a-z0-9]+/g, '-')
+                                    }))
+                                };
+                            }
+                        }
+                        // If no existing price found, skip this variation (don't add with 0 price)
+                        console.warn(`Skipping variation with no valid price. Variation attributes: ${JSON.stringify(variation.attributes || [])}`);
+                        return null;
+                    }
+                    
+                    // Calculate current price (sale price if active, otherwise regular price)
+                    let currentPrice = regularPrice;
+                    if (salePrice && regularPrice && salePrice < regularPrice) {
+                        // Check if sale is active
+                        const now = new Date();
+                        const saleStart = variation.saleStartDate ? new Date(variation.saleStartDate) : null;
+                        const saleEnd = variation.saleEndDate ? new Date(variation.saleEndDate) : null;
+                        const isSaleActive = (!saleStart || saleStart <= now) && (!saleEnd || saleEnd >= now);
+                        
+                        if (isSaleActive) {
+                            currentPrice = salePrice;
+                        }
+                    }
+                    
+                    return {
+                        ...variation,
+                        // Ensure required fields have valid values
+                        regularPrice: regularPrice || currentPrice,
+                        price: currentPrice,
+                        salePrice: salePrice || null,
+                        stock: variation.stock || 0,
+                        stockStatus: variation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock'),
+                        manageStock: variation.manageStock !== false,
+                        isActive: variation.isActive !== false,
+                        isDefault: variation.isDefault || false,
+                        attributes: (variation.attributes || []).map(attr => ({
+                            name: attr.name || attr,
+                            slug: attr.slug || (attr.name || attr).toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                            value: attr.value || attr.label || attr,
+                            valueSlug: attr.valueSlug || (attr.value || attr.label || attr).toLowerCase().replace(/[^a-z0-9]+/g, '-')
+                        }))
+                    };
+                }).filter(v => v !== null); // Remove variations with no valid price
             }
 
             // Ensure attributes are populated from variations if needed

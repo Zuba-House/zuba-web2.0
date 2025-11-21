@@ -462,20 +462,37 @@ const ProductVariations = ({ product, onVariationSelect, selectedVariation }) =>
             <div>
               <span className="text-[12px] text-gray-500">Price:</span>
               <div className="flex items-center gap-2">
-                {currentVariation.salePrice && currentVariation.salePrice < currentVariation.regularPrice ? (
-                  <>
-                    <span className="oldPrice line-through text-gray-500 text-[16px] font-[500]">
-                      {formatCurrency(currentVariation.regularPrice)}
-                    </span>
+                {(() => {
+                  const regularPrice = currentVariation.regularPrice && currentVariation.regularPrice > 0 
+                    ? currentVariation.regularPrice 
+                    : (currentVariation.price && currentVariation.price > 0 ? currentVariation.price : null);
+                  const salePrice = currentVariation.salePrice && currentVariation.salePrice > 0 
+                    ? currentVariation.salePrice 
+                    : null;
+                  
+                  if (!regularPrice && !salePrice) {
+                    return <span className="price text-red-500 text-[16px] font-[600]">Price not available</span>;
+                  }
+                  
+                  if (salePrice && regularPrice && salePrice < regularPrice) {
+                    return (
+                      <>
+                        <span className="oldPrice line-through text-gray-500 text-[16px] font-[500]">
+                          {formatCurrency(regularPrice)}
+                        </span>
+                        <span className="price text-primary text-[18px] font-[600]">
+                          {formatCurrency(salePrice)}
+                        </span>
+                      </>
+                    );
+                  }
+                  
+                  return (
                     <span className="price text-primary text-[18px] font-[600]">
-                      {formatCurrency(currentVariation.salePrice)}
+                      {formatCurrency(regularPrice)}
                     </span>
-                  </>
-                ) : (
-                  <span className="price text-primary text-[18px] font-[600]">
-                    {formatCurrency(currentVariation.regularPrice || currentVariation.price)}
-                  </span>
-                )}
+                  );
+                })()}
               </div>
             </div>
             

@@ -777,13 +777,21 @@ ProductSchema.methods.calculatePriceRange = function() {
     return;
   }
   
+  // Get valid prices from active variations (filter out 0, null, undefined)
   const prices = this.variations
-    .filter(v => v.isActive)
-    .map(v => v.price);
+    .filter(v => v.isActive && v.price && v.price > 0)
+    .map(v => Number(v.price))
+    .filter(price => !isNaN(price) && price > 0);
   
   if (prices.length > 0) {
     this.priceRange.min = Math.min(...prices);
     this.priceRange.max = Math.max(...prices);
+    // Also update the product price to the minimum variation price for display
+    this.price = this.priceRange.min;
+  } else {
+    // If no valid prices, set to null or keep existing price
+    this.priceRange.min = null;
+    this.priceRange.max = null;
   }
 };
 

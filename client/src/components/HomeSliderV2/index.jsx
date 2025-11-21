@@ -72,7 +72,32 @@ const HomeBannerV2 = (props) => {
                         className="text-primary text-[16px] lg:text-[30px] 
                         font-[700] block lg:inline w-full lg:w-max"
                       >
-                        {formatCurrency(item?.price)}
+                        {(() => {
+                          // For variable products, use price range minimum
+                          if (item?.productType === 'variable' || item?.type === 'variable') {
+                            if (item?.variations && Array.isArray(item.variations) && item.variations.length > 0) {
+                              const validPrices = item.variations
+                                .filter(v => v && (v.isActive !== false))
+                                .map(v => {
+                                  const salePrice = v.salePrice && v.salePrice > 0 ? v.salePrice : null;
+                                  const regularPrice = v.regularPrice && v.regularPrice > 0 ? v.regularPrice : (v.price && v.price > 0 ? v.price : null);
+                                  return salePrice && regularPrice && salePrice < regularPrice ? salePrice : regularPrice;
+                                })
+                                .filter(p => p && p > 0);
+                              
+                              if (validPrices.length > 0) {
+                                return formatCurrency(Math.min(...validPrices));
+                              }
+                            }
+                            // Fallback to priceRange if available
+                            if (item?.priceRange?.min && item.priceRange.min > 0) {
+                              return formatCurrency(item.priceRange.min);
+                            }
+                          }
+                          // For simple products or fallback
+                          const displayPrice = item?.price || item?.pricing?.price || item?.pricing?.regularPrice || 0;
+                          return formatCurrency(displayPrice > 0 ? displayPrice : 0);
+                        })()}
                       </span>
                     </h3>
 

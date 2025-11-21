@@ -9,26 +9,54 @@
  * @returns {number} - Current price
  */
 export const getCurrentPrice = (item) => {
-  if (!item) return 0;
+  if (!item) return null;
 
-  // Check for sale price first
-  if (item.salePrice && item.salePrice < (item.regularPrice || item.price)) {
-    return Number(item.salePrice);
+  let price = null;
+
+  // Check for sale price first (if valid and active)
+  if (item.salePrice && item.salePrice > 0) {
+    const regularPrice = item.regularPrice || item.price;
+    if (regularPrice && regularPrice > 0 && item.salePrice < regularPrice) {
+      // Check if sale is active (if dates are provided)
+      const now = new Date();
+      const saleStart = item.saleStartDate ? new Date(item.saleStartDate) : null;
+      const saleEnd = item.saleEndDate ? new Date(item.saleEndDate) : null;
+      
+      const isSaleActive = (!saleStart || saleStart <= now) && (!saleEnd || saleEnd >= now);
+      
+      if (isSaleActive) {
+        price = Number(item.salePrice);
+      } else {
+        price = Number(regularPrice);
+      }
+    } else if (regularPrice && regularPrice > 0) {
+      price = Number(regularPrice);
+    }
   }
 
   // Check pricing object
-  if (item.pricing?.salePrice && item.pricing.salePrice < item.pricing.regularPrice) {
-    return Number(item.pricing.salePrice);
+  if (!price && item.pricing) {
+    if (item.pricing.salePrice && item.pricing.salePrice > 0 && 
+        item.pricing.regularPrice && item.pricing.regularPrice > 0 &&
+        item.pricing.salePrice < item.pricing.regularPrice) {
+      price = Number(item.pricing.salePrice);
+    } else if (item.pricing.regularPrice && item.pricing.regularPrice > 0) {
+      price = Number(item.pricing.regularPrice);
+    } else if (item.pricing.price && item.pricing.price > 0) {
+      price = Number(item.pricing.price);
+    }
   }
 
-  // Fallback to regular price
-  return Number(
-    item.price || 
-    item.regularPrice || 
-    item.pricing?.regularPrice || 
-    item.pricing?.price || 
-    0
-  );
+  // Fallback to regular price fields
+  if (!price) {
+    const regularPrice = item.regularPrice || item.price;
+    if (regularPrice && regularPrice > 0) {
+      price = Number(regularPrice);
+    }
+  }
+
+  // Return null instead of 0 if no valid price found
+  return price && price > 0 ? price : null;
 };
 
 /**
@@ -199,7 +227,13 @@ export const getPriceRange = (product) => {
 
   if (product.variations.length === 0) return null;
 
-  const prices = product.variations.map(v => getCurrentPrice(v));
+  // Get valid prices from variations (filter out 0, null, undefined)
+  const prices = product.variations
+    .filter(v => v && (v.isActive !== false))
+    .map(v => getCurrentPrice(v))
+    .filter(price => price && price > 0 && !isNaN(price));
+
+  if (prices.length === 0) return null;
 
   return {
     min: Math.min(...prices),
