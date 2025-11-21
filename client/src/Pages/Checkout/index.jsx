@@ -19,12 +19,17 @@ const Checkout = () => {
   const [userData, setUserData] = useState(null);
   const [isChecked, setIsChecked] = useState(0);
   const [selectedAddress, setSelectedAddress] = useState("");
+  const [selectedAddressData, setSelectedAddressData] = useState(null);
   // numeric total for server payloads
   const [totalAmount, setTotalAmount] = useState(0);
   const [showStripeForm, setShowStripeForm] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [isProcessingOrder, setIsProcessingOrder] = useState(false); // Prevent double-click on order creation
   const [selectedShippingRate, setSelectedShippingRate] = useState(null);
+  const [shippingOptions, setShippingOptions] = useState([]);
+  const [loadingShipping, setLoadingShipping] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const context = useContext(MyContext);
 
   const history = useNavigate();
@@ -32,20 +37,36 @@ const Checkout = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    setUserData(context?.userData)
-    setSelectedAddress(context?.userData?.address_details[0]?._id);
+    setUserData(context?.userData);
     
-    // Get shipping rate from location state (passed from Cart page)
-    if (location.state?.selectedShippingRate) {
-      setSelectedShippingRate(location.state.selectedShippingRate);
-    } else if (!selectedShippingRate && context?.cartData?.length > 0) {
-      // Redirect user back to cart if they navigated directly to checkout without shipping
-      context?.alertBox("error", "Please enter shipping address in cart first");
-      setTimeout(() => {
-        history("/cart");
-      }, 2000);
+    // Set initial address if available
+    if (context?.userData?.address_details?.[0]) {
+      const firstAddress = context.userData.address_details[0];
+      setSelectedAddress(firstAddress._id);
+      setSelectedAddressData(firstAddress);
+      
+      // Set phone from address if available
+      if (firstAddress?.contactInfo?.phone) {
+        setPhone(firstAddress.contactInfo.phone);
+      }
     }
-  }, [context?.userData, userData, location.state])
+    
+    // Get shipping rate from location state (passed from Cart page) - fallback
+    if (location.state?.selectedShippingRate && !selectedShippingRate) {
+      setSelectedShippingRate(location.state.selectedShippingRate);
+    }
+  }, [context?.userData, location.state]);
+
+  // Calculate shipping when address is selected and cart is available
+  useEffect(() => {
+    if (selectedAddressData && context?.cartData?.length > 0 && !loadingShipping) {
+      // Use a small delay to avoid multiple calls
+      const timer = setTimeout(() => {
+        calculateShipping(selectedAddressData);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedAddressData?._id, context?.cartData?.length]);
 
 
   useEffect(() => {
@@ -53,7 +74,7 @@ const Checkout = () => {
       context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
         .reduce((sum, value) => sum + value, 0) : 0;
     
-    const shippingCost = selectedShippingRate ? selectedShippingRate.cost : 0;
+    const shippingCost = selectedShippingRate ? (selectedShippingRate.cost || selectedShippingRate.price || 0) : 0;
     const total = subtotal + shippingCost;
     
     // keep numeric for backend; format only when rendering
@@ -76,9 +97,132 @@ const Checkout = () => {
   const handleChange = (e, index) => {
     if (e.target.checked) {
       setIsChecked(index);
-      setSelectedAddress(e.target.value)
+      const addressId = e.target.value;
+      setSelectedAddress(addressId);
+      
+      // Get full address data
+      const address = userData?.address_details?.find(addr => addr._id === addressId);
+      setSelectedAddressData(address);
+      
+      // Set phone from address if available
+      if (address?.contactInfo?.phone) {
+        setPhone(address.contactInfo.phone);
+        setPhoneError('');
+      }
+      
+      // Calculate shipping for this address
+      if (address && context?.cartData?.length > 0) {
+        calculateShipping(address);
+      }
     }
   }
+
+  // Calculate shipping using new comprehensive calculator
+  const calculateShipping = async (address) => {
+    if (!address || !context?.cartData || context.cartData.length === 0) {
+      return;
+    }
+
+    setLoadingShipping(true);
+    
+    try {
+      // Prepare shipping address for calculator
+      const shippingAddress = {
+        countryCode: address?.address?.countryCode || address?.countryCode || 'CA',
+        country: address?.address?.country || address?.country || 'Canada',
+        province: address?.address?.provinceCode || address?.provinceCode || address?.address?.province || address?.province || '',
+        city: address?.address?.city || address?.city || '',
+        postalCode: address?.address?.postalCode || address?.postalCode || ''
+      };
+
+      // Fetch product data for cart items to get category and weight
+      const cartItemsWithProducts = await Promise.all(
+        context.cartData.map(async (item) => {
+          try {
+            // Try to get product data if not already available
+            let productData = item.product;
+            if (!productData && item.productId) {
+              const productResponse = await fetchDataFromApi(`/api/product/${item.productId}`);
+              productData = productResponse?.product || productResponse;
+            }
+            
+            return {
+              product: productData || {},
+              productId: item.productId,
+              quantity: item.quantity || 1,
+              price: item.price
+            };
+          } catch (error) {
+            console.warn('Error fetching product data:', error);
+            return {
+              product: {},
+              productId: item.productId,
+              quantity: item.quantity || 1,
+              price: item.price
+            };
+          }
+        })
+      );
+
+      const response = await postData('/api/shipping/calculate', {
+        cartItems: cartItemsWithProducts,
+        shippingAddress: shippingAddress
+      });
+
+      if (response?.success && response?.options && response.options.length > 0) {
+        setShippingOptions(response.options);
+        // Auto-select first option (usually standard)
+        const selectedOption = {
+          ...response.options[0],
+          cost: response.options[0].price
+        };
+        setSelectedShippingRate(selectedOption);
+      } else {
+        setShippingOptions([]);
+        setSelectedShippingRate(null);
+        if (response?.message) {
+          context?.alertBox("error", response.message);
+        }
+      }
+    } catch (error) {
+      console.error('Shipping calculation error:', error);
+      setShippingOptions([]);
+      setSelectedShippingRate(null);
+      context?.alertBox("error", "Failed to calculate shipping rates. Please try again.");
+    } finally {
+      setLoadingShipping(false);
+    }
+  };
+
+  // Validate phone number
+  const validatePhone = async (phoneNumber) => {
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      setPhoneError('Phone number is required');
+      return false;
+    }
+
+    try {
+      const response = await postData('/api/shipping/validate-phone', {
+        phone: phoneNumber,
+        country: selectedAddressData?.address?.countryCode || 'CA'
+      });
+
+      if (response?.success && response?.valid) {
+        setPhoneError('');
+        if (response?.formatted) {
+          setPhone(response.formatted);
+        }
+        return true;
+      } else {
+        setPhoneError(response?.message || 'Invalid phone number format');
+        return false;
+      }
+    } catch (error) {
+      console.error('Phone validation error:', error);
+      setPhoneError('Unable to validate phone number');
+      return false;
+    }
+  };
 
 
 
@@ -130,8 +274,21 @@ const Checkout = () => {
     }
 
     // Validate shipping address and rate
-    if (!selectedShippingRate || !selectedShippingRate.cost) {
-      context?.alertBox("error", "Please go back to cart and enter a shipping address to calculate shipping rates");
+    if (!selectedShippingRate || (!selectedShippingRate.cost && !selectedShippingRate.price)) {
+      context?.alertBox("error", "Please select a shipping method");
+      return;
+    }
+
+    // Validate phone number
+    if (!phone || phone.trim() === '') {
+      context?.alertBox("error", "Phone number is required for shipping");
+      setPhoneError('Phone number is required');
+      return;
+    }
+
+    const phoneValid = await validatePhone(phone);
+    if (!phoneValid) {
+      context?.alertBox("error", "Please enter a valid phone number");
       return;
     }
 
@@ -148,7 +305,7 @@ const Checkout = () => {
     const subtotal = context.cartData?.length > 0
       ? context.cartData.map(item => parseFloat(item.price || 0) * (item.quantity || 0)).reduce((a, b) => a + b, 0)
       : 0;
-    const shippingCost = selectedShippingRate ? selectedShippingRate.cost : 0;
+    const shippingCost = selectedShippingRate ? (selectedShippingRate.cost || selectedShippingRate.price || 0) : 0;
     const finalTotal = subtotal + shippingCost;
     
     console.log('Order creation - Amounts:', {
@@ -168,6 +325,7 @@ const Checkout = () => {
       totalAmt: finalTotal, // Use calculated total with shipping
       shippingCost: shippingCost,
       shippingRate: selectedShippingRate,
+      phone: phone, // Include phone number
       date: new Date().toLocaleString("en-US", {
         month: "short",
         day: "2-digit",
@@ -374,6 +532,99 @@ const Checkout = () => {
 
               </div>
 
+              {/* Phone Number - REQUIRED */}
+              {selectedAddress && selectedAddressData && (
+                <div className="mt-4">
+                  <label htmlFor="phone" className="block text-[14px] font-[600] mb-2">
+                    Phone Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    value={phone}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      setPhoneError('');
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value) {
+                        validatePhone(e.target.value);
+                      }
+                    }}
+                    placeholder="+1-613-555-0100"
+                    required
+                    className={`w-full px-4 py-2.5 border rounded-md text-[14px] focus:outline-none focus:ring-2 focus:ring-primary ${
+                      phoneError ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  />
+                  {phoneError && (
+                    <span className="text-red-500 text-[12px] mt-1 block">{phoneError}</span>
+                  )}
+                  <small className="text-gray-600 text-[12px] mt-1 block">
+                    Required for shipping label. Format: +1-XXX-XXX-XXXX
+                  </small>
+                </div>
+              )}
+
+              {/* Shipping Options */}
+              {selectedAddress && selectedAddressData && (
+                <div className="mt-4">
+                  <h3 className="text-[16px] font-[600] mb-3">Shipping Method</h3>
+                  
+                  {loadingShipping ? (
+                    <div className="flex items-center justify-center py-4">
+                      <CircularProgress size={24} />
+                      <span className="ml-2 text-[14px] text-gray-600">Calculating shipping...</span>
+                    </div>
+                  ) : shippingOptions.length > 0 ? (
+                    <div className="flex flex-col gap-3">
+                      {shippingOptions.map((option) => (
+                        <div
+                          key={option.id}
+                          onClick={() => {
+                            setSelectedShippingRate({
+                              ...option,
+                              cost: option.price
+                            });
+                          }}
+                          className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                            selectedShippingRate?.id === option.id
+                              ? 'border-primary bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-[18px]">{option.icon}</span>
+                                <strong className="text-[15px] font-[600]">{option.name}</strong>
+                              </div>
+                              <p className="text-[13px] text-gray-600 mb-1">{option.description}</p>
+                              <p className="text-[12px] text-green-600 font-[500] mb-1">
+                                Estimated: {option.estimatedDelivery}
+                              </p>
+                              <p className="text-[12px] text-gray-500">{option.deliveryDays}</p>
+                            </div>
+                            <div className="text-right ml-4">
+                              <strong className="text-[20px] font-[700] text-primary">
+                                {formatCurrency(option.price)}
+                              </strong>
+                              <p className="text-[12px] text-gray-500">{option.currency}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-[14px] text-yellow-800">
+                        No shipping options available. Please check your address or try again.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
             </div>
           </div>
@@ -433,9 +684,9 @@ const Checkout = () => {
                   <span className="text-[14px] font-[500]">Shipping</span>
                   <span className="text-[14px] font-[600]">
                     {selectedShippingRate ? (
-                      formatCurrency(selectedShippingRate.cost)
+                      formatCurrency(selectedShippingRate.cost || selectedShippingRate.price || 0)
                     ) : (
-                      <span className="text-gray-400">Not calculated</span>
+                      <span className="text-gray-400">Select address</span>
                     )}
                   </span>
                 </div>
@@ -477,7 +728,7 @@ const Checkout = () => {
                                   .map((item) => (item.price || 0) * (item.quantity || 0))
                                   .reduce((a, b) => a + b, 0)
                                 : 0;
-                              const shippingCost = selectedShippingRate ? selectedShippingRate.cost : 0;
+                              const shippingCost = selectedShippingRate ? (selectedShippingRate.cost || selectedShippingRate.price || 0) : 0;
                               const total = subtotal + shippingCost;
                               const amount = parseFloat(total?.toFixed(2)) || 0;
                               return amount > 0 ? amount : 0;

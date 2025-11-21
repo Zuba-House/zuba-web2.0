@@ -61,6 +61,25 @@ export const createOrderController = async (request, response) => {
             finalTotal
         });
 
+        // Update address with phone number if provided
+        if (request.body.phone && request.body.delivery_address) {
+            try {
+                const address = await AddressModel.findById(request.body.delivery_address);
+                if (address) {
+                    // Update phone in address contactInfo
+                    if (!address.contactInfo) {
+                        address.contactInfo = {};
+                    }
+                    address.contactInfo.phone = request.body.phone;
+                    await address.save();
+                    console.log('✅ Phone number updated in address:', request.body.delivery_address);
+                }
+            } catch (addressError) {
+                console.warn('⚠️ Could not update phone in address:', addressError.message);
+                // Continue with order creation even if address update fails
+            }
+        }
+
         let order = new OrderModel({
             userId: request.body.userId || null,
             products: request.body.products,

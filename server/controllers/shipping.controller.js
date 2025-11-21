@@ -1,6 +1,7 @@
 import { stallionAPI, WAREHOUSE } from '../config/stallion.js';
 import ShippingCalculator from '../utils/shippingCalculator.js';
 import RegionShippingCalculator from '../utils/regionShippingCalculator.js';
+import * as shippingCalculatorService from '../services/shipping-calculator.service.js';
 
 /**
  * Get live shipping rates with fallback
@@ -396,6 +397,75 @@ export const trackShipment = async (req, res) => {
         message: 'Failed to track shipment: ' + (error.message || 'Unknown error')
       });
     }
+  }
+};
+
+/**
+ * Calculate shipping rates using comprehensive calculator
+ * POST /api/shipping/calculate
+ */
+export const calculateShippingRates = async (req, res) => {
+  try {
+    const { cartItems, shippingAddress } = req.body;
+
+    // Validate
+    if (!cartItems || cartItems.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cart items are required'
+      });
+    }
+
+    if (!shippingAddress) {
+      return res.status(400).json({
+        success: false,
+        message: 'Shipping address is required'
+      });
+    }
+
+    // Calculate shipping
+    const result = shippingCalculatorService.calculateShipping(cartItems, shippingAddress);
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('Calculate shipping rates error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to calculate shipping rates',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Validate phone number
+ * POST /api/shipping/validate-phone
+ */
+export const validatePhone = async (req, res) => {
+  try {
+    const { phone, country } = req.body;
+
+    const isValid = shippingCalculatorService.validatePhoneNumber(phone);
+    
+    if (isValid) {
+      const formatted = shippingCalculatorService.formatPhoneNumber(phone, country || 'CA');
+      return res.status(200).json({
+        success: true,
+        valid: true,
+        formatted: formatted
+      });
+    } else {
+      return res.status(200).json({
+        success: true,
+        valid: false,
+        message: 'Invalid phone number format'
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Phone validation failed'
+    });
   }
 };
 
