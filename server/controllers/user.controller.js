@@ -63,7 +63,7 @@ export async function registerUserController(request, response) {
         console.log('📧 Sending OTP email to:', email);
         const emailSent = await sendEmailFun({
             sendTo: email,
-            subject: "Verify email from Ecommerce App",
+            subject: "Verify Your Email - Zuba House",
             text: "",
             html: VerificationEmail(name, verifyCode)
         });
@@ -503,7 +503,7 @@ export async function forgotPasswordController(request, response) {
             console.log('📧 Sending forgot password OTP email to:', email);
             const emailSent = await sendEmailFun({
                 sendTo: email,
-                subject: "Verify OTP from Ecommerce App",
+                subject: "Password Reset OTP - Zuba House",
                 text: "",
                 html: VerificationEmail(user.name, verifyCode)
             });

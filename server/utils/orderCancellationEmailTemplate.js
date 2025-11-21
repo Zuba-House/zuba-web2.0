@@ -24,7 +24,7 @@ const OrderCancellationEmail = (username, order, cancellationReason = '') => {
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
         .header {
-            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            background: linear-gradient(135deg, #0b2735 0%, #1a3d52 100%);
             color: white;
             padding: 30px 20px;
             text-align: center;

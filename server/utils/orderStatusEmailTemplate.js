@@ -125,7 +125,7 @@ const OrderStatusEmailTemplate = (order, newStatus) => {
         }
         .order-details h3 {
             margin-top: 0;
-            color: #2c3e50;
+            color: #0b2735;
             font-size: 18px;
         }
         .order-details table {
@@ -162,7 +162,7 @@ const OrderStatusEmailTemplate = (order, newStatus) => {
         }
         .product-name {
             font-weight: 600;
-            color: #2c3e50;
+            color: #0b2735;
             margin-bottom: 5px;
         }
         .product-details {
@@ -191,7 +191,7 @@ const OrderStatusEmailTemplate = (order, newStatus) => {
             margin-top: 20px;
         }
         .footer {
-            background: #2c3e50;
+            background: #0b2735;
             color: white;
             padding: 30px;
             text-align: center;

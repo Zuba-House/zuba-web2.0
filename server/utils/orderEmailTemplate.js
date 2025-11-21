@@ -58,7 +58,7 @@ const OrderConfirmationEmail = (username, orders) => {
             }
         }
         .header {
-            background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
+            background: linear-gradient(135deg, #0b2735 0%, #1a3d52 100%);
             color: white;
             padding: 30px 20px;
             text-align: center;

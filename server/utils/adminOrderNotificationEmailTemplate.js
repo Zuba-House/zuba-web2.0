@@ -88,7 +88,7 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
             }
         }
         .header {
-            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            background: linear-gradient(135deg, #0b2735 0%, #1a3d52 100%);
             color: white;
             padding: 30px 20px;
             text-align: center;
@@ -129,13 +129,13 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
             padding: 20px;
             border-radius: 8px;
             margin: 20px 0;
-            border-left: 4px solid #2c3e50;
+            border-left: 4px solid #0b2735;
         }
         .info-section h3 {
             margin: 0 0 15px 0;
-            color: #2c3e50;
+            color: #0b2735;
             font-size: 18px;
-            border-bottom: 2px solid #2c3e50;
+            border-bottom: 2px solid #0b2735;
             padding-bottom: 8px;
         }
         .info-row {
@@ -149,12 +149,12 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
         }
         .info-label {
             font-weight: 600;
-            color: #2c3e50;
+            color: #0b2735;
             width: 180px;
             flex-shrink: 0;
         }
         .info-value {
-            color: #1a252f;
+            color: #1a3d52;
             flex: 1;
             word-break: break-word;
         }
@@ -190,7 +190,7 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
         .order-details th {
-            background: #2c3e50;
+            background: #0b2735;
             color: white;
             padding: 12px;
             text-align: left;
@@ -237,7 +237,7 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
             .order-details td:before {
                 content: attr(data-label);
                 font-weight: 600;
-                color: #2c3e50;
+                color: #0b2735;
                 display: block;
                 margin-bottom: 5px;
             }
@@ -255,7 +255,7 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
         }
         .order-details tr.total-row td {
             font-size: 16px;
-            color: #2c3e50;
+            color: #0b2735;
             padding: 15px 12px;
         }
         .product-variations {
@@ -270,7 +270,7 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
             margin-top: 2px;
         }
         .footer {
-            background: #2c3e50;
+            background: #0b2735;
             color: white;
             text-align: center;
             padding: 20px;
@@ -383,7 +383,7 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
                 </div>
             </div>
 
-            <h3 style="color: #2c3e50; margin: 30px 0 15px 0; font-size: 20px;">🛍️ Order Items</h3>
+            <h3 style="color: #0b2735; margin: 30px 0 15px 0; font-size: 20px;">🛍️ Order Items</h3>
             <table class="order-details">
                 <thead>
                     <tr>
