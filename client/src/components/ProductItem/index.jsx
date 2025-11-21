@@ -246,11 +246,15 @@ const ProductItem = (props) => {
 
   // Helper functions for stock status
   const getProductStock = () => {
-    // For variable products, get min stock from variations
+    // For variable products, get total stock from all active variations
     if (item?.productType === 'variable' || item?.type === 'variable') {
       if (Array.isArray(item?.variations) && item.variations.length > 0) {
-        const stocks = item.variations.map(v => v.stock || 0);
-        return Math.min(...stocks);
+        // Return total stock across all ACTIVE variations
+        return item.variations
+          .filter(v => v && (v.isActive !== false))
+          .reduce((total, v) => {
+            return total + Number(v.stock || 0);
+          }, 0);
       }
     }
     // For simple products
@@ -258,6 +262,22 @@ const ProductItem = (props) => {
   };
 
   const isOutOfStock = () => {
+    // For variable products, check if ANY variation is in stock
+    if (item?.productType === 'variable' || item?.type === 'variable') {
+      if (item?.variations && Array.isArray(item.variations) && item.variations.length > 0) {
+        // Product is out of stock only if ALL variations are out of stock
+        const hasInStockVariation = item.variations.some(v => {
+          if (!v || v.isActive === false) return false;
+          const stock = Number(v.stock || 0);
+          const stockStatus = v.stockStatus || (stock > 0 ? 'in_stock' : 'out_of_stock');
+          return stockStatus === 'in_stock' && stock > 0;
+        });
+        return !hasInStockVariation; // Out of stock if NO variations are in stock
+      }
+      // If no variations, consider it out of stock
+      return true;
+    }
+    // For simple products, check total stock
     return getProductStock() <= 0;
   };
 

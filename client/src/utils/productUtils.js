@@ -143,6 +143,35 @@ export const getProductStock = (product, variationId = null) => {
  * @returns {boolean}
  */
 export const isInStock = (product, variationId = null) => {
+  if (!product) return false;
+
+  // If specific variation ID provided, check only that variation
+  if (variationId && Array.isArray(product.variations)) {
+    const variation = product.variations.find(v => 
+      v._id === variationId || v.id === variationId
+    );
+    if (variation) {
+      const stock = Number(variation.stock || 0);
+      const stockStatus = variation.stockStatus || (stock > 0 ? 'in_stock' : 'out_of_stock');
+      return stockStatus === 'in_stock' && stock > 0 && (variation.isActive !== false);
+    }
+    return false;
+  }
+
+  // For variable products without specific variation, check if ANY variation is in stock
+  if (product.productType === 'variable' || product.type === 'variable') {
+    if (Array.isArray(product.variations) && product.variations.length > 0) {
+      return product.variations.some(v => {
+        if (!v || v.isActive === false) return false;
+        const stock = Number(v.stock || 0);
+        const stockStatus = v.stockStatus || (stock > 0 ? 'in_stock' : 'out_of_stock');
+        return stockStatus === 'in_stock' && stock > 0;
+      });
+    }
+    return false;
+  }
+
+  // For simple products
   return getProductStock(product, variationId) > 0;
 };
 
