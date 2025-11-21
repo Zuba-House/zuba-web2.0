@@ -53,9 +53,9 @@ const CartPage = () => {
     }
   }, [context?.userData]);
 
-  // Calculate shipping when address changes
+  // Calculate shipping when address and phone are available
   useEffect(() => {
-    if (shippingAddress?.city && shippingAddress?.countryCode && context?.cartData?.length > 0) {
+    if (shippingAddress?.city && shippingAddress?.countryCode && phone && context?.cartData?.length > 0) {
       const timer = setTimeout(() => {
         calculateShipping();
       }, 500);
@@ -64,38 +64,18 @@ const CartPage = () => {
       setShippingOptions([]);
       setSelectedShippingRate(null);
     }
-  }, [shippingAddress?.city, shippingAddress?.countryCode, shippingAddress?.province, context?.cartData?.length]);
+  }, [shippingAddress?.city, shippingAddress?.countryCode, shippingAddress?.province, shippingAddress?.postal_code, phone, context?.cartData?.length]);
 
-
-
-
-  // Calculate shipping using new comprehensive calculator
+  // Calculate shipping rates
   const calculateShipping = async () => {
-    if (!shippingAddress?.city || !shippingAddress?.countryCode || !context?.cartData?.length) {
+    if (!shippingAddress?.city || !shippingAddress?.countryCode || !phone || !context?.cartData?.length) {
       return;
     }
 
     setLoadingShipping(true);
     
     try {
-      // Prepare shipping address for calculator
-      const addressForCalc = {
-        country: shippingAddress.country || (shippingAddress.countryCode === 'CA' ? 'Canada' : shippingAddress.countryCode === 'US' ? 'United States' : ''),
-        countryCode: shippingAddress.countryCode,
-        province: shippingAddress.province,
-        city: shippingAddress.city,
-        postalCode: shippingAddress.postal_code
-      };
-
-      // 🔍 DEBUG: Log address being sent
-      console.log('🔍 [SHIPPING DEBUG] Address being sent to API:', {
-        original: shippingAddress,
-        processed: addressForCalc,
-        countryCode: addressForCalc.countryCode,
-        province: addressForCalc.province
-      });
-
-      // Fetch product data for cart items to get category and weight
+      // Prepare cart items with product data
       const cartItemsWithProducts = await Promise.all(
         context.cartData.map(async (item) => {
           try {
@@ -123,24 +103,15 @@ const CartPage = () => {
         })
       );
 
-      // 🔍 DEBUG: Log cart items
-      console.log('🔍 [SHIPPING DEBUG] Cart items with products:', cartItemsWithProducts.map(item => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        category: item.product?.category?.name || item.product?.category || 'N/A',
-        weight: item.product?.shipping?.weight || item.product?.inventory?.weight || 'N/A'
-      })));
+      // Prepare shipping address
+      const addressForCalc = {
+        ...shippingAddress,
+        phone: phone
+      };
 
       const response = await postData('/api/shipping/calculate', {
         cartItems: cartItemsWithProducts,
         shippingAddress: addressForCalc
-      });
-
-      // 🔍 DEBUG: Log API response
-      console.log('🔍 [SHIPPING DEBUG] API Response:', {
-        success: response?.success,
-        options: response?.options,
-        calculation: response?.calculation
       });
 
       if (response?.success && response?.options && response.options.length > 0) {
@@ -350,54 +321,24 @@ const CartPage = () => {
                     addressLine2: newAddress.addressLine2 || ''
                   });
                 }}
+                onPhoneChange={(phoneValue) => {
+                  setPhone(phoneValue || '');
+                  setPhoneError('');
+                }}
                 initialAddress={shippingAddress}
+                initialPhone={phone}
               />
             </div>
 
-            {/* Phone Number Input */}
-            {shippingAddress?.city && shippingAddress?.countryCode && (
-              <div className="mt-4 mb-4">
-                <label htmlFor="phone" className="block text-[14px] font-[600] mb-2">
-                  Phone Number <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  value={phone}
-                  onChange={(e) => {
-                    setPhone(e.target.value);
-                    setPhoneError('');
-                  }}
-                  onBlur={(e) => {
-                    if (e.target.value) {
-                      validatePhone(e.target.value);
-                    }
-                  }}
-                  placeholder="+1-613-555-0100"
-                  required
-                  className={`w-full px-3 py-2 border rounded-md text-[14px] focus:outline-none focus:ring-2 focus:ring-primary ${
-                    phoneError ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {phoneError && (
-                  <span className="text-red-500 text-[12px] mt-1 block">{phoneError}</span>
-                )}
-                <small className="text-gray-600 text-[12px] mt-1 block">
-                  Required for shipping label. Format: +1-XXX-XXX-XXXX
-                </small>
-              </div>
-            )}
-
             {/* Shipping Options */}
-            {context.cartData?.length > 0 && shippingAddress?.city && shippingAddress?.countryCode && (
+            {context.cartData?.length > 0 && shippingAddress?.city && shippingAddress?.countryCode && phone && (
               <div className="mt-4 mb-4">
                 <h4 className="text-[14px] font-[600] mb-3">Shipping Method</h4>
                 
                 {loadingShipping ? (
                   <div className="flex items-center justify-center py-4">
                     <CircularProgress size={20} />
-                    <span className="ml-2 text-[13px] text-gray-600">Calculating...</span>
+                    <span className="ml-2 text-[13px] text-gray-600">Calculating shipping...</span>
                   </div>
                 ) : shippingOptions.length > 0 ? (
                   <div className="flex flex-col gap-2">
@@ -419,14 +360,16 @@ const CartPage = () => {
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="text-[16px]">{option.icon}</span>
+                              <span className="text-[16px]">{option.icon || '📦'}</span>
                               <strong className="text-[14px] font-[600]">{option.name}</strong>
                             </div>
-                            <p className="text-[12px] text-gray-600 mb-1">{option.description}</p>
+                            <p className="text-[12px] text-gray-600 mb-1">{option.description || option.estimatedDelivery}</p>
                             <p className="text-[11px] text-green-600 font-[500] mb-1">
-                              Est: {option.estimatedDelivery}
+                              Est: {option.estimatedDelivery || option.deliveryDays}
                             </p>
-                            <p className="text-[11px] text-gray-500">{option.deliveryDays}</p>
+                            {option.deliveryDays && (
+                              <p className="text-[11px] text-gray-500">{option.deliveryDays}</p>
+                            )}
                           </div>
                           <div className="text-right ml-3">
                             <strong className="text-[16px] font-[700] text-primary">
@@ -440,7 +383,7 @@ const CartPage = () => {
                 ) : (
                   <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                     <p className="text-[13px] text-yellow-800">
-                      No shipping options available. Please check your address.
+                      No shipping options available. Please check your address and phone number.
                     </p>
                   </div>
                 )}
@@ -487,27 +430,47 @@ const CartPage = () => {
 
             {/* Validate address, phone, and shipping rate before allowing checkout */}
             {(() => {
+              // Address validation - all required fields must be filled
               const hasValidAddress = shippingAddress && 
                                      shippingAddress.city && 
                                      shippingAddress.city.trim() !== '' &&
                                      shippingAddress.countryCode && 
-                                     shippingAddress.countryCode.trim() !== '';
+                                     shippingAddress.countryCode.trim() !== '' &&
+                                     shippingAddress.postal_code &&
+                                     shippingAddress.postal_code.trim() !== '' &&
+                                     shippingAddress.province &&
+                                     shippingAddress.province.trim() !== '';
+              
+              // Phone validation - check if phone has at least 10 digits
+              const phoneDigits = phone ? phone.replace(/\D/g, '') : '';
               const hasPhone = phone && 
                               phone.trim() !== '' && 
                               !phoneError &&
-                              phone.length >= 10;
+                              phoneDigits.length >= 10;
+              
+              // Shipping rate validation
               const hasShippingRate = selectedShippingRate && 
                                      (selectedShippingRate.cost || selectedShippingRate.price) &&
                                      (selectedShippingRate.cost > 0 || selectedShippingRate.price > 0);
               
               const handleCheckoutClick = async () => {
-                // Validate address
+                // Validate address - REQUIRED
                 if (!hasValidAddress) {
-                  context?.alertBox("error", "Please enter a complete shipping address (city and country are required)");
+                  if (!shippingAddress?.city || shippingAddress.city.trim() === '') {
+                    context?.alertBox("error", "Please enter your city");
+                  } else if (!shippingAddress?.countryCode || shippingAddress.countryCode.trim() === '') {
+                    context?.alertBox("error", "Please select your country");
+                  } else if (!shippingAddress?.postal_code || shippingAddress.postal_code.trim() === '') {
+                    context?.alertBox("error", "Please enter your postal/zip code");
+                  } else if (!shippingAddress?.province || shippingAddress.province.trim() === '') {
+                    context?.alertBox("error", "Please enter your state/province");
+                  } else {
+                    context?.alertBox("error", "Please enter a complete shipping address");
+                  }
                   return;
                 }
                 
-                // Validate phone
+                // Validate phone - REQUIRED
                 if (!hasPhone) {
                   if (!phone || phone.trim() === '') {
                     context?.alertBox("error", "Please enter your phone number");
@@ -521,7 +484,7 @@ const CartPage = () => {
                 
                 // Validate shipping rate
                 if (!hasShippingRate) {
-                  context?.alertBox("error", "Please wait for shipping rates to calculate. Make sure your address is complete.");
+                  context?.alertBox("error", "Please wait for shipping rates to calculate. Make sure your address and phone number are complete.");
                   return;
                 }
                 
@@ -540,7 +503,8 @@ const CartPage = () => {
                 });
               };
               
-              if (!hasValidAddress || !hasPhone || !hasShippingRate) {
+              // Disable checkout if address or phone is missing
+              if (!hasValidAddress || !hasPhone) {
                 return (
                   <Button 
                     className="btn-org btn-lg w-full flex gap-2" 
@@ -549,7 +513,7 @@ const CartPage = () => {
                     style={{ opacity: 0.6, cursor: 'not-allowed' }}
                   >
                     <BsFillBagCheckFill className="text-[20px]" /> 
-                    {!hasValidAddress ? "⚠️ Enter Shipping Address" : !hasPhone ? "⚠️ Enter Phone Number" : "⏳ Calculating Shipping..."}
+                    {!hasValidAddress ? "⚠️ Complete Shipping Address Required" : !hasPhone ? "⚠️ Phone Number Required" : "⚠️ Complete Required Fields"}
                   </Button>
                 );
               }

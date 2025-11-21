@@ -1,292 +1,63 @@
-import { stallionAPI, WAREHOUSE } from '../config/stallion.js';
-import ShippingCalculator from '../utils/shippingCalculator.js';
-import RegionShippingCalculator from '../utils/regionShippingCalculator.js';
-import * as shippingCalculatorService from '../services/shipping-calculator.service.js';
+import { WAREHOUSE } from '../config/stallion.js';
+import * as shippingService from '../services/shipping.service.js';
 
 /**
- * Get live shipping rates with fallback
+ * Get shipping rates
+ * POST /api/shipping/rates
  */
 export const getShippingRates = async (req, res) => {
   try {
     const { cartItems, shippingAddress } = req.body;
 
-    console.log('Shipping rates request:', {
-      cartItemsCount: cartItems?.length,
-      hasShippingAddress: !!shippingAddress,
-      shippingAddress: shippingAddress ? {
-        city: shippingAddress.city || shippingAddress.address?.city,
-        country: shippingAddress.countryCode || shippingAddress.country || shippingAddress.address?.countryCode,
-        postalCode: shippingAddress.postal_code || shippingAddress.postalCode || shippingAddress.address?.postalCode
-      } : null
-    });
-
-    // Validation
+    // Validate
     if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Cart is empty or invalid'
+        message: 'Cart items are required'
       });
     }
 
-    // Worldwide support - need at least city and country (postal code optional for some countries)
-    const hasPostalCode = shippingAddress?.postal_code || 
-                         shippingAddress?.postalCode ||
-                         shippingAddress?.address?.postalCode;
-    const hasCity = shippingAddress?.city || shippingAddress?.address?.city;
-    const hasCountry = shippingAddress?.countryCode || 
-                      shippingAddress?.country ||
-                      shippingAddress?.address?.countryCode;
-    
-    console.log('Address validation:', {
-      hasCity: !!hasCity,
-      hasCountry: !!hasCountry,
-      hasPostalCode: !!hasPostalCode,
-      city: hasCity,
-      country: hasCountry,
-      postalCode: hasPostalCode
-    });
-    
-    if (!hasCity || !hasCountry) {
-      console.error('Missing required address fields:', {
-        city: hasCity,
-        country: hasCountry,
-        shippingAddress: shippingAddress
-      });
+    if (!shippingAddress) {
       return res.status(400).json({
         success: false,
-        message: 'City and country are required for shipping calculation. Please enter a complete address.'
+        message: 'Shipping address is required'
       });
     }
 
-    // Get country code (worldwide support)
-    // Handle both string country codes and country names
-    let countryCode = 'CA'; // Default
-    if (hasCountry) {
-      const countryStr = hasCountry.toString().toUpperCase();
-      // If it's a 2-letter code, use it directly
-      if (countryStr.length === 2) {
-        countryCode = countryStr;
-      } else {
-        // Try to extract from country name or use default
-        // Common country name mappings
-        const countryMap = {
-          'CANADA': 'CA',
-          'UNITED STATES': 'US',
-          'USA': 'US',
-          'UNITED KINGDOM': 'GB',
-          'UK': 'GB',
-          'AUSTRALIA': 'AU',
-          'GERMANY': 'DE',
-          'FRANCE': 'FR'
-        };
-        countryCode = countryMap[countryStr] || 'CA';
-      }
-    }
-    
-    console.log('Country code determined:', countryCode);
+    // Prepare items for shipping service
+    const items = cartItems.map(item => ({
+      id: item.productId || item._id,
+      name: item.product?.name || item.name || 'Product',
+      quantity: item.quantity || 1,
+      weight: item.product?.shipping?.weight || item.product?.inventory?.weight || 0.5,
+      product: item.product || {}
+    }));
 
-    // Validate postal code format (relaxed for worldwide)
-    const cleanPostalCode = (shippingAddress.postal_code || 
-                            shippingAddress.postalCode ||
-                            shippingAddress.address?.postalCode ||
-                            '').replace(/\s/g, '').toUpperCase();
-    
-    // Only validate Canadian postal codes strictly (if provided)
-    if (countryCode === 'CA' && cleanPostalCode && cleanPostalCode.length > 0) {
-      const postalCodeRegex = /^[A-Za-z]\d[A-Za-z][\s-]?\d[A-Za-z]\d$/;
-      if (!postalCodeRegex.test(cleanPostalCode)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid Canadian postal code format. Please use format: A1A1A1'
-        });
-      }
-    }
-
-    // Calculate package dimensions
-    const packageDetails = ShippingCalculator.calculatePackage(cartItems);
-    
-    // Format addresses
-    const fromAddress = WAREHOUSE;
-    let toAddress;
-    try {
-      toAddress = ShippingCalculator.formatAddress(shippingAddress);
-    } catch (error) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid address format: ' + error.message
-      });
-    }
-
-    // Prepare Stallion request
-    const ratesRequest = {
-      from: {
-        country: fromAddress.country,
-        province: fromAddress.province,
-        postal_code: fromAddress.postal_code
-      },
-      to: {
-        name: toAddress.name,
-        address1: toAddress.address1,
-        city: toAddress.city,
-        province: toAddress.province,
-        postal_code: toAddress.postal_code,
-        country: toAddress.country,
-        phone: toAddress.phone
-      },
-      parcel: {
-        length: packageDetails.length,
-        width: packageDetails.width,
-        height: packageDetails.height,
-        weight: packageDetails.weight
-      }
+    // Prepare destination address
+    const destination = {
+      firstName: shippingAddress.firstName || '',
+      lastName: shippingAddress.lastName || '',
+      address: shippingAddress.addressLine1 || shippingAddress.address?.addressLine1 || '',
+      addressLine1: shippingAddress.addressLine1 || shippingAddress.address?.addressLine1 || '',
+      addressLine2: shippingAddress.addressLine2 || shippingAddress.address?.addressLine2 || '',
+      city: shippingAddress.city || shippingAddress.address?.city || '',
+      province: shippingAddress.province || shippingAddress.provinceCode || shippingAddress.address?.provinceCode || '',
+      state: shippingAddress.province || shippingAddress.provinceCode || shippingAddress.address?.provinceCode || '',
+      postalCode: shippingAddress.postal_code || shippingAddress.postalCode || shippingAddress.address?.postalCode || '',
+      postal_code: shippingAddress.postal_code || shippingAddress.postalCode || shippingAddress.address?.postalCode || '',
+      country: shippingAddress.country || shippingAddress.address?.country || '',
+      countryCode: shippingAddress.countryCode || shippingAddress.address?.countryCode || 'CA',
+      phone: shippingAddress.phone || ''
     };
 
-    try {
-      // Try to get live Stallion rates
-      const response = await stallionAPI.post('/rates', ratesRequest);
-      
-      if (response?.data?.rates && Array.isArray(response.data.rates) && response.data.rates.length > 0) {
-        // Success - return live rates
-        const rates = response.data.rates
-          .map(rate => {
-            const cost = parseFloat(rate.total || rate.cost || 0);
-            // Filter out invalid rates (negative or zero cost)
-            if (isNaN(cost) || cost <= 0) return null;
-            
-            // Get delivery estimate from region calculator for consistency
-            const deliveryEstimate = RegionShippingCalculator.getDeliveryEstimate(countryCode);
-            
-            // Parse delivery days if provided by Stallion
-            let minDays = deliveryEstimate.minDays;
-            let maxDays = deliveryEstimate.maxDays;
-            let deliveryDaysStr = deliveryEstimate.estimate;
-            
-            if (rate.delivery_days) {
-              if (typeof rate.delivery_days === 'string' && rate.delivery_days.includes('-')) {
-                const parts = rate.delivery_days.split('-');
-                minDays = parseInt(parts[0]) || deliveryEstimate.minDays;
-                maxDays = parseInt(parts[1]) || deliveryEstimate.maxDays;
-                deliveryDaysStr = rate.delivery_days;
-              } else if (typeof rate.delivery_days === 'number') {
-                minDays = rate.delivery_days;
-                maxDays = rate.delivery_days;
-                deliveryDaysStr = `${rate.delivery_days} business days`;
-              }
-            }
-            
-            return {
-              carrier: rate.carrier || 'Unknown',
-              service: rate.service_name || rate.service || 'Standard',
-              serviceCode: rate.service_code || 'STANDARD',
-              cost: cost,
-              currency: rate.currency || 'CAD',
-              deliveryDays: deliveryDaysStr,
-              minDays: minDays,
-              maxDays: maxDays,
-              deliveryDate: rate.delivery_date || null,
-              isLive: true,
-              region: deliveryEstimate.regionName
-            };
-          })
-          .filter(rate => rate !== null); // Remove invalid rates
+    // Get shipping rates
+    const rates = await shippingService.getShippingRates({ items, destination });
 
-        // Sort by price (cheapest first)
-        rates.sort((a, b) => a.cost - b.cost);
-
-        if (rates.length > 0) {
-          return res.json({
-            success: true,
-            source: 'stallion',
-            rates: rates,
-            packageDetails: packageDetails
-          });
-        }
-      }
-    } catch (stallionError) {
-      // Log error details for debugging
-      const errorDetails = {
-        message: stallionError.message,
-        status: stallionError.response?.status,
-        data: stallionError.response?.data,
-        config: {
-          url: stallionError.config?.url,
-          method: stallionError.config?.method
-        }
-      };
-      console.error('Stallion API Error:', JSON.stringify(errorDetails, null, 2));
-      // Continue to fallback
-    }
-
-    // ✅ FALLBACK SHIPPING (if Stallion fails) - Region-based
-    // countryCode already declared above, reuse it
-    try {
-      const coordinates = shippingAddress.coordinates || 
-                         shippingAddress.googlePlaces?.coordinates ||
-                         null;
-
-      console.log('Calculating fallback shipping:', {
-        quantity: cartItems.length,
-        weight: packageDetails.weight,
-        countryCode: countryCode,
-        hasCoordinates: !!coordinates
-      });
-
-      const fallbackResult = ShippingCalculator.calculateFallbackShipping(
-        cartItems.length,
-        packageDetails.weight,
-        countryCode,
-        coordinates
-      );
-
-      console.log('Fallback result:', fallbackResult);
-
-      const fallbackRates = [
-        {
-          carrier: 'Zuba House',
-          service: `Standard Shipping (${fallbackResult.region})`,
-          serviceCode: 'STANDARD',
-          cost: fallbackResult.cost,
-          currency: 'USD',
-          deliveryDays: fallbackResult.deliveryEstimate,
-          minDays: fallbackResult.minDays,
-          maxDays: fallbackResult.maxDays,
-          deliveryDate: null,
-          isLive: false,
-          region: fallbackResult.region
-        }
-      ];
-
-      return res.json({
-        success: true,
-        source: 'fallback',
-        reason: 'Stallion API unavailable',
-        rates: fallbackRates,
-        packageDetails: packageDetails
-      });
-    } catch (fallbackError) {
-      console.error('Fallback calculation error:', fallbackError);
-      // Last resort - simple calculation
-      const simpleCost = 13 + (cartItems.length > 1 ? (cartItems.length - 1) * 3 : 0);
-      return res.json({
-        success: true,
-        source: 'fallback',
-        reason: 'Simple fallback calculation',
-        rates: [{
-          carrier: 'Zuba House',
-          service: 'Standard Shipping',
-          serviceCode: 'STANDARD',
-          cost: simpleCost,
-          currency: 'USD',
-          deliveryDays: '5-7 business days',
-          minDays: 5,
-          maxDays: 7,
-          deliveryDate: null,
-          isLive: false,
-          region: 'International'
-        }],
-        packageDetails: packageDetails
-      });
-    }
+    return res.json({
+      success: true,
+      standard: rates.standard,
+      express: rates.express
+    });
 
   } catch (error) {
     console.error('Shipping Controller Error:', error);
@@ -300,53 +71,17 @@ export const getShippingRates = async (req, res) => {
 
 /**
  * Create shipment and get label
+ * NOTE: This will be updated to use EasyPost API
+ * TODO: Implement EasyPost integration
  */
 export const createShipment = async (req, res) => {
   try {
-    const { orderId, shippingAddress, packageDetails, serviceCode } = req.body;
-
-    // Validation
-    if (!orderId || !shippingAddress || !packageDetails) {
-      return res.status(400).json({
-        success: false,
-        message: 'Order ID, shipping address, and package details are required'
-      });
-    }
-
-    const fromAddress = WAREHOUSE;
-    let toAddress;
-    try {
-      toAddress = ShippingCalculator.formatAddress(shippingAddress);
-    } catch (error) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid address format: ' + error.message
-      });
-    }
-
-    const shipmentRequest = {
-      from: fromAddress,
-      to: toAddress,
-      parcel: packageDetails,
-      service_code: serviceCode || 'CA-POST-REGULAR',
-      reference: orderId
-    };
-
-    const response = await stallionAPI.post('/shipments', shipmentRequest);
-
-    res.json({
-      success: true,
-      shipment: {
-        id: response.data.id,
-        trackingNumber: response.data.tracking_number,
-        labelUrl: response.data.label_url,
-        carrier: response.data.carrier,
-        service: response.data.service_name
-      }
+    return res.status(501).json({
+      success: false,
+      message: 'Shipment creation will be available soon with EasyPost integration'
     });
-
   } catch (error) {
-    console.error('Create Shipment Error:', error.response?.data || error);
+    console.error('Create Shipment Error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create shipment'
@@ -356,6 +91,8 @@ export const createShipment = async (req, res) => {
 
 /**
  * Track shipment
+ * NOTE: This will be updated to use EasyPost API
+ * TODO: Implement EasyPost tracking integration
  */
 export const trackShipment = async (req, res) => {
   try {
@@ -369,40 +106,24 @@ export const trackShipment = async (req, res) => {
       });
     }
 
-    const response = await stallionAPI.get(`/tracking/${trackingNumber.trim()}`);
-    
-    if (response?.data) {
-      res.json({
-        success: true,
-        tracking: response.data
-      });
-    } else {
-      res.status(404).json({
-        success: false,
-        message: 'Tracking information not found'
-      });
-    }
+    return res.status(501).json({
+      success: false,
+      message: 'Tracking will be available soon with EasyPost integration'
+    });
 
   } catch (error) {
-    console.error('Track Shipment Error:', error.response?.data || error.message);
-    
-    if (error.response?.status === 404) {
-      res.status(404).json({
-        success: false,
-        message: 'Tracking number not found'
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to track shipment: ' + (error.message || 'Unknown error')
-      });
-    }
+    console.error('Track Shipment Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to track shipment: ' + (error.message || 'Unknown error')
+    });
   }
 };
 
 /**
- * Calculate shipping rates using comprehensive calculator
+ * Calculate shipping rates
  * POST /api/shipping/calculate
+ * Alias for getShippingRates - returns same format
  */
 export const calculateShippingRates = async (req, res) => {
   try {
@@ -423,10 +144,70 @@ export const calculateShippingRates = async (req, res) => {
       });
     }
 
-    // Calculate shipping
-    const result = shippingCalculatorService.calculateShipping(cartItems, shippingAddress);
+    // Prepare items for shipping service
+    const items = cartItems.map(item => ({
+      id: item.productId || item._id,
+      name: item.product?.name || item.name || 'Product',
+      quantity: item.quantity || 1,
+      weight: item.product?.shipping?.weight || item.product?.inventory?.weight || 0.5,
+      product: item.product || {}
+    }));
 
-    return res.status(200).json(result);
+    // Prepare destination address
+    const destination = {
+      firstName: shippingAddress.firstName || '',
+      lastName: shippingAddress.lastName || '',
+      address: shippingAddress.addressLine1 || shippingAddress.address?.addressLine1 || '',
+      addressLine1: shippingAddress.addressLine1 || shippingAddress.address?.addressLine1 || '',
+      addressLine2: shippingAddress.addressLine2 || shippingAddress.address?.addressLine2 || '',
+      city: shippingAddress.city || shippingAddress.address?.city || '',
+      province: shippingAddress.province || shippingAddress.provinceCode || shippingAddress.address?.provinceCode || '',
+      state: shippingAddress.province || shippingAddress.provinceCode || shippingAddress.address?.provinceCode || '',
+      postalCode: shippingAddress.postal_code || shippingAddress.postalCode || shippingAddress.address?.postalCode || '',
+      postal_code: shippingAddress.postal_code || shippingAddress.postalCode || shippingAddress.address?.postalCode || '',
+      country: shippingAddress.country || shippingAddress.address?.country || '',
+      countryCode: shippingAddress.countryCode || shippingAddress.address?.countryCode || 'CA',
+      phone: shippingAddress.phone || ''
+    };
+
+    // Get shipping rates
+    const rates = await shippingService.getShippingRates({ items, destination });
+
+    // Return in format expected by frontend
+    return res.json({
+      success: true,
+      options: [
+        {
+          id: 'standard',
+          name: rates.standard.name,
+          price: rates.standard.cost,
+          currency: 'USD',
+          deliveryDays: rates.standard.delivery,
+          estimatedDelivery: rates.standard.delivery,
+          minDays: rates.standard.minDays,
+          maxDays: rates.standard.maxDays,
+          icon: '📦',
+          type: 'standard'
+        },
+        {
+          id: 'express',
+          name: rates.express.name,
+          price: rates.express.cost,
+          currency: 'USD',
+          deliveryDays: rates.express.delivery,
+          estimatedDelivery: rates.express.delivery,
+          minDays: rates.express.minDays,
+          maxDays: rates.express.maxDays,
+          icon: '🚀',
+          type: 'express'
+        }
+      ],
+      calculation: {
+        source: rates.standard.source,
+        standard: rates.standard,
+        express: rates.express
+      }
+    });
   } catch (error) {
     console.error('Calculate shipping rates error:', error);
     return res.status(500).json({
@@ -445,14 +226,24 @@ export const validatePhone = async (req, res) => {
   try {
     const { phone, country } = req.body;
 
-    const isValid = shippingCalculatorService.validatePhoneNumber(phone);
-    
+    if (!phone || typeof phone !== 'string') {
+      return res.status(200).json({
+        success: true,
+        valid: false,
+        message: 'Phone number is required'
+      });
+    }
+
+    // Basic phone validation
+    const cleaned = phone.replace(/[^\d+]/g, '');
+    const digitsOnly = cleaned.replace(/\+/g, '');
+    const isValid = digitsOnly.length >= 10 && digitsOnly.length <= 15;
+
     if (isValid) {
-      const formatted = shippingCalculatorService.formatPhoneNumber(phone, country || 'CA');
       return res.status(200).json({
         success: true,
         valid: true,
-        formatted: formatted
+        formatted: cleaned
       });
     } else {
       return res.status(200).json({

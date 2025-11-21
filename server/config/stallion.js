@@ -1,19 +1,8 @@
 import dotenv from 'dotenv';
-import axios from 'axios';
 
 dotenv.config();
 
-const stallionAPI = axios.create({
-  baseURL: process.env.STALLION_API_URL || 'https://api.stallionexpress.ca/v3',
-  headers: {
-    'Authorization': `Bearer ${process.env.STALLION_API_KEY}`,
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  },
-  timeout: 15000 // 15 second timeout
-});
-
-// Warehouse configuration
+// Warehouse configuration (kept for EasyPost integration)
 const WAREHOUSE = {
   name: process.env.WAREHOUSE_NAME || "Zuba House Warehouse",
   company: "Zuba House",
@@ -26,5 +15,6 @@ const WAREHOUSE = {
   phone: process.env.WAREHOUSE_PHONE || "+14375577487"
 };
 
-export { stallionAPI, WAREHOUSE };
+// NOTE: Stallion API removed - will be replaced with EasyPost
+export { WAREHOUSE };
 

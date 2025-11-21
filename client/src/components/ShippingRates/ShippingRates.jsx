@@ -34,64 +34,19 @@ const ShippingRates = ({ cartItems, shippingAddress, onRateSelected }) => {
   }, [shippingAddress?.postal_code, shippingAddress?.city, shippingAddress?.province, shippingAddress?.countryCode, cartItems?.length]);
 
   const fetchShippingRates = async () => {
-    // Validate inputs before making request (worldwide support)
-    const hasValidAddress = shippingAddress && (
-      (shippingAddress.postal_code && shippingAddress.city) ||
-      (shippingAddress.city && shippingAddress.countryCode)
-    );
-    
-    if (!hasValidAddress || !cartItems?.length) {
-      setError('Please enter a valid address (city and country required)');
-      return;
-    }
-
+    // TODO: Implement new shipping calculation method
     setLoading(true);
     setError('');
     
     try {
-      const response = await axios.post(
-        `${VITE_API_URL}/api/shipping/rates`,
-        {
-          cartItems: cartItems,
-          shippingAddress: shippingAddress
-        },
-        {
-          timeout: 20000 // 20 second timeout
-        }
-      );
-
-      if (response?.data?.success && Array.isArray(response.data.rates)) {
-        setRates(response.data.rates);
-        setSource(response.data.source || 'fallback');
-        
-        // Auto-select cheapest option
-        if (response.data.rates.length > 0) {
-          const cheapest = response.data.rates[0];
-          setSelectedRate(cheapest);
-          onRateSelected && onRateSelected(cheapest);
-        } else {
-          setError('No shipping options available for this address');
-        }
-      } else {
-        setError(response?.data?.message || 'Unable to calculate shipping rates');
-      }
+      // New shipping calculation will be implemented here
+      setRates([]);
+      setSelectedRate(null);
+      setSource('');
+      setError('Shipping calculation will be available soon');
     } catch (err) {
       console.error('Shipping rates error:', err);
-      
-      // Provide more specific error messages
-      if (err.code === 'ECONNABORTED') {
-        setError('Request timed out. Please try again.');
-      } else if (err.response?.data?.message) {
-        setError(err.response.data.message);
-      } else if (err.response?.status === 400) {
-        setError('Invalid address. Please check your postal code and try again.');
-      } else if (err.response?.status >= 500) {
-        setError('Server error. Please try again later.');
-      } else {
-        setError('Unable to calculate shipping. Please check your connection and try again.');
-      }
-      
-      // Reset rates on error
+      setError('Unable to calculate shipping. Please try again later.');
       setRates([]);
       setSelectedRate(null);
       onRateSelected && onRateSelected(null);
@@ -217,9 +172,9 @@ const ShippingRates = ({ cartItems, shippingAddress, onRateSelected }) => {
         </div>
       )}
 
-      {source === 'stallion' && (
+      {source === 'calculator' && (
         <p className="rate-source-info">
-          ✅ Live rates from Stallion Express
+          ℹ️ Shipping rates calculated based on location, weight, and category
         </p>
       )}
       
