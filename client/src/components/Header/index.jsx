@@ -104,15 +104,6 @@ const Header = () => {
   return (
     <>
       <header className="bg-[#0b2735] fixed lg:sticky left-0 w-full top-0 lg:-top-[47px] z-[101]">
-        {/* Mobile USD Notice - Fixed below header */}
-        {context?.windowWidth < 992 && (
-          <div className="fixed top-[115px] left-0 w-full bg-[#0b2735] border-b border-[rgba(229,226,219,0.2)] py-1.5 px-3 z-[100] lg:hidden">
-            <p className="text-[11px] font-[500] text-center text-[#e5e2db] mb-0">
-              💵 All prices are in USD (not CAD)
-            </p>
-          </div>
-        )}
-        
         <div className="top-strip hidden lg:block py-2 border-t-[1px] border-[rgba(229,226,219,0.2)] border-b-[1px]">
           <div className="container">
             <div className="flex items-center justify-between">
@@ -354,8 +345,7 @@ const Header = () => {
       </header>
 
 
-      {/* Spacer for fixed header - includes mobile USD notice height */}
-      <div className="afterHeader mt-[147px] lg:mt-0"></div>
+      <div className="afterHeader mt-[115px] lg:mt-0"></div>
 
     </>
   );
