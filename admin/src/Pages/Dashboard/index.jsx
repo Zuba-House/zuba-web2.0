@@ -300,7 +300,12 @@ const Dashboard = () => {
                           {order?.userId?.name}
                         </td>
 
-                        <td className="px-6 py-4 font-[500]">{order?.delivery_address?.mobile}</td>
+                        <td className="px-6 py-4 font-[500]">
+                          {order?.phone || 
+                           order?.delivery_address?.contactInfo?.phone || 
+                           order?.delivery_address?.mobile || 
+                           'N/A'}
+                        </td>
 
                         <td className="px-6 py-4 font-[500]">
                           <span className='inline-block text-[13px] font-[500] p-1 bg-[#f1f1f1] rounded-md'>{order?.delivery_address?.addressType}</span>

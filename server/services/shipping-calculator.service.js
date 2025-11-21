@@ -27,16 +27,71 @@ export const calculateShipping = (cartItems, shippingAddress) => {
       throw new Error('Shipping address is required');
     }
 
-    // Extract address info
-    const country = shippingAddress.countryCode || 
-                   shippingAddress.country || 
-                   shippingAddress.address?.countryCode || 
-                   'CA';
-    const province = shippingAddress.province || 
-                    shippingAddress.provinceCode || 
-                    shippingAddress.address?.provinceCode || 
-                    '';
+    // Extract address info - handle multiple formats
+    let countryCode = shippingAddress.countryCode || 
+                     shippingAddress.address?.countryCode || 
+                     'CA';
+    
+    // If country is a full name, convert to code
+    if (!countryCode || countryCode.length > 2) {
+      const countryName = (shippingAddress.country || shippingAddress.address?.country || '').toString().toUpperCase();
+      const countryMap = {
+        'CANADA': 'CA',
+        'UNITED STATES': 'US',
+        'USA': 'US',
+        'UNITED STATES OF AMERICA': 'US',
+        'UNITED KINGDOM': 'GB',
+        'UK': 'GB',
+        'AUSTRALIA': 'AU',
+        'GERMANY': 'DE',
+        'FRANCE': 'FR',
+        'ITALY': 'IT',
+        'SPAIN': 'ES',
+        'NETHERLANDS': 'NL',
+        'BELGIUM': 'BE',
+        'SWITZERLAND': 'CH',
+        'AUSTRIA': 'AT',
+        'SWEDEN': 'SE',
+        'NORWAY': 'NO',
+        'DENMARK': 'DK',
+        'FINLAND': 'FI',
+        'POLAND': 'PL',
+        'CHINA': 'CN',
+        'JAPAN': 'JP',
+        'SOUTH KOREA': 'KR',
+        'KOREA': 'KR',
+        'INDIA': 'IN',
+        'SINGAPORE': 'SG',
+        'MALAYSIA': 'MY',
+        'THAILAND': 'TH',
+        'BRAZIL': 'BR',
+        'MEXICO': 'MX',
+        'ARGENTINA': 'AR',
+        'SOUTH AFRICA': 'ZA',
+        'UNITED ARAB EMIRATES': 'AE',
+        'UAE': 'AE',
+        'SAUDI ARABIA': 'SA',
+        'NEW ZEALAND': 'NZ'
+      };
+      countryCode = countryMap[countryName] || (countryCode && countryCode.length === 2 ? countryCode : 'CA');
+    }
+    
+    // Ensure countryCode is uppercase and 2 characters
+    countryCode = countryCode.toString().toUpperCase().substring(0, 2);
+    
+    const province = (shippingAddress.province || 
+                     shippingAddress.provinceCode || 
+                     shippingAddress.address?.provinceCode || 
+                     '').toString().toUpperCase();
     const city = shippingAddress.city || shippingAddress.address?.city || '';
+
+    console.log('Shipping calculation - Address:', {
+      countryCode,
+      province,
+      city,
+      originalCountry: shippingAddress.country || shippingAddress.countryCode,
+      originalProvince: shippingAddress.province || shippingAddress.provinceCode
+    });
 
     // Calculate base shipping cost
     let baseCost = 10; // $10 for first item
@@ -46,7 +101,9 @@ export const calculateShipping = (cartItems, shippingAddress) => {
     }
 
     // Determine shipping zone
-    const zone = getShippingZone(country, province);
+    const zone = getShippingZone(countryCode, province);
+    
+    console.log('Shipping calculation - Zone:', zone);
     
     // Add zone-based cost
     const zoneCost = getZoneCost(zone);
@@ -77,6 +134,19 @@ export const calculateShipping = (cartItems, shippingAddress) => {
 
     // Apply category multiplier
     const finalCost = baseCost * highestCategoryMultiplier;
+    
+    console.log('Shipping calculation - Costs:', {
+      baseCost: 10,
+      additionalItems,
+      additionalItemsCost: additionalItems * 3,
+      zone,
+      zoneCost,
+      totalWeight: totalWeight.toFixed(2),
+      weightCost,
+      categoryMultiplier: highestCategoryMultiplier,
+      finalCost: finalCost.toFixed(2),
+      expressCost: (finalCost * 1.5).toFixed(2)
+    });
 
     // Calculate delivery estimates
     const standardEstimate = getDeliveryEstimate(zone, 'standard');
@@ -142,16 +212,23 @@ export const calculateShipping = (cartItems, shippingAddress) => {
 /**
  * Get shipping zone based on country and province
  */
-const getShippingZone = (country, province) => {
-  const countryCode = country.toString().toUpperCase().substring(0, 2);
+const getShippingZone = (countryCode, province) => {
+  // countryCode should already be uppercase 2-letter code
+  if (!countryCode || countryCode.length !== 2) {
+    console.warn('Invalid country code:', countryCode, 'defaulting to international');
+    return 'international';
+  }
   
   if (countryCode === 'CA') {
     // Canadian provinces
-    const provinceCode = province.toString().toUpperCase().substring(0, 2);
+    const provinceCode = province ? province.toString().toUpperCase().substring(0, 2) : '';
     if (provinceCode === 'ON' || provinceCode === 'QC') {
       return 'local'; // Ontario/Quebec
-    } else {
+    } else if (provinceCode) {
       return 'western'; // Other Canadian provinces
+    } else {
+      // No province code, default to local for Canada
+      return 'local';
     }
   } else if (countryCode === 'US') {
     return 'usa';

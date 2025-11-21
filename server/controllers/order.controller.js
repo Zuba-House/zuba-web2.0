@@ -80,6 +80,24 @@ export const createOrderController = async (request, response) => {
             }
         }
 
+        // Prepare shipping address for order
+        let orderShippingAddress = null;
+        if (request.body.shippingAddress) {
+            const addr = request.body.shippingAddress;
+            orderShippingAddress = {
+                addressLine1: addr.addressLine1 || addr.address?.addressLine1 || '',
+                addressLine2: addr.addressLine2 || addr.address?.addressLine2 || '',
+                city: addr.city || addr.address?.city || '',
+                province: addr.province || addr.address?.province || '',
+                provinceCode: addr.provinceCode || addr.province || addr.address?.provinceCode || '',
+                postalCode: addr.postalCode || addr.postal_code || addr.address?.postalCode || '',
+                postal_code: addr.postal_code || addr.postalCode || addr.address?.postalCode || '',
+                country: addr.country || addr.address?.country || '',
+                countryCode: addr.countryCode || addr.address?.countryCode || '',
+                coordinates: addr.coordinates || addr.googlePlaces?.coordinates || null
+            };
+        }
+
         let order = new OrderModel({
             userId: request.body.userId || null,
             products: request.body.products,
@@ -89,6 +107,8 @@ export const createOrderController = async (request, response) => {
             totalAmt: finalTotal, // Ensure shipping is included
             shippingCost: shippingCost,
             shippingRate: request.body.shippingRate || null,
+            shippingAddress: orderShippingAddress,
+            phone: request.body.phone || '',
             date: request.body.date,
             // Guest checkout fields
             isGuestOrder: isGuestOrder,
@@ -258,9 +278,12 @@ export const createOrderController = async (request, response) => {
                 const adminEmail = process.env.ADMIN_EMAIL || 'sales@zubahouse.com';
                 console.log('📧 Preparing to send admin notification email to:', adminEmail);
                 
-                // Get shipping address if available
+                // Get shipping address if available - prefer order.shippingAddress, then fetch from delivery_address
                 let shippingAddress = null;
-                if (order.delivery_address) {
+                if (order.shippingAddress) {
+                    // Use shipping address stored directly in order
+                    shippingAddress = order.shippingAddress;
+                } else if (order.delivery_address) {
                     try {
                         shippingAddress = await AddressModel.findById(order.delivery_address);
                     } catch (addrError) {

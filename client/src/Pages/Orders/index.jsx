@@ -122,22 +122,47 @@ const Orders = () => {
                                 {order?.userId?.name}
                               </td>
 
-                              <td className="px-6 py-4 font-[500]">{order?.delivery_address?.mobile}</td>
-
                               <td className="px-6 py-4 font-[500]">
-                               <span className='inline-block text-[13px] font-[500] p-1 bg-[#f1f1f1] rounded-md'>{order?.delivery_address?.addressType}</span>
-                                <span className="block w-[400px]">
-                                  {order?.delivery_address?.
-                                    address_line1 + " " +
-                                    order?.delivery_address?.city + " " +
-                                    order?.delivery_address?.landmark + " " +
-                                    order?.delivery_address?.state + " " +
-                                    order?.delivery_address?.country
-                                  }
-                                </span>
+                                {order?.phone || 
+                                 order?.delivery_address?.contactInfo?.phone || 
+                                 order?.delivery_address?.mobile || 
+                                 'N/A'}
                               </td>
 
-                              <td className="px-6 py-4 font-[500]">{order?.delivery_address?.pincode}</td>
+                              <td className="px-6 py-4 font-[500]">
+                                {/* Use order.shippingAddress if available, otherwise use delivery_address */}
+                                {order?.shippingAddress ? (
+                                  <span className="block w-[400px]">
+                                    {[
+                                      order.shippingAddress.addressLine1,
+                                      order.shippingAddress.addressLine2,
+                                      order.shippingAddress.city,
+                                      order.shippingAddress.province || order.shippingAddress.provinceCode,
+                                      order.shippingAddress.postalCode || order.shippingAddress.postal_code,
+                                      order.shippingAddress.country
+                                    ].filter(Boolean).join(", ")}
+                                  </span>
+                                ) : (
+                                  <>
+                                    <span className='inline-block text-[13px] font-[500] p-1 bg-[#f1f1f1] rounded-md'>{order?.delivery_address?.addressType || order?.delivery_address?.label}</span>
+                                    <span className="block w-[400px]">
+                                      {order?.delivery_address?.address?.addressLine1 || order?.delivery_address?.address_line1 || ''} {" "}
+                                      {order?.delivery_address?.address?.city || order?.delivery_address?.city || ''} {" "}
+                                      {order?.delivery_address?.address?.addressLine2 || order?.delivery_address?.landmark || ''} {" "}
+                                      {order?.delivery_address?.address?.provinceCode || order?.delivery_address?.state || ''} {" "}
+                                      {order?.delivery_address?.address?.country || order?.delivery_address?.country || ''}
+                                    </span>
+                                  </>
+                                )}
+                              </td>
+
+                              <td className="px-6 py-4 font-[500]">
+                                {order?.shippingAddress?.postalCode || 
+                                 order?.shippingAddress?.postal_code || 
+                                 order?.delivery_address?.address?.postalCode || 
+                                 order?.delivery_address?.pincode || 
+                                 'N/A'}
+                              </td>
 
                               <td className="px-6 py-4 font-[500]">{order?.totalAmt}</td>
 

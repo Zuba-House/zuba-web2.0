@@ -263,8 +263,35 @@ const OrderConfirmationEmail = (username, orders) => {
                 <p><strong>Order ID:</strong> #${orders?._id}</p>
                 <p><strong>Order Date:</strong> ${orders?.date || new Date().toLocaleDateString()}</p>
                 <p><strong>Payment Status:</strong> ${orders?.payment_status || 'Pending'}</p>
-                <p><strong>Estimated Delivery:</strong> 5-12 business days</p>
+                <p><strong>Estimated Delivery:</strong> ${orders?.shippingRate?.deliveryDays || orders?.shippingRate?.estimatedDelivery || '5-12 business days'}</p>
             </div>
+
+            ${(() => {
+                // Get shipping address from order
+                const addr = orders?.shippingAddress;
+                const phone = orders?.phone || 'N/A';
+                
+                if (addr) {
+                    const addressParts = [
+                        addr.addressLine1,
+                        addr.addressLine2,
+                        addr.city,
+                        addr.province || addr.provinceCode,
+                        addr.postalCode || addr.postal_code,
+                        addr.country
+                    ].filter(Boolean);
+                    
+                    if (addressParts.length > 0) {
+                        return `
+            <div class="order-info" style="background: #e8f4f8; border-left: 4px solid #3498db;">
+                <h3 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 16px;">📍 Shipping Address</h3>
+                <p style="margin: 5px 0; color: #2c3e50;"><strong>Address:</strong> ${addressParts.join(', ')}</p>
+                <p style="margin: 5px 0; color: #2c3e50;"><strong>Phone:</strong> ${phone}</p>
+            </div>`;
+                    }
+                }
+                return '';
+            })()}
 
             <div class="divider"></div>
             

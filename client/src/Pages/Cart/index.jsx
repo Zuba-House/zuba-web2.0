@@ -464,27 +464,69 @@ const CartPage = () => {
 
             {/* Validate address, phone, and shipping rate before allowing checkout */}
             {(() => {
-              const hasValidAddress = shippingAddress && shippingAddress.city && shippingAddress.countryCode;
-              const hasPhone = phone && phone.trim() !== '' && !phoneError;
-              const hasShippingRate = selectedShippingRate && (selectedShippingRate.cost || selectedShippingRate.price);
+              const hasValidAddress = shippingAddress && 
+                                     shippingAddress.city && 
+                                     shippingAddress.city.trim() !== '' &&
+                                     shippingAddress.countryCode && 
+                                     shippingAddress.countryCode.trim() !== '';
+              const hasPhone = phone && 
+                              phone.trim() !== '' && 
+                              !phoneError &&
+                              phone.length >= 10;
+              const hasShippingRate = selectedShippingRate && 
+                                     (selectedShippingRate.cost || selectedShippingRate.price) &&
+                                     (selectedShippingRate.cost > 0 || selectedShippingRate.price > 0);
+              
+              const handleCheckoutClick = async () => {
+                // Validate address
+                if (!hasValidAddress) {
+                  context?.alertBox("error", "Please enter a complete shipping address (city and country are required)");
+                  return;
+                }
+                
+                // Validate phone
+                if (!hasPhone) {
+                  if (!phone || phone.trim() === '') {
+                    context?.alertBox("error", "Please enter your phone number");
+                  } else if (phoneError) {
+                    context?.alertBox("error", `Invalid phone number: ${phoneError}`);
+                  } else {
+                    context?.alertBox("error", "Please enter a valid phone number (at least 10 digits)");
+                  }
+                  return;
+                }
+                
+                // Validate shipping rate
+                if (!hasShippingRate) {
+                  context?.alertBox("error", "Please wait for shipping rates to calculate. Make sure your address is complete.");
+                  return;
+                }
+                
+                // All validations passed - proceed
+                // Save address silently before proceeding
+                if (shippingAddress?.city && phone && !savingAddress) {
+                  await saveAddress(true); // Save silently
+                }
+                // Navigate to checkout
+                history("/checkout", { 
+                  state: { 
+                    selectedShippingRate, 
+                    shippingAddress,
+                    phone: phone
+                  }
+                });
+              };
               
               if (!hasValidAddress || !hasPhone || !hasShippingRate) {
                 return (
                   <Button 
                     className="btn-org btn-lg w-full flex gap-2" 
-                    disabled
-                    onClick={() => {
-                      if (!hasValidAddress) {
-                        context?.alertBox("error", "Please enter a complete shipping address");
-                      } else if (!hasPhone) {
-                        context?.alertBox("error", "Please enter a valid phone number");
-                      } else if (!hasShippingRate) {
-                        context?.alertBox("error", "Please wait for shipping rates to calculate");
-                      }
-                    }}
+                    disabled={true}
+                    onClick={handleCheckoutClick}
+                    style={{ opacity: 0.6, cursor: 'not-allowed' }}
                   >
                     <BsFillBagCheckFill className="text-[20px]" /> 
-                    {!hasValidAddress ? "Enter Shipping Address" : !hasPhone ? "Enter Phone Number" : "Calculating Shipping..."}
+                    {!hasValidAddress ? "⚠️ Enter Shipping Address" : !hasPhone ? "⚠️ Enter Phone Number" : "⏳ Calculating Shipping..."}
                   </Button>
                 );
               }
@@ -492,20 +534,7 @@ const CartPage = () => {
               return (
                 <Button 
                   className="btn-org btn-lg w-full flex gap-2"
-                  onClick={async () => {
-                    // Save address silently before proceeding
-                    if (shippingAddress?.city && phone && !savingAddress) {
-                      await saveAddress(true); // Save silently
-                    }
-                    // Navigate to checkout
-                    history("/checkout", { 
-                      state: { 
-                        selectedShippingRate, 
-                        shippingAddress,
-                        phone: phone
-                      }
-                    });
-                  }}
+                  onClick={handleCheckoutClick}
                 >
                   <BsFillBagCheckFill className="text-[20px]" /> Proceed to Checkout
                 </Button>

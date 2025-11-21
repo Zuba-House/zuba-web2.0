@@ -24,20 +24,29 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
     // Format customer info
     const customerName = customerInfo?.name || order?.guestCustomer?.name || 'N/A';
     const customerEmail = customerInfo?.email || order?.guestCustomer?.email || 'N/A';
-    const customerPhone = customerInfo?.mobile || customerInfo?.phone || order?.guestCustomer?.phone || 'N/A';
+    // Get phone from multiple sources: order.phone, customerInfo, shippingAddress, or guestCustomer
+    const customerPhone = order?.phone || 
+                         customerInfo?.mobile || 
+                         customerInfo?.phone || 
+                         shippingAddress?.contactInfo?.phone ||
+                         order?.guestCustomer?.phone || 
+                         'N/A';
 
-    // Format shipping address
+    // Format shipping address - check order.shippingAddress first, then shippingAddress parameter
     let addressText = 'N/A';
-    if (shippingAddress) {
-        const addr = shippingAddress.address || shippingAddress;
-        const contact = shippingAddress.contactInfo || {};
+    let addressPhone = order?.phone || shippingAddress?.contactInfo?.phone || 'N/A';
+    
+    // Priority: order.shippingAddress > shippingAddress parameter
+    const addrData = order?.shippingAddress || shippingAddress?.address || shippingAddress;
+    
+    if (addrData) {
         const parts = [];
-        if (addr.addressLine1) parts.push(addr.addressLine1);
-        if (addr.addressLine2) parts.push(addr.addressLine2);
-        if (addr.city) parts.push(addr.city);
-        if (addr.province || addr.provinceCode) parts.push(addr.province || addr.provinceCode);
-        if (addr.postalCode) parts.push(addr.postalCode);
-        if (addr.country) parts.push(addr.country);
+        if (addrData.addressLine1) parts.push(addrData.addressLine1);
+        if (addrData.addressLine2) parts.push(addrData.addressLine2);
+        if (addrData.city) parts.push(addrData.city);
+        if (addrData.province || addrData.provinceCode) parts.push(addrData.province || addrData.provinceCode);
+        if (addrData.postalCode || addrData.postal_code) parts.push(addrData.postalCode || addrData.postal_code);
+        if (addrData.country) parts.push(addrData.country);
         addressText = parts.length > 0 ? parts.join(', ') : 'Address not available';
     }
 
@@ -380,6 +389,10 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
                 <div class="info-row">
                     <div class="info-label">Address:</div>
                     <div class="info-value">${addressText}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Phone:</div>
+                    <div class="info-value"><a href="tel:${addressPhone}" style="color: #3498db;">${addressPhone}</a></div>
                 </div>
             </div>
 

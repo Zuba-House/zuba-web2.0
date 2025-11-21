@@ -143,6 +143,27 @@ const orderSchema = new mongoose.Schema({
     shippingRate: {
         type: mongoose.Schema.Types.Mixed,
         default: null
+    },
+    // Store shipping address directly in order (for admin visibility)
+    shippingAddress: {
+        addressLine1: String,
+        addressLine2: String,
+        city: String,
+        province: String,
+        provinceCode: String,
+        postalCode: String,
+        postal_code: String,
+        country: String,
+        countryCode: String,
+        coordinates: {
+            lat: Number,
+            lng: Number
+        }
+    },
+    // Store phone number directly in order (for admin visibility)
+    phone: {
+        type: String,
+        default: ''
     }
 }, {
     timestamps: true
