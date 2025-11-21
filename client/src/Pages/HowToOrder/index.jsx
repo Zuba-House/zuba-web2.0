@@ -205,8 +205,8 @@ const HowToOrder = () => {
 
   const faqs = [
     {
-      question: "Can I order without creating an account?",
-      answer: "Yes! You can checkout as a guest. However, creating an account allows you to track orders, save addresses, and access exclusive member benefits."
+      question: "Do I need to create an account to order?",
+      answer: "Yes, you need to create an account to place an order. Creating an account allows you to track orders, save addresses, and access exclusive member benefits. Registration is quick and easy."
     },
     {
       question: "What payment methods do you accept?",

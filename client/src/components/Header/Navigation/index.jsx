@@ -138,11 +138,11 @@ const Navigation = (props) => {
             </ul>
           </div>
 
-          {/* ZeroX Intelligence: Updated Free International Delivery text colors */}
+          {/* Currency Notice */}
           <div className="col_3 w-[20%] hidden lg:block">
             <p className="text-[14px] font-[500] flex items-center gap-3 mb-0 mt-0 text-[#e5e2db]">
               <GoRocket className="text-[18px] text-[#efb291]" />
-              Free International Delivery
+              All prices in USD
             </p>
           </div>
         </div>

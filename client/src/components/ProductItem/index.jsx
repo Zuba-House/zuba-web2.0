@@ -38,15 +38,14 @@ const ProductItem = (props) => {
   const context = useContext(MyContext);
 
   const addToCart = (product, userId, quantity) => {
-    // For guest users, show info message and redirect to product page
-    // They can add to cart from product detail page or login
+    // For guest users, show info message and redirect to login
     if (userId === undefined) {
       context?.alertBox(
         "info", 
-        "Please login to add items to cart, or visit the product page for guest checkout options."
+        "Please login to add items to cart. Registration is quick and easy!"
       );
-      // Redirect to product page where they can see guest checkout option
-      navigate(`/product/${product?._id || product?._id}`);
+      // Redirect to login page
+      navigate("/login");
       return false;
     }
 

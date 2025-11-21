@@ -75,8 +75,8 @@ const FAQ = () => {
           answer: "Creating an account is easy! Click on the 'Sign Up' or 'Register' button at the top right of the page. Fill in your name, email address, and create a secure password. You'll receive a verification email to activate your account. You can also create an account through our mobile app, available for download on iOS and Android."
         },
         {
-          question: "Can I place an order without creating an account?",
-          answer: "Yes, you can place an order as a guest without creating an account. However, creating an account offers benefits such as order tracking, wishlist features, faster checkout, exclusive app-only discounts, and easier returns. We recommend creating an account for the best shopping experience."
+          question: "Do I need to create an account to place an order?",
+          answer: "Yes, you need to create an account to place an order. Creating an account offers many benefits such as order tracking, wishlist features, faster checkout, exclusive app-only discounts, and easier returns. Registration is quick and easy - just provide your name, email, and create a password."
         },
         {
           question: "How do I reset my account password?",
