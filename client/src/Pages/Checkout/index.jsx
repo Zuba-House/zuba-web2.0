@@ -2,7 +2,6 @@
 
 import React, { useContext, useEffect, useState } from "react";
 import { Button } from "@mui/material";
-import { BsFillBagCheckFill } from "react-icons/bs";
 import { MyContext } from '../../App';
 import { FaPlus } from "react-icons/fa6";
 import Radio from '@mui/material/Radio';
@@ -22,7 +21,6 @@ const Checkout = () => {
   const [selectedAddress, setSelectedAddress] = useState("");
   // numeric total for server payloads
   const [totalAmount, setTotalAmount] = useState(0);
-  const [isLoading, setIsloading] = useState(false);
   const [showStripeForm, setShowStripeForm] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [isProcessingOrder, setIsProcessingOrder] = useState(false); // Prevent double-click on order creation
@@ -118,67 +116,6 @@ const Checkout = () => {
     return true;
   };
 
-  const cashOnDelivery = () => {
-    // Validate cart before proceeding
-    if (!validateCartStock()) {
-      return;
-    }
-
-    // Validate shipping address and rate
-    if (!selectedShippingRate || !selectedShippingRate.cost) {
-      context?.alertBox("error", "Please go back to cart and enter a shipping address to calculate shipping rates");
-      return;
-    }
-
-    // Prevent double-click on COD orders
-    if (isLoading) {
-      console.log('⚠️ Order is already being processed, please wait...');
-      return;
-    }
-
-    const user = context?.userData
-    setIsloading(true);
-
-    if (userData?.address_details?.length !== 0) {
-      const payLoad = {
-        userId: user?._id,
-        products: context?.cartData,
-        paymentId: '',
-        payment_status: "CASH ON DELIVERY",
-        delivery_address: selectedAddress,
-        totalAmt: totalAmount,
-        shippingCost: selectedShippingRate ? selectedShippingRate.cost : 0,
-        shippingRate: selectedShippingRate,
-        date: new Date().toLocaleString("en-US", {
-          month: "short",
-          day: "2-digit",
-          year: "numeric",
-        })
-      };
-
-
-      postData(`/api/order/create`, payLoad).then((res) => {
-        context.alertBox("success", res?.message);
-
-        if (res?.error === false) {
-          deleteData(`/api/cart/emptyCart/${user?._id}`).then((res) => {
-            context?.getCartItems();
-            setIsloading(false);
-          })
-        } else {
-          context.alertBox("error", res?.message);
-        }
-        // Use window.location for more reliable redirect
-        window.location.href = "/order/success";
-      });
-    } else {
-      context.alertBox("error", "Please add a delivery address before proceeding");
-      setIsloading(false);
-    }
-
-
-
-  }
 
   const handleStripeSuccess = async (paymentIntent) => {
     // Prevent double-click / multiple submissions
@@ -565,16 +502,6 @@ const Checkout = () => {
                     </div>
                   )}
                 </div>
-
-                <Button type="button" className="btn-dark btn-lg w-full flex gap-2 items-center" onClick={cashOnDelivery}>
-                  {
-                    isLoading === true ? <CircularProgress /> :
-                      <>
-                        <BsFillBagCheckFill className="text-[20px]" />
-                        Cash on Delivery
-                      </>
-                  }
-                </Button>
               </div>
 
             </div>
