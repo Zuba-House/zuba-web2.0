@@ -3,9 +3,8 @@
 import React, { useContext, useEffect, useState } from "react";
 import { Button } from "@mui/material";
 import { MyContext } from '../../App';
-import { FaPlus } from "react-icons/fa6";
-import Radio from '@mui/material/Radio';
-import { deleteData, fetchDataFromApi, postData } from "../../utils/api";
+import { Link } from "react-router-dom";
+import { fetchDataFromApi, postData, deleteData } from "../../utils/api";
 import axios from 'axios';
 import { useNavigate, useLocation } from "react-router-dom";
 import CircularProgress from '@mui/material/CircularProgress';
@@ -17,17 +16,13 @@ const VITE_API_URL = import.meta.env.VITE_API_URL;
 const Checkout = () => {
 
   const [userData, setUserData] = useState(null);
-  const [isChecked, setIsChecked] = useState(0);
-  const [selectedAddress, setSelectedAddress] = useState("");
-  const [selectedAddressData, setSelectedAddressData] = useState(null);
   // numeric total for server payloads
   const [totalAmount, setTotalAmount] = useState(0);
   const [showStripeForm, setShowStripeForm] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [isProcessingOrder, setIsProcessingOrder] = useState(false); // Prevent double-click on order creation
   const [selectedShippingRate, setSelectedShippingRate] = useState(null);
-  const [shippingOptions, setShippingOptions] = useState([]);
-  const [loadingShipping, setLoadingShipping] = useState(false);
+  const [shippingAddress, setShippingAddress] = useState(null);
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const context = useContext(MyContext);
@@ -39,34 +34,29 @@ const Checkout = () => {
     window.scrollTo(0, 0);
     setUserData(context?.userData);
     
-    // Set initial address if available
-    if (context?.userData?.address_details?.[0]) {
-      const firstAddress = context.userData.address_details[0];
-      setSelectedAddress(firstAddress._id);
-      setSelectedAddressData(firstAddress);
-      
-      // Set phone from address if available
-      if (firstAddress?.contactInfo?.phone) {
-        setPhone(firstAddress.contactInfo.phone);
-      }
+    // Get address, phone, and shipping rate from location state (passed from Cart page)
+    if (location.state?.shippingAddress) {
+      setShippingAddress(location.state.shippingAddress);
     }
     
-    // Get shipping rate from location state (passed from Cart page) - fallback
-    if (location.state?.selectedShippingRate && !selectedShippingRate) {
+    if (location.state?.phone) {
+      setPhone(location.state.phone);
+      setPhoneError('');
+    }
+    
+    if (location.state?.selectedShippingRate) {
       setSelectedShippingRate(location.state.selectedShippingRate);
     }
-  }, [context?.userData, location.state]);
-
-  // Calculate shipping when address is selected and cart is available
-  useEffect(() => {
-    if (selectedAddressData && context?.cartData?.length > 0 && !loadingShipping) {
-      // Use a small delay to avoid multiple calls
-      const timer = setTimeout(() => {
-        calculateShipping(selectedAddressData);
-      }, 300);
-      return () => clearTimeout(timer);
+    
+    // If no data from cart, redirect back to cart
+    if (!location.state?.shippingAddress || !location.state?.phone || !location.state?.selectedShippingRate) {
+      context?.alertBox("error", "Please complete your shipping information in the cart first");
+      setTimeout(() => {
+        history("/cart");
+      }, 2000);
     }
-  }, [selectedAddressData?._id, context?.cartData?.length]);
+  }, [location.state]);
+
 
 
   useEffect(() => {
@@ -87,113 +77,6 @@ const Checkout = () => {
 
   // Removed PayPal integration
 
-  const editAddress = (id) => {
-    context?.setOpenAddressPanel(true);
-    context?.setAddressMode("edit");
-    context?.setAddressId(id);
-  }
-
-
-  const handleChange = (e, index) => {
-    if (e.target.checked) {
-      setIsChecked(index);
-      const addressId = e.target.value;
-      setSelectedAddress(addressId);
-      
-      // Get full address data
-      const address = userData?.address_details?.find(addr => addr._id === addressId);
-      setSelectedAddressData(address);
-      
-      // Set phone from address if available
-      if (address?.contactInfo?.phone) {
-        setPhone(address.contactInfo.phone);
-        setPhoneError('');
-      }
-      
-      // Calculate shipping for this address
-      if (address && context?.cartData?.length > 0) {
-        calculateShipping(address);
-      }
-    }
-  }
-
-  // Calculate shipping using new comprehensive calculator
-  const calculateShipping = async (address) => {
-    if (!address || !context?.cartData || context.cartData.length === 0) {
-      return;
-    }
-
-    setLoadingShipping(true);
-    
-    try {
-      // Prepare shipping address for calculator
-      const shippingAddress = {
-        countryCode: address?.address?.countryCode || address?.countryCode || 'CA',
-        country: address?.address?.country || address?.country || 'Canada',
-        province: address?.address?.provinceCode || address?.provinceCode || address?.address?.province || address?.province || '',
-        city: address?.address?.city || address?.city || '',
-        postalCode: address?.address?.postalCode || address?.postalCode || ''
-      };
-
-      // Fetch product data for cart items to get category and weight
-      const cartItemsWithProducts = await Promise.all(
-        context.cartData.map(async (item) => {
-          try {
-            // Try to get product data if not already available
-            let productData = item.product;
-            if (!productData && item.productId) {
-              const productResponse = await fetchDataFromApi(`/api/product/${item.productId}`);
-              productData = productResponse?.product || productResponse;
-            }
-            
-            return {
-              product: productData || {},
-              productId: item.productId,
-              quantity: item.quantity || 1,
-              price: item.price
-            };
-          } catch (error) {
-            console.warn('Error fetching product data:', error);
-            return {
-              product: {},
-              productId: item.productId,
-              quantity: item.quantity || 1,
-              price: item.price
-            };
-          }
-        })
-      );
-
-      const response = await postData('/api/shipping/calculate', {
-        cartItems: cartItemsWithProducts,
-        shippingAddress: shippingAddress
-      });
-
-      if (response?.success && response?.options && response.options.length > 0) {
-        setShippingOptions(response.options);
-        // Auto-select first option (usually standard)
-        const selectedOption = {
-          ...response.options[0],
-          cost: response.options[0].price
-        };
-        setSelectedShippingRate(selectedOption);
-      } else {
-        setShippingOptions([]);
-        setSelectedShippingRate(null);
-        if (response?.message) {
-          context?.alertBox("error", response.message);
-        }
-      }
-    } catch (error) {
-      console.error('Shipping calculation error:', error);
-      setShippingOptions([]);
-      setSelectedShippingRate(null);
-      context?.alertBox("error", "Failed to calculate shipping rates. Please try again.");
-    } finally {
-      setLoadingShipping(false);
-    }
-  };
-
   // Validate phone number
   const validatePhone = async (phoneNumber) => {
     if (!phoneNumber || phoneNumber.trim() === '') {
@@ -204,7 +87,7 @@ const Checkout = () => {
     try {
       const response = await postData('/api/shipping/validate-phone', {
         phone: phoneNumber,
-        country: selectedAddressData?.address?.countryCode || 'CA'
+        country: shippingAddress?.countryCode || 'CA'
       });
 
       if (response?.success && response?.valid) {
@@ -293,8 +176,9 @@ const Checkout = () => {
     }
 
     const user = context?.userData;
-    if (userData?.address_details?.length === 0) {
-      context.alertBox("error", "Please add a delivery address before proceeding");
+    if (!shippingAddress || !shippingAddress.city || !shippingAddress.countryCode) {
+      context.alertBox("error", "Shipping address is required. Please go back to cart and enter your address.");
+      history("/cart");
       return;
     }
 
@@ -316,16 +200,28 @@ const Checkout = () => {
       totalAmountState: totalAmount
     });
 
+    // Find or create address ID from shippingAddress
+    let addressId = null;
+    if (shippingAddress && context?.userData?.address_details) {
+      // Try to find existing address
+      const existingAddress = context.userData.address_details.find(addr => 
+        addr.address?.city === shippingAddress.city &&
+        addr.address?.postalCode === shippingAddress.postal_code
+      );
+      addressId = existingAddress?._id || null;
+    }
+
     const payLoad = {
       userId: user?._id,
       products: context?.cartData,
       paymentId: paymentIntent?.id || '',
       payment_status: "COMPLETED",
-      delivery_address: selectedAddress,
+      delivery_address: addressId, // Use address ID if found, otherwise will be created
       totalAmt: finalTotal, // Use calculated total with shipping
       shippingCost: shippingCost,
       shippingRate: selectedShippingRate,
       phone: phone, // Include phone number
+      shippingAddress: shippingAddress, // Include full address data
       date: new Date().toLocaleString("en-US", {
         month: "short",
         day: "2-digit",
@@ -413,19 +309,32 @@ const Checkout = () => {
 
   const handleStripeFailed = async (error) => {
     const user = context?.userData;
-    if (userData?.address_details?.length === 0) {
+    if (!shippingAddress) {
       return;
     }
     const fail = error || {};
     const pi = fail?.payment_intent || fail?.paymentIntent || {};
     const lastErr = pi?.last_payment_error || {};
+    
+    // Find address ID
+    let addressId = null;
+    if (shippingAddress && context?.userData?.address_details) {
+      const existingAddress = context.userData.address_details.find(addr => 
+        addr.address?.city === shippingAddress.city &&
+        addr.address?.postalCode === shippingAddress.postal_code
+      );
+      addressId = existingAddress?._id || null;
+    }
+    
     const payLoad = {
       userId: user?._id,
       products: context?.cartData,
       paymentId: pi?.id || '',
       payment_status: "FAILED",
-      delivery_address: selectedAddress,
+      delivery_address: addressId,
       totalAmt: totalAmount,
+      shippingAddress: shippingAddress,
+      phone: phone,
       date: new Date().toLocaleString("en-US", {
         month: "short",
         day: "2-digit",
@@ -450,179 +359,55 @@ const Checkout = () => {
         <div className="w-full lg:w-[70%] m-auto flex flex-col md:flex-row gap-5">
           <div className="leftCol w-full md:w-[60%]">
             <div className="card bg-white shadow-md p-5 rounded-md w-full">
-              <div className="flex items-center justify-between">
-                <h2>Select Delivery Address</h2>
-                {
-                  userData?.address_details?.length !== 0 &&
-                  <Button variant="outlined"
-                    onClick={() => {
-                      context?.setOpenAddressPanel(true);
-                      context?.setAddressMode("add");
-                    }} className="btn">
-                    <FaPlus />
-                    ADD {context?.windowWidth< 767 ? '' : 'NEW ADDRESS'}
-                  </Button>
-                }
-
-              </div>
-
+              <h2>Delivery Information</h2>
               <br />
 
-              <div className="flex flex-col gap-4">
-
-
-                {
-                  userData?.address_details?.length !== 0 ? userData?.address_details?.map((address, index) => {
-
-                    return (
-                      <label className={`flex gap-3 p-4 border border-[rgba(0,0,0,0.1)] rounded-md relative ${isChecked === index && 'bg-[#fff2f2]'}`} key={index}>
-                        <div>
-                          <Radio size="small" onChange={(e) => handleChange(e, index)}
-                            checked={isChecked === index} value={address?._id} />
-                        </div>
-                        <div className="info flex-1">
-                          <span className="inline-block text-[13px] font-[500] p-1 bg-[#f1f1f1] rounded-md mb-2">
-                            {address?.label || address?.addressType || 'Home'}
-                          </span>
-                          <h3 className="font-[600] mb-1">
-                            {address?.contactInfo?.firstName 
-                              ? `${address.contactInfo.firstName} ${address.contactInfo.lastName || ''}`.trim()
-                              : userData?.name
-                            }
-                          </h3>
-                          <p className="mt-0 mb-1 text-[14px] text-gray-700">
-                            {address?.address?.addressLine1 
-                              ? `${address.address.addressLine1}${address.address.addressLine2 ? ', ' + address.address.addressLine2 : ''}, ${address.address.city}, ${address.address.provinceCode} ${address.address.postalCode}, ${address.address.country}`
-                              : `${address?.address_line1 || ''} ${address?.city || ''} ${address?.country || ''} ${address?.state || ''} ${address?.landmark || ''}`.trim()
-                            }
-                          </p>
-                          <p className="mb-0 font-[500] text-[14px]">
-                            {address?.contactInfo?.phone 
-                              ? address.contactInfo.phone 
-                              : (address?.mobile ? `+${address.mobile}` : (userData?.mobile ? `+${userData.mobile}` : ''))
-                            }
-                          </p>
-                        </div>
-
-                        <Button variant="text" className="!absolute top-[15px] right-[15px]" size="small"
-                          onClick={() => editAddress(address?._id)}
-                        >EDIT</Button>
-
-                      </label>
-                    )
-                  })
-
-                    :
-
-
-                    <>
-                      <div className="flex items-center mt-5 justify-between flex-col p-5">
-                        <img src="/map.png" width="100" />
-                        <h2 className="text-center">No Addresses found in your account!</h2>
-                        <p className="mt-0">Add a delivery address.</p>
-                        <Button className="btn-org" 
-                        onClick={() => {
-                          context?.setOpenAddressPanel(true);
-                          context?.setAddressMode("add");
-                        }}>ADD ADDRESS</Button>
-                      </div>
-                    </>
-
-                }
-
-              </div>
-
-              {/* Phone Number - REQUIRED */}
-              {selectedAddress && selectedAddressData && (
-                <div className="mt-4">
-                  <label htmlFor="phone" className="block text-[14px] font-[600] mb-2">
-                    Phone Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    value={phone}
-                    onChange={(e) => {
-                      setPhone(e.target.value);
-                      setPhoneError('');
-                    }}
-                    onBlur={(e) => {
-                      if (e.target.value) {
-                        validatePhone(e.target.value);
-                      }
-                    }}
-                    placeholder="+1-613-555-0100"
-                    required
-                    className={`w-full px-4 py-2.5 border rounded-md text-[14px] focus:outline-none focus:ring-2 focus:ring-primary ${
-                      phoneError ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  />
-                  {phoneError && (
-                    <span className="text-red-500 text-[12px] mt-1 block">{phoneError}</span>
+              {/* Display Shipping Address */}
+              {shippingAddress && (
+                <div className="mb-4 p-4 border border-gray-200 rounded-md bg-gray-50">
+                  <h3 className="text-[14px] font-[600] mb-2">Shipping Address</h3>
+                  <p className="text-[14px] text-gray-700 mb-1">
+                    {shippingAddress.addressLine1 || shippingAddress.city}
+                    {shippingAddress.addressLine2 && `, ${shippingAddress.addressLine2}`}
+                  </p>
+                  <p className="text-[14px] text-gray-700 mb-1">
+                    {shippingAddress.city}, {shippingAddress.province} {shippingAddress.postal_code}
+                  </p>
+                  <p className="text-[14px] text-gray-700">
+                    {shippingAddress.country}
+                  </p>
+                  {phone && (
+                    <p className="text-[14px] text-gray-700 mt-2 font-[500]">
+                      Phone: {phone}
+                    </p>
                   )}
-                  <small className="text-gray-600 text-[12px] mt-1 block">
-                    Required for shipping label. Format: +1-XXX-XXX-XXXX
-                  </small>
+                  <Link to="/cart">
+                    <Button variant="outlined" size="small" className="mt-2">
+                      Change Address
+                    </Button>
+                  </Link>
                 </div>
               )}
 
-              {/* Shipping Options */}
-              {selectedAddress && selectedAddressData && (
-                <div className="mt-4">
-                  <h3 className="text-[16px] font-[600] mb-3">Shipping Method</h3>
-                  
-                  {loadingShipping ? (
-                    <div className="flex items-center justify-center py-4">
-                      <CircularProgress size={24} />
-                      <span className="ml-2 text-[14px] text-gray-600">Calculating shipping...</span>
+              {/* Display Selected Shipping Method */}
+              {selectedShippingRate && (
+                <div className="mb-4 p-4 border border-gray-200 rounded-md bg-gray-50">
+                  <h3 className="text-[14px] font-[600] mb-2">Shipping Method</h3>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[14px] font-[500]">{selectedShippingRate.name || selectedShippingRate.service}</p>
+                      {selectedShippingRate.estimatedDelivery && (
+                        <p className="text-[12px] text-gray-600">
+                          Estimated: {selectedShippingRate.estimatedDelivery}
+                        </p>
+                      )}
                     </div>
-                  ) : shippingOptions.length > 0 ? (
-                    <div className="flex flex-col gap-3">
-                      {shippingOptions.map((option) => (
-                        <div
-                          key={option.id}
-                          onClick={() => {
-                            setSelectedShippingRate({
-                              ...option,
-                              cost: option.price
-                            });
-                          }}
-                          className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                            selectedShippingRate?.id === option.id
-                              ? 'border-primary bg-blue-50'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-[18px]">{option.icon}</span>
-                                <strong className="text-[15px] font-[600]">{option.name}</strong>
-                              </div>
-                              <p className="text-[13px] text-gray-600 mb-1">{option.description}</p>
-                              <p className="text-[12px] text-green-600 font-[500] mb-1">
-                                Estimated: {option.estimatedDelivery}
-                              </p>
-                              <p className="text-[12px] text-gray-500">{option.deliveryDays}</p>
-                            </div>
-                            <div className="text-right ml-4">
-                              <strong className="text-[20px] font-[700] text-primary">
-                                {formatCurrency(option.price)}
-                              </strong>
-                              <p className="text-[12px] text-gray-500">{option.currency}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                    <div className="text-right">
+                      <strong className="text-[16px] font-[700] text-primary">
+                        {formatCurrency(selectedShippingRate.cost || selectedShippingRate.price || 0)}
+                      </strong>
                     </div>
-                  ) : (
-                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                      <p className="text-[14px] text-yellow-800">
-                        No shipping options available. Please check your address or try again.
-                      </p>
-                    </div>
-                  )}
+                  </div>
                 </div>
               )}
 

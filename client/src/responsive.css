@@ -1,6 +1,89 @@
 /* ========================================
    📱 MOBILE RESPONSIVE STYLES (320px - 992px)
    ======================================== */
+
+/* Cart Page - Mobile Optimization */
+@media only screen and (min-width:320px) and (max-width:992px){
+    /* Cart layout - stack on mobile */
+    .container.w-\[80\%\] {
+        width: 95% !important;
+        max-width: 95% !important;
+        padding: 0 10px !important;
+    }
+    
+    /* Cart totals sidebar - full width on mobile */
+    .rightPart {
+        width: 100% !important;
+        margin-top: 20px !important;
+        position: relative !important;
+        top: 0 !important;
+        z-index: 1 !important;
+    }
+    
+    /* Shipping address input - mobile friendly */
+    .shipping-address-input {
+        padding: 10px !important;
+    }
+    
+    .shipping-address-input input,
+    .shipping-address-input select {
+        font-size: 14px !important;
+        padding: 10px !important;
+    }
+    
+    /* Phone input - mobile friendly */
+    input[type="tel"] {
+        font-size: 14px !important;
+        padding: 10px !important;
+    }
+    
+    /* Shipping options - mobile friendly */
+    .shipping-address-input + div {
+        margin-top: 15px !important;
+    }
+    
+    /* Shipping option cards - mobile */
+    .border-2.rounded-lg {
+        padding: 12px !important;
+    }
+    
+    .border-2.rounded-lg strong {
+        font-size: 13px !important;
+    }
+    
+    .border-2.rounded-lg p {
+        font-size: 11px !important;
+    }
+    
+    /* Buttons - mobile */
+    .btn-org.btn-lg {
+        font-size: 14px !important;
+        padding: 12px !important;
+    }
+    
+    /* Checkout page - mobile */
+    .leftCol,
+    .rightCol {
+        width: 100% !important;
+    }
+    
+    .card {
+        padding: 15px !important;
+    }
+    
+    .card h2 {
+        font-size: 18px !important;
+    }
+    
+    /* Delivery information display - mobile */
+    .bg-gray-50 {
+        padding: 12px !important;
+    }
+    
+    .bg-gray-50 p {
+        font-size: 13px !important;
+    }
+}
 @media only screen and (min-width:320px) and (max-width:992px){
     /* Product Detail Page - Mobile Optimization */
     .product-details-wrapper {

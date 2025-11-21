@@ -2,26 +2,34 @@ import React, { useContext, useEffect, useState } from "react";
 
 import Button from "@mui/material/Button";
 import { BsFillBagCheckFill } from "react-icons/bs";
+import { CircularProgress } from "@mui/material";
 import CartItems from "./cartItems";
 import { MyContext } from "../../App";
-import { fetchDataFromApi } from "../../utils/api";
-import { Link } from "react-router-dom";
+import { fetchDataFromApi, postData } from "../../utils/api";
+import { Link, useNavigate } from "react-router-dom";
 import { formatCurrency } from "../../utils/currency";
-import ShippingRates from "../../components/ShippingRates/ShippingRates";
 import ShippingAddressInput from "../../components/ShippingAddressInput/ShippingAddressInput";
 
 const CartPage = () => {
 
   const context = useContext(MyContext);
+  const history = useNavigate();
   const [shippingAddress, setShippingAddress] = useState({
     postal_code: '',
     city: '',
     province: '',
     country: 'Canada',
     countryCode: 'CA',
-    coordinates: null
+    coordinates: null,
+    addressLine1: '',
+    addressLine2: ''
   });
+  const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [selectedShippingRate, setSelectedShippingRate] = useState(null);
+  const [shippingOptions, setShippingOptions] = useState([]);
+  const [loadingShipping, setLoadingShipping] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -29,16 +37,207 @@ const CartPage = () => {
     if (context?.userData?.address_details?.[0]) {
       const addr = context.userData.address_details[0];
       setShippingAddress({
-        postal_code: addr.postalCode || addr.postal_code || '',
-        city: addr.city || '',
-        province: addr.provinceCode || addr.province || '',
-        country: addr.country || 'CA'
+        postal_code: addr.address?.postalCode || addr.postalCode || addr.postal_code || '',
+        city: addr.address?.city || addr.city || '',
+        province: addr.address?.provinceCode || addr.provinceCode || addr.province || '',
+        country: addr.address?.country || addr.country || 'Canada',
+        countryCode: addr.address?.countryCode || addr.countryCode || 'CA',
+        addressLine1: addr.address?.addressLine1 || addr.address_line1 || '',
+        addressLine2: addr.address?.addressLine2 || addr.address_line2 || '',
+        coordinates: addr.googlePlaces?.coordinates || null
       });
+      // Pre-fill phone if available
+      if (addr?.contactInfo?.phone) {
+        setPhone(addr.contactInfo.phone);
+      }
     }
   }, [context?.userData]);
 
+  // Calculate shipping when address changes
+  useEffect(() => {
+    if (shippingAddress?.city && shippingAddress?.countryCode && context?.cartData?.length > 0) {
+      const timer = setTimeout(() => {
+        calculateShipping();
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      setShippingOptions([]);
+      setSelectedShippingRate(null);
+    }
+  }, [shippingAddress?.city, shippingAddress?.countryCode, shippingAddress?.province, context?.cartData?.length]);
 
 
+
+
+  // Calculate shipping using new comprehensive calculator
+  const calculateShipping = async () => {
+    if (!shippingAddress?.city || !shippingAddress?.countryCode || !context?.cartData?.length) {
+      return;
+    }
+
+    setLoadingShipping(true);
+    
+    try {
+      // Prepare shipping address for calculator
+      const addressForCalc = {
+        country: shippingAddress.country || (shippingAddress.countryCode === 'CA' ? 'Canada' : shippingAddress.countryCode === 'US' ? 'United States' : ''),
+        countryCode: shippingAddress.countryCode,
+        province: shippingAddress.province,
+        city: shippingAddress.city,
+        postalCode: shippingAddress.postal_code
+      };
+
+      // Fetch product data for cart items to get category and weight
+      const cartItemsWithProducts = await Promise.all(
+        context.cartData.map(async (item) => {
+          try {
+            let productData = item.product;
+            if (!productData && item.productId) {
+              const productResponse = await fetchDataFromApi(`/api/product/${item.productId}`);
+              productData = productResponse?.product || productResponse;
+            }
+            
+            return {
+              product: productData || {},
+              productId: item.productId,
+              quantity: item.quantity || 1,
+              price: item.price
+            };
+          } catch (error) {
+            console.warn('Error fetching product data:', error);
+            return {
+              product: {},
+              productId: item.productId,
+              quantity: item.quantity || 1,
+              price: item.price
+            };
+          }
+        })
+      );
+
+      const response = await postData('/api/shipping/calculate', {
+        cartItems: cartItemsWithProducts,
+        shippingAddress: addressForCalc
+      });
+
+      if (response?.success && response?.options && response.options.length > 0) {
+        setShippingOptions(response.options);
+        // Auto-select first option (usually standard)
+        const selectedOption = {
+          ...response.options[0],
+          cost: response.options[0].price
+        };
+        setSelectedShippingRate(selectedOption);
+      } else {
+        setShippingOptions([]);
+        setSelectedShippingRate(null);
+      }
+    } catch (error) {
+      console.error('Shipping calculation error:', error);
+      setShippingOptions([]);
+      setSelectedShippingRate(null);
+    } finally {
+      setLoadingShipping(false);
+    }
+  };
+
+  // Validate phone number
+  const validatePhone = async (phoneNumber) => {
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      setPhoneError('Phone number is required');
+      return false;
+    }
+
+    try {
+      const response = await postData('/api/shipping/validate-phone', {
+        phone: phoneNumber,
+        country: shippingAddress.countryCode || 'CA'
+      });
+
+      if (response?.success && response?.valid) {
+        setPhone(response.formatted || phoneNumber);
+        setPhoneError('');
+        return true;
+      } else {
+        setPhoneError(response?.message || 'Invalid phone number format');
+        return false;
+      }
+    } catch (error) {
+      console.error('Phone validation error:', error);
+      setPhoneError('Failed to validate phone number');
+      return false;
+    }
+  };
+
+  // Save address to user account
+  const saveAddress = async (silent = false) => {
+    if (!shippingAddress.city || !shippingAddress.countryCode) {
+      context?.alertBox("error", "Please enter a complete address (city and country required)");
+      return;
+    }
+
+    if (!phone || phone.trim() === '') {
+      context?.alertBox("error", "Please enter a phone number");
+      return;
+    }
+
+    // Validate phone first
+    const isValidPhone = await validatePhone(phone);
+    if (!isValidPhone) {
+      return;
+    }
+
+    setSavingAddress(true);
+
+    try {
+      const addressData = {
+        label: 'Home',
+        addressType: 'home',
+        contactInfo: {
+          firstName: context?.userData?.name?.split(' ')[0] || '',
+          lastName: context?.userData?.name?.split(' ').slice(1).join(' ') || '',
+          phone: phone
+        },
+        address: {
+          addressLine1: shippingAddress.addressLine1 || shippingAddress.city,
+          addressLine2: shippingAddress.addressLine2 || '',
+          city: shippingAddress.city,
+          provinceCode: shippingAddress.province,
+          postalCode: shippingAddress.postal_code,
+          country: shippingAddress.country || (shippingAddress.countryCode === 'CA' ? 'Canada' : ''),
+          countryCode: shippingAddress.countryCode
+        },
+        googlePlaces: shippingAddress.coordinates ? {
+          coordinates: shippingAddress.coordinates
+        } : undefined,
+        userId: context?.userData?._id
+      };
+
+      const response = await postData('/api/address/add', addressData);
+
+      if (response?.error !== true) {
+        if (!silent) {
+          context?.alertBox("success", "Address saved successfully");
+        }
+        // Refresh user data
+        await context?.getUserDetails();
+        return true;
+      } else {
+        if (!silent) {
+          context?.alertBox("error", response?.message || "Failed to save address");
+        }
+        return false;
+      }
+    } catch (error) {
+      console.error('Error saving address:', error);
+      if (!silent) {
+        context?.alertBox("error", "Failed to save address. Please try again.");
+      }
+      return false;
+    } finally {
+      setSavingAddress(false);
+    }
+  };
 
   // Helper to get variation display info (backward compatible)
   const getVariationDisplay = (item) => {
@@ -117,25 +316,112 @@ const CartPage = () => {
               <ShippingAddressInput
                 onAddressChange={(newAddress) => {
                   setShippingAddress({
+                    ...shippingAddress,
                     postal_code: newAddress.postal_code,
                     city: newAddress.city,
                     province: newAddress.province,
                     country: newAddress.country,
                     countryCode: newAddress.countryCode,
-                    coordinates: newAddress.coordinates
+                    coordinates: newAddress.coordinates,
+                    addressLine1: newAddress.addressLine1 || '',
+                    addressLine2: newAddress.addressLine2 || ''
                   });
                 }}
                 initialAddress={shippingAddress}
               />
             </div>
 
-            {/* Shipping Rates */}
-            {context.cartData?.length > 0 && (
-              <ShippingRates
-                cartItems={context.cartData}
-                shippingAddress={shippingAddress}
-                onRateSelected={setSelectedShippingRate}
-              />
+            {/* Phone Number Input */}
+            {shippingAddress?.city && shippingAddress?.countryCode && (
+              <div className="mt-4 mb-4">
+                <label htmlFor="phone" className="block text-[14px] font-[600] mb-2">
+                  Phone Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  id="phone"
+                  name="phone"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    setPhoneError('');
+                  }}
+                  onBlur={(e) => {
+                    if (e.target.value) {
+                      validatePhone(e.target.value);
+                    }
+                  }}
+                  placeholder="+1-613-555-0100"
+                  required
+                  className={`w-full px-3 py-2 border rounded-md text-[14px] focus:outline-none focus:ring-2 focus:ring-primary ${
+                    phoneError ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                {phoneError && (
+                  <span className="text-red-500 text-[12px] mt-1 block">{phoneError}</span>
+                )}
+                <small className="text-gray-600 text-[12px] mt-1 block">
+                  Required for shipping label. Format: +1-XXX-XXX-XXXX
+                </small>
+              </div>
+            )}
+
+            {/* Shipping Options */}
+            {context.cartData?.length > 0 && shippingAddress?.city && shippingAddress?.countryCode && (
+              <div className="mt-4 mb-4">
+                <h4 className="text-[14px] font-[600] mb-3">Shipping Method</h4>
+                
+                {loadingShipping ? (
+                  <div className="flex items-center justify-center py-4">
+                    <CircularProgress size={20} />
+                    <span className="ml-2 text-[13px] text-gray-600">Calculating...</span>
+                  </div>
+                ) : shippingOptions.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    {shippingOptions.map((option) => (
+                      <div
+                        key={option.id}
+                        onClick={() => {
+                          setSelectedShippingRate({
+                            ...option,
+                            cost: option.price
+                          });
+                        }}
+                        className={`p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                          selectedShippingRate?.id === option.id
+                            ? 'border-primary bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[16px]">{option.icon}</span>
+                              <strong className="text-[14px] font-[600]">{option.name}</strong>
+                            </div>
+                            <p className="text-[12px] text-gray-600 mb-1">{option.description}</p>
+                            <p className="text-[11px] text-green-600 font-[500] mb-1">
+                              Est: {option.estimatedDelivery}
+                            </p>
+                            <p className="text-[11px] text-gray-500">{option.deliveryDays}</p>
+                          </div>
+                          <div className="text-right ml-3">
+                            <strong className="text-[16px] font-[700] text-primary">
+                              {formatCurrency(option.price)}
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                    <p className="text-[13px] text-yellow-800">
+                      No shipping options available. Please check your address.
+                    </p>
+                  </div>
+                )}
+              </div>
             )}
 
             <hr className="my-4" />
@@ -165,39 +451,64 @@ const CartPage = () => {
 
             <br />
 
-            {/* Validate address and shipping rate before allowing checkout */}
+            {/* Save Address Button */}
+            {shippingAddress?.city && shippingAddress?.countryCode && phone && (
+              <Button
+                className="btn-outline w-full mb-3"
+                onClick={saveAddress}
+                disabled={savingAddress}
+              >
+                {savingAddress ? 'Saving...' : '💾 Save Address'}
+              </Button>
+            )}
+
+            {/* Validate address, phone, and shipping rate before allowing checkout */}
             {(() => {
-              const hasValidAddress = shippingAddress && (
-                (shippingAddress.postal_code && shippingAddress.city) ||
-                (shippingAddress.city && shippingAddress.countryCode)
-              );
-              const hasShippingRate = selectedShippingRate && selectedShippingRate.cost > 0;
+              const hasValidAddress = shippingAddress && shippingAddress.city && shippingAddress.countryCode;
+              const hasPhone = phone && phone.trim() !== '' && !phoneError;
+              const hasShippingRate = selectedShippingRate && (selectedShippingRate.cost || selectedShippingRate.price);
               
-              if (!hasValidAddress || !hasShippingRate) {
+              if (!hasValidAddress || !hasPhone || !hasShippingRate) {
                 return (
                   <Button 
                     className="btn-org btn-lg w-full flex gap-2" 
                     disabled
                     onClick={() => {
                       if (!hasValidAddress) {
-                        context?.alertBox("error", "Please enter a complete shipping address (city and country required)");
+                        context?.alertBox("error", "Please enter a complete shipping address");
+                      } else if (!hasPhone) {
+                        context?.alertBox("error", "Please enter a valid phone number");
                       } else if (!hasShippingRate) {
-                        context?.alertBox("error", "Please wait for shipping rates to calculate, or enter a valid address");
+                        context?.alertBox("error", "Please wait for shipping rates to calculate");
                       }
                     }}
                   >
                     <BsFillBagCheckFill className="text-[20px]" /> 
-                    {!hasValidAddress ? "Enter Shipping Address" : "Calculating Shipping..."}
+                    {!hasValidAddress ? "Enter Shipping Address" : !hasPhone ? "Enter Phone Number" : "Calculating Shipping..."}
                   </Button>
                 );
               }
               
               return (
-                <Link to="/checkout" state={{ selectedShippingRate, shippingAddress }}>
-                  <Button className="btn-org btn-lg w-full flex gap-2">
-                    <BsFillBagCheckFill className="text-[20px]" /> Checkout
-                  </Button>
-                </Link>
+                <Button 
+                  className="btn-org btn-lg w-full flex gap-2"
+                  onClick={async () => {
+                    // Save address silently before proceeding
+                    if (shippingAddress?.city && phone && !savingAddress) {
+                      await saveAddress(true); // Save silently
+                    }
+                    // Navigate to checkout
+                    history("/checkout", { 
+                      state: { 
+                        selectedShippingRate, 
+                        shippingAddress,
+                        phone: phone
+                      }
+                    });
+                  }}
+                >
+                  <BsFillBagCheckFill className="text-[20px]" /> Proceed to Checkout
+                </Button>
               );
             })()}
           </div>

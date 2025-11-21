@@ -16,7 +16,9 @@ const ShippingAddressInput = ({ onAddressChange, initialAddress = null }) => {
     province: initialAddress?.province || initialAddress?.provinceCode || initialAddress?.address?.provinceCode || '',
     country: initialAddress?.country || initialAddress?.countryCode || initialAddress?.address?.countryCode || 'CA',
     countryCode: initialAddress?.countryCode || initialAddress?.address?.countryCode || 'CA',
-    coordinates: initialAddress?.coordinates || initialAddress?.googlePlaces?.coordinates || null
+    coordinates: initialAddress?.coordinates || initialAddress?.googlePlaces?.coordinates || null,
+    addressLine1: initialAddress?.addressLine1 || initialAddress?.address?.addressLine1 || '',
+    addressLine2: initialAddress?.addressLine2 || initialAddress?.address?.addressLine2 || ''
   });
 
   const autocompleteInputRef = useRef(null);
@@ -56,11 +58,15 @@ const ShippingAddressInput = ({ onAddressChange, initialAddress = null }) => {
   const fillAddressFromPlace = (place) => {
     const components = {};
     place.address_components.forEach((component) => {
-      const type = component.types[0];
-      components[type] = {
-        long: component.long_name,
-        short: component.short_name
-      };
+      // Store all types for this component
+      component.types.forEach((type) => {
+        if (!components[type]) {
+          components[type] = {
+            long: component.long_name,
+            short: component.short_name
+          };
+        }
+      });
     });
 
     const city = components.locality?.long || 
@@ -71,6 +77,11 @@ const ShippingAddressInput = ({ onAddressChange, initialAddress = null }) => {
     const country = components.country?.long || '';
     const countryCode = components.country?.short || 'CA';
     const postalCode = components.postal_code?.long || '';
+    
+    // Extract street address
+    const streetNumber = components.street_number?.long || '';
+    const route = components.route?.long || '';
+    const addressLine1 = [streetNumber, route].filter(Boolean).join(' ').trim() || place.formatted_address?.split(',')[0] || '';
 
     const newAddress = {
       postal_code: postalCode.replace(/\s/g, '').toUpperCase(),
@@ -78,6 +89,8 @@ const ShippingAddressInput = ({ onAddressChange, initialAddress = null }) => {
       province: provinceCode || province,
       country: country,
       countryCode: countryCode,
+      addressLine1: addressLine1,
+      addressLine2: '',
       coordinates: {
         lat: place.geometry?.location?.lat() || null,
         lng: place.geometry?.location?.lng() || null
