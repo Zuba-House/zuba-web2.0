@@ -8,8 +8,18 @@ const ProductVariations = ({ formData, setFormData, errors }) => {
     regularPrice: '',
     salePrice: '',
     stock: 0,
+    endlessStock: false,
     sku: '',
-    image: ''
+    image: '', // Legacy - for backward compatibility
+    images: [], // Array of image URLs
+    weight: '',
+    weightUnit: 'kg',
+    dimensions: {
+      length: '',
+      width: '',
+      height: '',
+      unit: 'cm'
+    }
   });
 
   // Generate variations from attributes
@@ -72,6 +82,11 @@ const ProductVariations = ({ formData, setFormData, errors }) => {
       return;
     }
 
+    // Handle images: use images array if available, otherwise fallback to single image
+    const variationImages = variationData.images && variationData.images.length > 0 
+      ? variationData.images 
+      : (variationData.image ? [variationData.image] : []);
+    
     const variation = {
       attributes: Object.entries(variationData.attributes).map(([name, value]) => ({
         name,
@@ -87,7 +102,16 @@ const ProductVariations = ({ formData, setFormData, errors }) => {
       manageStock: true,
       endlessStock: variationData.endlessStock || false,
       sku: variationData.sku || '',
-      image: variationData.image || '',
+      image: variationImages[0] || '', // Legacy field - first image for backward compatibility
+      images: variationImages, // New images array
+      weight: variationData.weight ? parseFloat(variationData.weight) : null,
+      weightUnit: variationData.weightUnit || 'kg',
+      dimensions: {
+        length: variationData.dimensions?.length ? parseFloat(variationData.dimensions.length) : null,
+        width: variationData.dimensions?.width ? parseFloat(variationData.dimensions.width) : null,
+        height: variationData.dimensions?.height ? parseFloat(variationData.dimensions.height) : null,
+        unit: variationData.dimensions?.unit || 'cm'
+      },
       isActive: true,
       isDefault: false
     };
@@ -102,13 +126,28 @@ const ProductVariations = ({ formData, setFormData, errors }) => {
       regularPrice: '',
       salePrice: '',
       stock: 0,
+      endlessStock: false,
       sku: '',
-      image: ''
+      image: '',
+      images: [],
+      weight: '',
+      weightUnit: 'kg',
+      dimensions: {
+        length: '',
+        width: '',
+        height: '',
+        unit: 'cm'
+      }
     });
   };
 
   const updateVariation = (index) => {
     const updated = [...formData.variations];
+    // Handle images: use images array if available, otherwise fallback to single image
+    const variationImages = variationData.images && variationData.images.length > 0 
+      ? variationData.images 
+      : (variationData.image ? [variationData.image] : []);
+    
     updated[index] = {
       ...updated[index],
       regularPrice: parseFloat(variationData.regularPrice) || updated[index].regularPrice,
@@ -118,7 +157,16 @@ const ProductVariations = ({ formData, setFormData, errors }) => {
       stockStatus: variationData.endlessStock ? 'in_stock' : (parseInt(variationData.stock) > 0 ? 'in_stock' : 'out_of_stock'),
       endlessStock: variationData.endlessStock || false,
       sku: variationData.sku || updated[index].sku,
-      image: variationData.image || updated[index].image
+      image: variationImages[0] || updated[index].image || '', // Legacy field
+      images: variationImages.length > 0 ? variationImages : (updated[index].images || []), // New images array
+      weight: variationData.weight ? parseFloat(variationData.weight) : (updated[index].weight || null),
+      weightUnit: variationData.weightUnit || updated[index].weightUnit || 'kg',
+      dimensions: {
+        length: variationData.dimensions?.length ? parseFloat(variationData.dimensions.length) : (updated[index].dimensions?.length || null),
+        width: variationData.dimensions?.width ? parseFloat(variationData.dimensions.width) : (updated[index].dimensions?.width || null),
+        height: variationData.dimensions?.height ? parseFloat(variationData.dimensions.height) : (updated[index].dimensions?.height || null),
+        unit: variationData.dimensions?.unit || updated[index].dimensions?.unit || 'cm'
+      }
     };
 
     setFormData(prev => ({
@@ -134,7 +182,16 @@ const ProductVariations = ({ formData, setFormData, errors }) => {
       stock: 0,
       endlessStock: false,
       sku: '',
-      image: ''
+      image: '',
+      images: [],
+      weight: '',
+      weightUnit: 'kg',
+      dimensions: {
+        length: '',
+        width: '',
+        height: '',
+        unit: 'cm'
+      }
     });
   };
 
@@ -390,6 +447,172 @@ const ProductVariations = ({ formData, setFormData, errors }) => {
               value={variationData.sku}
               onChange={(e) => setVariationData(prev => ({ ...prev, sku: e.target.value }))}
               placeholder="Variation SKU"
+              className="w-full px-4 py-2 rounded-lg outline-none"
+              style={{ backgroundColor: '#1a3d52', color: '#e5e2db', border: '1px solid rgba(239, 178, 145, 0.2)' }}
+            />
+          </div>
+        </div>
+
+        {/* Variation Images - Multiple Images Support */}
+        <div className="mb-4">
+          <label className="block mb-2 font-semibold text-sm" style={{ color: '#e5e2db' }}>
+            Variation Images (Multiple images for this variation)
+          </label>
+          <div className="space-y-2">
+            {variationData.images && variationData.images.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mb-2">
+                {variationData.images.map((img, idx) => (
+                  <div key={idx} className="relative">
+                    <img 
+                      src={img} 
+                      alt={`Variation ${idx + 1}`}
+                      className="w-full h-20 object-cover rounded border border-gray-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newImages = variationData.images.filter((_, i) => i !== idx);
+                        setVariationData(prev => ({ ...prev, images: newImages, image: newImages[0] || '' }));
+                      }}
+                      className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <input
+              type="text"
+              placeholder="Enter image URL and press Enter"
+              className="w-full px-4 py-2 rounded-lg outline-none"
+              style={{ backgroundColor: '#1a3d52', color: '#e5e2db', border: '1px solid rgba(239, 178, 145, 0.2)' }}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const url = e.target.value.trim();
+                  if (url) {
+                    setVariationData(prev => ({
+                      ...prev,
+                      images: [...(prev.images || []), url],
+                      image: prev.images && prev.images.length > 0 ? prev.image : url // Set first image as legacy field
+                    }));
+                    e.target.value = '';
+                  }
+                }
+              }}
+            />
+            <p className="text-xs mt-1" style={{ color: '#e5e2db', opacity: 0.6 }}>
+              Press Enter after each URL to add multiple images
+            </p>
+          </div>
+        </div>
+
+        {/* Dimensions and Weight */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          {/* Weight */}
+          <div>
+            <label className="block mb-2 font-semibold text-sm" style={{ color: '#e5e2db' }}>
+              Weight
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={variationData.weight}
+                onChange={(e) => setVariationData(prev => ({ ...prev, weight: e.target.value }))}
+                placeholder="0.00"
+                min="0"
+                step="0.01"
+                className="flex-1 px-4 py-2 rounded-lg outline-none"
+                style={{ backgroundColor: '#1a3d52', color: '#e5e2db', border: '1px solid rgba(239, 178, 145, 0.2)' }}
+              />
+              <select
+                value={variationData.weightUnit}
+                onChange={(e) => setVariationData(prev => ({ ...prev, weightUnit: e.target.value }))}
+                className="px-4 py-2 rounded-lg outline-none"
+                style={{ backgroundColor: '#1a3d52', color: '#e5e2db', border: '1px solid rgba(239, 178, 145, 0.2)' }}
+              >
+                <option value="kg">kg</option>
+                <option value="g">g</option>
+                <option value="lb">lb</option>
+                <option value="oz">oz</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Dimensions Unit */}
+          <div>
+            <label className="block mb-2 font-semibold text-sm" style={{ color: '#e5e2db' }}>
+              Dimensions Unit
+            </label>
+            <select
+              value={variationData.dimensions?.unit || 'cm'}
+              onChange={(e) => setVariationData(prev => ({
+                ...prev,
+                dimensions: { ...prev.dimensions, unit: e.target.value }
+              }))}
+              className="w-full px-4 py-2 rounded-lg outline-none"
+              style={{ backgroundColor: '#1a3d52', color: '#e5e2db', border: '1px solid rgba(239, 178, 145, 0.2)' }}
+            >
+              <option value="cm">cm</option>
+              <option value="in">in</option>
+              <option value="m">m</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Dimensions */}
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div>
+            <label className="block mb-2 font-semibold text-sm" style={{ color: '#e5e2db' }}>
+              Length
+            </label>
+            <input
+              type="number"
+              value={variationData.dimensions?.length || ''}
+              onChange={(e) => setVariationData(prev => ({
+                ...prev,
+                dimensions: { ...prev.dimensions, length: e.target.value }
+              }))}
+              placeholder="0.00"
+              min="0"
+              step="0.01"
+              className="w-full px-4 py-2 rounded-lg outline-none"
+              style={{ backgroundColor: '#1a3d52', color: '#e5e2db', border: '1px solid rgba(239, 178, 145, 0.2)' }}
+            />
+          </div>
+          <div>
+            <label className="block mb-2 font-semibold text-sm" style={{ color: '#e5e2db' }}>
+              Width
+            </label>
+            <input
+              type="number"
+              value={variationData.dimensions?.width || ''}
+              onChange={(e) => setVariationData(prev => ({
+                ...prev,
+                dimensions: { ...prev.dimensions, width: e.target.value }
+              }))}
+              placeholder="0.00"
+              min="0"
+              step="0.01"
+              className="w-full px-4 py-2 rounded-lg outline-none"
+              style={{ backgroundColor: '#1a3d52', color: '#e5e2db', border: '1px solid rgba(239, 178, 145, 0.2)' }}
+            />
+          </div>
+          <div>
+            <label className="block mb-2 font-semibold text-sm" style={{ color: '#e5e2db' }}>
+              Height
+            </label>
+            <input
+              type="number"
+              value={variationData.dimensions?.height || ''}
+              onChange={(e) => setVariationData(prev => ({
+                ...prev,
+                dimensions: { ...prev.dimensions, height: e.target.value }
+              }))}
+              placeholder="0.00"
+              min="0"
+              step="0.01"
               className="w-full px-4 py-2 rounded-lg outline-none"
               style={{ backgroundColor: '#1a3d52', color: '#e5e2db', border: '1px solid rgba(239, 178, 145, 0.2)' }}
             />

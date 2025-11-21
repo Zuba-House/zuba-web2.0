@@ -482,6 +482,16 @@ export async function createProduct(request, response) {
                     stockStatus: variation.endlessStock ? 'in_stock' : (variation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock')),
                     manageStock: variation.manageStock !== false,
                     endlessStock: variation.endlessStock || false,
+                    image: variation.image || (variation.images && variation.images.length > 0 ? variation.images[0] : ''), // Legacy field
+                    images: variation.images && Array.isArray(variation.images) ? variation.images : (variation.image ? [variation.image] : []), // New images array
+                    weight: variation.weight || null,
+                    weightUnit: variation.weightUnit || 'kg',
+                    dimensions: variation.dimensions ? {
+                        length: variation.dimensions.length || null,
+                        width: variation.dimensions.width || null,
+                        height: variation.dimensions.height || null,
+                        unit: variation.dimensions.unit || 'cm'
+                    } : null,
                     isActive: variation.isActive !== false,
                     isDefault: variation.isDefault || false,
                 // Normalize variation attributes to ensure proper structure
@@ -1704,6 +1714,20 @@ export async function updateProduct(request, response) {
                                     stockStatus: variation.endlessStock ? 'in_stock' : (variation.stockStatus || existingVariation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock')),
                                     manageStock: variation.manageStock !== undefined ? variation.manageStock : existingVariation.manageStock !== false,
                                     endlessStock: variation.endlessStock !== undefined ? variation.endlessStock : (existingVariation.endlessStock || false),
+                                    image: variation.image || (variation.images && variation.images.length > 0 ? variation.images[0] : '') || existingVariation.image || '', // Legacy field
+                                    images: variation.images && Array.isArray(variation.images) && variation.images.length > 0 
+                                        ? variation.images 
+                                        : (existingVariation.images && Array.isArray(existingVariation.images) && existingVariation.images.length > 0 
+                                            ? existingVariation.images 
+                                            : (variation.image ? [variation.image] : (existingVariation.image ? [existingVariation.image] : []))), // New images array
+                                    weight: variation.weight !== undefined ? (variation.weight ? parseFloat(variation.weight) : null) : (existingVariation.weight || null),
+                                    weightUnit: variation.weightUnit || existingVariation.weightUnit || 'kg',
+                                    dimensions: variation.dimensions ? {
+                                        length: variation.dimensions.length ? parseFloat(variation.dimensions.length) : null,
+                                        width: variation.dimensions.width ? parseFloat(variation.dimensions.width) : null,
+                                        height: variation.dimensions.height ? parseFloat(variation.dimensions.height) : null,
+                                        unit: variation.dimensions.unit || 'cm'
+                                    } : (existingVariation.dimensions || null),
                                     isActive: variation.isActive !== undefined ? variation.isActive : existingVariation.isActive !== false,
                                     isDefault: variation.isDefault || existingVariation.isDefault || false,
                                     attributes: (variation.attributes || existingVariation.attributes || []).map(attr => ({
@@ -1744,6 +1768,16 @@ export async function updateProduct(request, response) {
                     stockStatus: variation.endlessStock ? 'in_stock' : (variation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock')),
                     manageStock: variation.manageStock !== false,
                     endlessStock: variation.endlessStock || false,
+                    image: variation.image || (variation.images && variation.images.length > 0 ? variation.images[0] : ''), // Legacy field
+                    images: variation.images && Array.isArray(variation.images) ? variation.images : (variation.image ? [variation.image] : []), // New images array
+                    weight: variation.weight || null,
+                    weightUnit: variation.weightUnit || 'kg',
+                    dimensions: variation.dimensions ? {
+                        length: variation.dimensions.length || null,
+                        width: variation.dimensions.width || null,
+                        height: variation.dimensions.height || null,
+                        unit: variation.dimensions.unit || 'cm'
+                    } : null,
                     isActive: variation.isActive !== false,
                     isDefault: variation.isDefault || false,
                         attributes: (variation.attributes || []).map(attr => ({

@@ -150,16 +150,17 @@ const VariationSchema = new mongoose.Schema({
     default: 'kg'
   },
   dimensions: {
-    length: { type: Number, min: 0 },
-    width: { type: Number, min: 0 },
-    height: { type: Number, min: 0 },
+    length: { type: Number, min: 0, default: null },
+    width: { type: Number, min: 0, default: null },
+    height: { type: Number, min: 0, default: null },
     unit: { 
       type: String, 
       enum: ['cm', 'in', 'm'], 
       default: 'cm' 
     }
   },
-  image: String,
+  image: String, // Legacy field - kept for backward compatibility
+  images: [String], // Array of image URLs for this variation
   isActive: { 
     type: Boolean, 
     default: true 

@@ -9,6 +9,7 @@ import { fetchDataFromApi } from "../../utils/api";
 import CircularProgress from '@mui/material/CircularProgress';
 import { Reviews } from "./reviews";
 import { normalizeProduct } from "../../utils/productNormalizer";
+import { isInStock } from "../../utils/productUtils";
 
 export const ProductDetails = () => {
 
@@ -148,17 +149,32 @@ export const ProductDetails = () => {
                   <div className="productZoomContainer w-full lg:w-[45%] lg:sticky lg:top-20">
                     <ProductZoom 
                       images={(() => {
-                        // If variation has image, prioritize it
-                        if (selectedVariation?.image) {
-                          const variationImage = typeof selectedVariation.image === 'string' 
-                            ? selectedVariation.image 
-                            : selectedVariation.image.url || selectedVariation.image;
-                          // Put variation image first, then product images
-                          const productImages = (productData?.images || []).filter(img => {
-                            const imgUrl = typeof img === 'string' ? img : img.url || img;
-                            return imgUrl !== variationImage; // Remove duplicate
-                          });
-                          return [variationImage, ...productImages];
+                        // If variation has images, use them
+                        if (selectedVariation) {
+                          // Check for images array first (new format)
+                          if (selectedVariation.images && Array.isArray(selectedVariation.images) && selectedVariation.images.length > 0) {
+                            const variationImages = selectedVariation.images.map(img => 
+                              typeof img === 'string' ? img : (img.url || img)
+                            ).filter(Boolean);
+                            // Add product images that aren't already in variation images
+                            const productImages = (productData?.images || []).filter(img => {
+                              const imgUrl = typeof img === 'string' ? img : (img.url || img);
+                              return !variationImages.includes(imgUrl);
+                            });
+                            return [...variationImages, ...productImages];
+                          }
+                          // Fallback to legacy single image field
+                          if (selectedVariation.image) {
+                            const variationImage = typeof selectedVariation.image === 'string' 
+                              ? selectedVariation.image 
+                              : selectedVariation.image.url || selectedVariation.image;
+                            // Put variation image first, then product images
+                            const productImages = (productData?.images || []).filter(img => {
+                              const imgUrl = typeof img === 'string' ? img : img.url || img;
+                              return imgUrl !== variationImage; // Remove duplicate
+                            });
+                            return [variationImage, ...productImages];
+                          }
                         }
                         // Otherwise use product images
                         return productData?.images || [];
@@ -280,13 +296,63 @@ export const ProductDetails = () => {
                           <tr className="border-b">
                             <td className="py-3 px-4 bg-gray-50 font-medium text-gray-700">Availability</td>
                             <td className="py-3 px-4">
-                              <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                                productData?.countInStock > 0 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {productData?.countInStock > 0 ? 'In Stock' : 'Out of Stock'}
-                              </span>
+                              {(() => {
+                                // Check actual stock status
+                                let isAvailable = false;
+                                let displayText = 'Out of Stock';
+                                let statusClass = 'bg-red-100 text-red-800';
+                                
+                                // If variation is selected, check variation stock
+                                if (selectedVariation) {
+                                  if (selectedVariation.endlessStock) {
+                                    isAvailable = true;
+                                    displayText = 'Available (Unlimited)';
+                                    statusClass = 'bg-green-100 text-green-800';
+                                  } else {
+                                    const stock = Number(selectedVariation.stock || 0);
+                                    const stockStatus = selectedVariation.stockStatus || (stock > 0 ? 'in_stock' : 'out_of_stock');
+                                    isAvailable = stockStatus === 'in_stock' && stock > 0 && (selectedVariation.isActive !== false);
+                                    displayText = isAvailable ? `In Stock (${stock} available)` : 'Out of Stock';
+                                    statusClass = isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                                  }
+                                } else {
+                                  // Use the utility function to check stock
+                                  isAvailable = isInStock(productData);
+                                  
+                                  // Check for endless stock
+                                  if (productData?.inventory?.endlessStock) {
+                                    displayText = 'Available (Unlimited)';
+                                    statusClass = 'bg-green-100 text-green-800';
+                                  } else if (productData?.productType === 'variable' || productData?.type === 'variable') {
+                                    // For variable products, check if any variation is in stock
+                                    if (Array.isArray(productData.variations) && productData.variations.length > 0) {
+                                      const hasInStock = productData.variations.some(v => {
+                                        if (!v || v.isActive === false) return false;
+                                        if (v.endlessStock) return true;
+                                        const stock = Number(v.stock || 0);
+                                        const stockStatus = v.stockStatus || (stock > 0 ? 'in_stock' : 'out_of_stock');
+                                        return stockStatus === 'in_stock' && stock > 0;
+                                      });
+                                      displayText = hasInStock ? 'In Stock' : 'Out of Stock';
+                                      statusClass = hasInStock ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                                    } else {
+                                      displayText = 'Out of Stock';
+                                      statusClass = 'bg-red-100 text-red-800';
+                                    }
+                                  } else {
+                                    // Simple product
+                                    const stock = productData?.countInStock || productData?.stock || productData?.inventory?.stock || 0;
+                                    displayText = isAvailable ? (stock > 0 ? `In Stock (${stock} available)` : 'In Stock') : 'Out of Stock';
+                                    statusClass = isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                                  }
+                                }
+                                
+                                return (
+                                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${statusClass}`}>
+                                    {displayText}
+                                  </span>
+                                );
+                              })()}
                             </td>
                           </tr>
                         </tbody>
