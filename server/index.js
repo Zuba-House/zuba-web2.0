@@ -52,7 +52,10 @@ const allowedOrigins = [
     'http://127.0.0.1:5173',
     'http://127.0.0.1:3000',
     
-    // Vercel production domains - Main frontend
+    // Production domain - Main frontend
+    'https://zubahouse.com',
+    'https://www.zubahouse.com',
+    // Legacy Vercel domains (kept for backward compatibility during transition)
     'https://zuba-web2-0.vercel.app',
     'https://zuba-web2-0-git-master-zuba-houses-projects.vercel.app',
     

@@ -1,5 +1,17 @@
 // Order Status Update Email Template
 const OrderStatusEmailTemplate = (order, newStatus) => {
+  // Get frontend URL - ensure it's always zubahouse.com (not old vercel domain)
+  const getFrontendUrl = () => {
+    const envUrl = process.env.FRONTEND_URL;
+    // If FRONTEND_URL is set to old vercel domain, use zubahouse.com instead
+    if (envUrl && (envUrl.includes('zuba-web2-0.vercel.app') || envUrl.includes('vercel.app'))) {
+      return 'https://zubahouse.com';
+    }
+    return envUrl || 'https://zubahouse.com';
+  };
+  
+  const frontendUrl = getFrontendUrl();
+  
   // Get logo URL from environment or use default
   const logoUrl = process.env.ZUBA_LOGO_URL || 
                  process.env.LOGO_URL || 
@@ -292,7 +304,7 @@ const OrderStatusEmailTemplate = (order, newStatus) => {
             ` : ''}
 
             <div style="text-align: center;">
-                <a href="${process.env.FRONTEND_URL || 'https://zubahouse.com'}/order-tracking" class="button">
+                <a href="${frontendUrl}/order-tracking" class="button">
                     Track Your Order
                 </a>
             </div>
@@ -300,7 +312,7 @@ const OrderStatusEmailTemplate = (order, newStatus) => {
             ${newStatus === 'Shipped' || newStatus === 'Out for Delivery' ? `
             <div class="tracking-notice">
                 <strong>📍 Track Your Package:</strong> Use your Order ID (#${orderId}) and email address on our 
-                <a href="${process.env.FRONTEND_URL || 'https://zubahouse.com'}/order-tracking" style="color: #007bff;">Order Tracking Page</a> 
+                <a href="${frontendUrl}/order-tracking" style="color: #007bff;">Order Tracking Page</a> 
                 to see real-time updates.
             </div>
             ` : ''}
@@ -317,7 +329,7 @@ const OrderStatusEmailTemplate = (order, newStatus) => {
             <p><strong>Zuba House</strong></p>
             <p>This is an automated notification from Zuba House.</p>
             <p>
-                <a href="${process.env.FRONTEND_URL || 'https://zubahouse.com'}">Visit Our Store</a> | 
+                <a href="${frontendUrl}">Visit Our Store</a> | 
                 <a href="mailto:orders@zubahouse.com">Contact Us</a>
             </p>
             <p style="margin-top: 20px; font-size: 12px; opacity: 0.8;">
