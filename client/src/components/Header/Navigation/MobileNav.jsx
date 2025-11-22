@@ -44,14 +44,14 @@ const MobileNav = () => {
 
             {
                 context?.isFilterBtnShow === true &&
-                <Button className="flex-col !w-[40px] !h-[40px] !min-w-[40px] !capitalize !text-gray-700 !bg-primary !rounded-full" onClick={openFilters}>
-                    <MdOutlineFilterAlt size={18} className='text-white' />
+                <Button className="flex-col !w-[40px] !h-[40px] !min-w-[40px] !capitalize !text-gray-700 !bg-primary !rounded-full mobile-filter-btn" onClick={openFilters}>
+                    <MdOutlineFilterAlt size={24} className='text-white mobile-filter-icon' />
                 </Button>
             }
 
-            <Button className="flex-col !w-[40px] !min-w-[40px] !capitalize !text-gray-700"
+            <Button className="flex-col !w-[40px] !min-w-[40px] !capitalize !text-gray-700 mobile-search-btn"
             onClick={()=>context?.setOpenSearchPanel(true)}>
-                <IoSearch size={18} />
+                <IoSearch size={24} className='mobile-search-icon' />
                 <span className='text-[12px]'>Search</span>
             </Button>
 

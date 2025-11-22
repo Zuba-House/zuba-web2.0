@@ -196,10 +196,10 @@ export const Sidebar = (props) => {
           <h3 className="w-full mb-3 text-[16px] font-[600] flex items-center pr-5">
             Shop by Category
             <Button
-              className="!w-[44px] !h-[44px] !min-w-[44px] !min-h-[44px] !rounded-full !ml-auto !text-[#000] lg:!w-[30px] lg:!h-[30px] lg:!min-w-[30px]"
+              className="!w-[44px] !h-[44px] !min-w-[44px] !min-h-[44px] !rounded-full !ml-auto !text-[#000] lg:!w-[30px] lg:!h-[30px] lg:!min-w-[30px] filter-toggle-btn"
               onClick={() => setIsOpenCategoryFilter(!isOpenCategoryFilter)}
             >
-              {isOpenCategoryFilter === true ? <FaAngleUp /> : <FaAngleDown />}
+              {isOpenCategoryFilter === true ? <FaAngleUp className="filter-icon" /> : <FaAngleDown className="filter-icon" />}
             </Button>
           </h3>
           <Collapse isOpened={isOpenCategoryFilter}>
@@ -348,10 +348,10 @@ export const Sidebar = (props) => {
             <h3 className="w-full mb-3 text-[16px] font-[600] flex items-center pr-5">
               Filter By Brand
               <Button
-              className="!w-[44px] !h-[44px] !min-w-[44px] !min-h-[44px] !rounded-full !ml-auto !text-[#000] lg:!w-[30px] lg:!h-[30px] lg:!min-w-[30px]"
+              className="!w-[44px] !h-[44px] !min-w-[44px] !min-h-[44px] !rounded-full !ml-auto !text-[#000] lg:!w-[30px] lg:!h-[30px] lg:!min-w-[30px] filter-toggle-btn"
               onClick={() => setIsOpenBrandFilter(!isOpenBrandFilter)}
               >
-                {isOpenBrandFilter === true ? <FaAngleUp /> : <FaAngleDown />}
+                {isOpenBrandFilter === true ? <FaAngleUp className="filter-icon" /> : <FaAngleDown className="filter-icon" />}
               </Button>
             </h3>
             <Collapse isOpened={isOpenBrandFilter}>
@@ -377,10 +377,10 @@ export const Sidebar = (props) => {
           <h3 className="w-full mb-3 text-[16px] font-[600] flex items-center pr-5">
             Filter By Stock
             <Button
-              className="!w-[44px] !h-[44px] !min-w-[44px] !min-h-[44px] !rounded-full !ml-auto !text-[#000] lg:!w-[30px] lg:!h-[30px] lg:!min-w-[30px]"
+              className="!w-[44px] !h-[44px] !min-w-[44px] !min-h-[44px] !rounded-full !ml-auto !text-[#000] lg:!w-[30px] lg:!h-[30px] lg:!min-w-[30px] filter-toggle-btn"
               onClick={() => setIsOpenStockFilter(!isOpenStockFilter)}
             >
-              {isOpenStockFilter === true ? <FaAngleUp /> : <FaAngleDown />}
+              {isOpenStockFilter === true ? <FaAngleUp className="filter-icon" /> : <FaAngleDown className="filter-icon" />}
             </Button>
           </h3>
           <Collapse isOpened={isOpenStockFilter}>
@@ -410,10 +410,10 @@ export const Sidebar = (props) => {
           <h3 className="w-full mb-3 text-[16px] font-[600] flex items-center pr-5">
             Filter By Type
             <Button
-              className="!w-[44px] !h-[44px] !min-w-[44px] !min-h-[44px] !rounded-full !ml-auto !text-[#000] lg:!w-[30px] lg:!h-[30px] lg:!min-w-[30px]"
+              className="!w-[44px] !h-[44px] !min-w-[44px] !min-h-[44px] !rounded-full !ml-auto !text-[#000] lg:!w-[30px] lg:!h-[30px] lg:!min-w-[30px] filter-toggle-btn"
               onClick={() => setIsOpenTypeFilter(!isOpenTypeFilter)}
             >
-              {isOpenTypeFilter === true ? <FaAngleUp /> : <FaAngleDown />}
+              {isOpenTypeFilter === true ? <FaAngleUp className="filter-icon" /> : <FaAngleDown className="filter-icon" />}
             </Button>
           </h3>
           <Collapse isOpened={isOpenTypeFilter}>
