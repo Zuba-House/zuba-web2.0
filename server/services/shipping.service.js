@@ -80,12 +80,17 @@ const calculateFallbackRates = (items, destination) => {
   standardCost = Math.min(standardCost, MAX_STANDARD);
   expressCost = Math.min(expressCost, MAX_EXPRESS);
   
+  // Calculate express delivery days (60% of standard, but minimum 2-5 days)
+  const expressMinDays = Math.max(2, Math.ceil(pricing.minDays * 0.6));
+  const expressMaxDays = Math.max(5, Math.ceil(pricing.maxDays * 0.6));
+  
   return {
     standard: {
       name: 'Zuba Standard Shipping',
       cost: Math.round(standardCost * 100) / 100,
       displayCost: `$${standardCost.toFixed(2)} USD`,
       delivery: `${pricing.minDays}-${pricing.maxDays} business days`,
+      estimatedDelivery: `${pricing.minDays}-${pricing.maxDays} business days`,
       minDays: pricing.minDays,
       maxDays: pricing.maxDays,
       type: 'standard',
@@ -95,9 +100,10 @@ const calculateFallbackRates = (items, destination) => {
       name: 'Zuba Express Shipping',
       cost: Math.round(expressCost * 100) / 100,
       displayCost: `$${expressCost.toFixed(2)} USD`,
-      delivery: `${Math.ceil(pricing.minDays * 0.6)}-${Math.ceil(pricing.maxDays * 0.6)} business days`,
-      minDays: Math.ceil(pricing.minDays * 0.6),
-      maxDays: Math.ceil(pricing.maxDays * 0.6),
+      delivery: `${expressMinDays}-${expressMaxDays} business days`,
+      estimatedDelivery: `${expressMinDays}-${expressMaxDays} business days`,
+      minDays: expressMinDays,
+      maxDays: expressMaxDays,
       type: 'express',
       source: 'fallback'
     }
@@ -181,19 +187,38 @@ export const getShippingRates = async ({ items, destination }) => {
             )
           ) || shipment.rates[0]; // Fallback to first rate
           
-          const expressRate = shipment.rates.find(r => 
+          // Find express rate - prioritize express services, then find higher rate than standard
+          let expressRate = shipment.rates.find(r => 
             r.service && (
               r.service.toLowerCase().includes('express') ||
               r.service.toLowerCase().includes('xpresspost') ||
               r.service.toLowerCase().includes('priority')
             )
-          ) || shipment.rates.find(r => r.rate > standardRate.rate) || standardRate;
+          );
+          
+          // If no express service found, find the highest rate (should be faster service)
+          if (!expressRate) {
+            const sortedRates = [...shipment.rates].sort((a, b) => parseFloat(b.rate) - parseFloat(a.rate));
+            expressRate = sortedRates.find(r => parseFloat(r.rate) > parseFloat(standardRate.rate)) || sortedRates[0];
+          }
+          
+          // Ensure we have both rates
+          if (!expressRate) {
+            expressRate = standardRate;
+          }
           
           // Convert to USD (EasyPost returns CAD for Canada Post)
           const cadToUsd = 0.73; // Approximate conversion
           
-          const standardCost = parseFloat(standardRate.rate) * cadToUsd;
-          const expressCost = parseFloat(expressRate.rate) * cadToUsd;
+          const standardCost = Math.max(0, parseFloat(standardRate.rate || 0) * cadToUsd);
+          let expressCost = Math.max(0, parseFloat(expressRate.rate || 0) * cadToUsd);
+          
+          // Ensure express is at least 1.2x standard (minimum express premium)
+          // This ensures express is always more expensive than standard
+          const minExpressCost = standardCost * 1.2;
+          if (expressCost < minExpressCost) {
+            expressCost = minExpressCost;
+          }
           
           // Apply caps
           const MAX_STANDARD = 30;
@@ -207,6 +232,9 @@ export const getShippingRates = async ({ items, destination }) => {
               delivery: standardRate.est_delivery_days 
                 ? `${standardRate.est_delivery_days} business days`
                 : '5-10 business days',
+              estimatedDelivery: standardRate.est_delivery_days 
+                ? `${standardRate.est_delivery_days} business days`
+                : '5-10 business days',
               minDays: 5,
               maxDays: 10,
               type: 'standard',
@@ -218,6 +246,9 @@ export const getShippingRates = async ({ items, destination }) => {
               cost: Math.min(Math.round(expressCost * 100) / 100, MAX_EXPRESS),
               displayCost: `$${Math.min(expressCost, MAX_EXPRESS).toFixed(2)} USD`,
               delivery: expressRate.est_delivery_days
+                ? `${expressRate.est_delivery_days} business days`
+                : '2-5 business days',
+              estimatedDelivery: expressRate.est_delivery_days
                 ? `${expressRate.est_delivery_days} business days`
                 : '2-5 business days',
               minDays: 2,

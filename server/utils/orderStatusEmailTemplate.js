@@ -292,7 +292,7 @@ const OrderStatusEmailTemplate = (order, newStatus) => {
             ` : ''}
 
             <div style="text-align: center;">
-                <a href="${process.env.FRONTEND_URL || 'https://zuba-web2-0.vercel.app'}/order-tracking" class="button">
+                <a href="${process.env.FRONTEND_URL || 'https://zubahouse.com'}/order-tracking" class="button">
                     Track Your Order
                 </a>
             </div>
@@ -300,7 +300,7 @@ const OrderStatusEmailTemplate = (order, newStatus) => {
             ${newStatus === 'Shipped' || newStatus === 'Out for Delivery' ? `
             <div class="tracking-notice">
                 <strong>📍 Track Your Package:</strong> Use your Order ID (#${orderId}) and email address on our 
-                <a href="${process.env.FRONTEND_URL || 'https://zuba-web2-0.vercel.app'}/order-tracking" style="color: #007bff;">Order Tracking Page</a> 
+                <a href="${process.env.FRONTEND_URL || 'https://zubahouse.com'}/order-tracking" style="color: #007bff;">Order Tracking Page</a> 
                 to see real-time updates.
             </div>
             ` : ''}
@@ -317,7 +317,7 @@ const OrderStatusEmailTemplate = (order, newStatus) => {
             <p><strong>Zuba House</strong></p>
             <p>This is an automated notification from Zuba House.</p>
             <p>
-                <a href="${process.env.FRONTEND_URL || 'https://zuba-web2-0.vercel.app'}">Visit Our Store</a> | 
+                <a href="${process.env.FRONTEND_URL || 'https://zubahouse.com'}">Visit Our Store</a> | 
                 <a href="mailto:orders@zubahouse.com">Contact Us</a>
             </p>
             <p style="margin-top: 20px; font-size: 12px; opacity: 0.8;">
