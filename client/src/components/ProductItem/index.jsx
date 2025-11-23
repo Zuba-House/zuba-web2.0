@@ -316,23 +316,75 @@ const ProductItem = (props) => {
         <Link to={`/product/${item?._id}`}>
           <div className="img product-image-container">
             <img
-              src={item?.featuredImage || (item?.images && item?.images.length > 0 && item?.images[0] ? (typeof item.images[0] === 'string' ? item.images[0] : item.images[0].url) : '') || 'https://via.placeholder.com/400x400?text=No+Image'}
+              src={(() => {
+                // Helper to extract URL from image (string or object)
+                const getImageUrl = (img) => {
+                  if (!img) return null;
+                  if (typeof img === 'string' && img.trim() !== '') return img.trim();
+                  if (typeof img === 'object') {
+                    if (img.url && typeof img.url === 'string' && img.url.trim() !== '') return img.url.trim();
+                    if (img.src && typeof img.src === 'string' && img.src.trim() !== '') return img.src.trim();
+                  }
+                  return null;
+                };
+                
+                // Try featuredImage first
+                const featuredUrl = getImageUrl(item?.featuredImage);
+                if (featuredUrl) return featuredUrl;
+                
+                // Try images array - check all images
+                if (item?.images && Array.isArray(item.images) && item.images.length > 0) {
+                  for (let i = 0; i < item.images.length; i++) {
+                    const imgUrl = getImageUrl(item.images[i]);
+                    if (imgUrl) return imgUrl;
+                  }
+                }
+                
+                // Try bannerimages as fallback
+                if (item?.bannerimages && Array.isArray(item.bannerimages) && item.bannerimages.length > 0) {
+                  for (let i = 0; i < item.bannerimages.length; i++) {
+                    const imgUrl = getImageUrl(item.bannerimages[i]);
+                    if (imgUrl) return imgUrl;
+                  }
+                }
+                
+                // Try image field (singular)
+                const singleImageUrl = getImageUrl(item?.image);
+                if (singleImageUrl) return singleImageUrl;
+                
+                // Last resort: placeholder
+                return 'https://via.placeholder.com/400x400?text=No+Image';
+              })()}
               className="product-image"
-              alt={item?.name || ''}
+              alt={item?.name || 'Product image'}
               loading="lazy"
               onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = 'https://via.placeholder.com/400x400?text=No+Image';
+                // Prevent infinite loop
+                if (e.target.src && !e.target.src.includes('placeholder')) {
+                  e.target.onerror = null;
+                  e.target.src = 'https://via.placeholder.com/400x400?text=No+Image';
+                }
               }}
             />
 
             {
-              item?.images?.length > 1 &&
-              <img
-                src={typeof item.images[1] === 'string' ? item.images[1] : item.images[1]?.url}
-                className="w-full transition-all duration-700 absolute top-0 left-0 opacity-0 group-hover:opacity-100 group-hover:scale-105"
-                alt={item?.name || ''}
-              />
+              item?.images?.length > 1 && (() => {
+                const secondImage = item.images[1];
+                const secondImageUrl = typeof secondImage === 'string' 
+                  ? (secondImage.trim() !== '' ? secondImage : null)
+                  : (secondImage?.url && secondImage.url.trim() !== '' ? secondImage.url : null);
+                
+                return secondImageUrl ? (
+                  <img
+                    src={secondImageUrl}
+                    className="w-full transition-all duration-700 absolute top-0 left-0 opacity-0 group-hover:opacity-100 group-hover:scale-105"
+                    alt={item?.name || 'Product image'}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                ) : null;
+              })()
             }
 
 

@@ -92,6 +92,9 @@
   object-fit: cover;
   object-position: center;
   transition: transform 0.3s ease;
+  display: block;
+  min-height: 150px;
+  background: #f8f9fa;
 }
 
 .product-image-container:hover .product-image {
