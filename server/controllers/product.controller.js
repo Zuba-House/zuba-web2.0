@@ -2379,7 +2379,19 @@ export async function filters(request, response) {
     }
 
     if (brand?.length) {
-        filters.brand = { $in: brand }
+        // Case-insensitive brand matching - use $or with regex for each brand
+        const brandFilters = brand.map(b => ({
+            brand: { $regex: `^${b}$`, $options: 'i' }
+        }));
+        
+        // If we already have $or conditions (from categories), combine with $and
+        if (filters.$or && filters.$or.length > 0) {
+            filters.$and = filters.$and || [];
+            filters.$and.push({ $or: brandFilters });
+        } else {
+            // No existing $or, just use $or for brands
+            filters.$or = brandFilters;
+        }
     }
 
     if (productType?.length) {

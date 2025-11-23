@@ -24,6 +24,7 @@ import ProductLoading from "../../components/ProductLoading";
 import { Button } from "@mui/material";
 import { MdArrowRightAlt } from "react-icons/md";
 import { Link } from "react-router-dom";
+import NGOMAProducts from "../../components/NGOMAProducts";
 
 const Home = () => {
   const [value, setValue] = useState(0);
@@ -161,9 +162,8 @@ const Home = () => {
         context?.catData?.length !== 0 && <HomeCatSlider data={context?.catData} />
       }
 
-
-
-
+      {/* NGOMA Products Section - Always at the top */}
+      <NGOMAProducts />
 
       <section className="bg-white py-3 lg:py-8">
         <div className="container">
