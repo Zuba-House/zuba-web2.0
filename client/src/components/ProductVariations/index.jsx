@@ -482,21 +482,30 @@ const ProductVariations = ({ product, onVariationSelect, selectedVariation }) =>
                   
                   if (salePrice && regularPrice && salePrice < regularPrice) {
                     return (
-                      <>
-                        <span className="oldPrice line-through text-gray-500 text-[16px] font-[500]">
-                          {formatCurrency(regularPrice)}
-                        </span>
-                        <span className="price text-primary text-[18px] font-[600]">
-                          {formatCurrency(salePrice)}
-                        </span>
-                      </>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          <span className="oldPrice line-through text-gray-500 text-[16px] font-[500]">
+                            {formatCurrency(regularPrice)}
+                          </span>
+                          <span className="text-[12px] text-gray-400 font-[400] line-through">USD</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="price text-primary text-[18px] font-[600]">
+                            {formatCurrency(salePrice)}
+                          </span>
+                          <span className="text-[13px] text-gray-600 font-[500]">USD</span>
+                        </div>
+                      </div>
                     );
                   }
                   
                   return (
-                    <span className="price text-primary text-[18px] font-[600]">
-                      {formatCurrency(regularPrice)}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className="price text-primary text-[18px] font-[600]">
+                        {formatCurrency(regularPrice)}
+                      </span>
+                      <span className="text-[13px] text-gray-600 font-[500]">USD</span>
+                    </div>
                   );
                 })()}
               </div>

@@ -255,21 +255,30 @@ export const ProductDetailsComponent = (props) => {
             if (salePrice && salePrice < regularPrice) {
               // Product is on sale - show regular price crossed out, sale price as current
               return (
-                <>
-                  <span className="oldPrice line-through text-gray-400 text-[20px] sm:text-[22px] font-[500]">
-                    {formatCurrency(regularPrice)}
-                  </span>
-                  <span className="price text-primary text-[24px] sm:text-[28px] font-[700]">
-                    {formatCurrency(salePrice)}
-                  </span>
-                </>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1">
+                    <span className="oldPrice line-through text-gray-400 text-[20px] sm:text-[22px] font-[500]">
+                      {formatCurrency(regularPrice)}
+                    </span>
+                    <span className="text-[12px] sm:text-[14px] text-gray-400 font-[400] line-through">USD</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="price text-primary text-[24px] sm:text-[28px] font-[700]">
+                      {formatCurrency(salePrice)}
+                    </span>
+                    <span className="text-[14px] sm:text-[16px] text-gray-600 font-[500]">USD</span>
+                  </div>
+                </div>
               );
             } else {
               // No sale - show regular price only
               return (
-                <span className="price text-primary text-[24px] sm:text-[28px] font-[700]">
-                  {formatCurrency(regularPrice)}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="price text-primary text-[24px] sm:text-[28px] font-[700]">
+                    {formatCurrency(regularPrice)}
+                  </span>
+                  <span className="text-[14px] sm:text-[16px] text-gray-600 font-[500]">USD</span>
+                </div>
               );
             }
           })()}

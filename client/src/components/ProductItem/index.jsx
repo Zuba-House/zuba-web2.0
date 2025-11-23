@@ -437,35 +437,47 @@ const ProductItem = (props) => {
 
         <Rating name="size-small" defaultValue={item?.rating} size="small" readOnly />
 
-        <div className="flex items-center gap-4 justify-between">
+        <div className="flex items-center gap-2 justify-between flex-wrap">
           {isVariableProduct(item) ? (
             // Variable product - show price range
             (() => {
               const priceRange = getPriceRange(item);
               if (priceRange && priceRange.min !== priceRange.max) {
                 return (
-                  <span className="price text-primary text-[12px] lg:text-[14px] font-[600]">
-                    {formatCurrency(priceRange.min)} - {formatCurrency(priceRange.max)}
-                  </span>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className="price text-primary text-[12px] lg:text-[14px] font-[600]">
+                      {formatCurrency(priceRange.min)} - {formatCurrency(priceRange.max)}
+                    </span>
+                    <span className="text-[10px] lg:text-[11px] text-gray-600 font-[500]">USD</span>
+                  </div>
                 );
               }
               return (
-                <span className="price text-primary text-[12px] lg:text-[14px] font-[600]">
-                  {formatCurrency(item?.price || priceRange?.min)}
-                </span>
+                <div className="flex items-center gap-1">
+                  <span className="price text-primary text-[12px] lg:text-[14px] font-[600]">
+                    {formatCurrency(item?.price || priceRange?.min)}
+                  </span>
+                  <span className="text-[10px] lg:text-[11px] text-gray-600 font-[500]">USD</span>
+                </div>
               );
             })()
           ) : (
             // Simple product - show single price
             <>
               {item?.isOnSale && item?.oldPrice > item?.price && (
-                <span className="oldPrice line-through text-gray-500 text-[12px] lg:text-[14px] font-[500]">
-                  {formatCurrency(item?.oldPrice)}
-                </span>
+                <div className="flex items-center gap-1">
+                  <span className="oldPrice line-through text-gray-500 text-[12px] lg:text-[14px] font-[500]">
+                    {formatCurrency(item?.oldPrice)}
+                  </span>
+                  <span className="text-[10px] lg:text-[11px] text-gray-400 font-[400] line-through">USD</span>
+                </div>
               )}
-              <span className="price text-primary text-[12px] lg:text-[14px] font-[600]">
-                {formatCurrency(item?.price)}
-              </span>
+              <div className="flex items-center gap-1">
+                <span className="price text-primary text-[12px] lg:text-[14px] font-[600]">
+                  {formatCurrency(item?.price)}
+                </span>
+                <span className="text-[10px] lg:text-[11px] text-gray-600 font-[500]">USD</span>
+              </div>
             </>
           )}
         </div>

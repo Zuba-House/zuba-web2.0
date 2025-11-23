@@ -457,13 +457,16 @@ const Checkout = () => {
               <div className="border-t border-[rgba(0,0,0,0.1)] pt-3 mt-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[14px] font-[500]">Subtotal</span>
-                  <span className="text-[14px] font-[600]">
-                    {formatCurrency(
-                      context.cartData?.length !== 0 ?
-                        context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
-                          .reduce((total, value) => total + value, 0) : 0
-                    )}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[14px] font-[600]">
+                      {formatCurrency(
+                        context.cartData?.length !== 0 ?
+                          context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
+                            .reduce((total, value) => total + value, 0) : 0
+                      )}
+                    </span>
+                    <span className="text-[11px] text-gray-600 font-[500]">USD</span>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[14px] font-[500]">Shipping</span>
@@ -477,9 +480,12 @@ const Checkout = () => {
                 </div>
                 <div className="flex items-center justify-between pt-2 border-t border-[rgba(0,0,0,0.1)]">
                   <span className="text-[16px] font-[700]">Total</span>
-                  <span className="text-[16px] font-[700] text-primary">
-                    {formatCurrency(totalAmount)}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[16px] font-[700] text-primary">
+                      {formatCurrency(totalAmount)}
+                    </span>
+                    <span className="text-[12px] text-gray-600 font-[500]">USD</span>
+                  </div>
                 </div>
               </div>
 

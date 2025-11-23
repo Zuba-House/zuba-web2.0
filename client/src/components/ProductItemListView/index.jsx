@@ -313,13 +313,21 @@ const ProductItem = (props) => {
 
         <Rating name="size-small" value={props?.item?.rating} size="small" readOnly />
 
-        <div className="flex items-center gap-4">
-          <span className="oldPrice line-through text-gray-500 text-[15px] font-[500]">
-           {formatCurrency(props?.item?.oldPrice)}
-          </span>
-          <span className="price text-primary text-[15px]  font-[600]">
-            {formatCurrency(props?.item?.price)}
-          </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          {props?.item?.oldPrice && props?.item?.oldPrice > props?.item?.price && (
+            <div className="flex items-center gap-1">
+              <span className="oldPrice line-through text-gray-500 text-[15px] font-[500]">
+                {formatCurrency(props?.item?.oldPrice)}
+              </span>
+              <span className="text-[11px] text-gray-400 font-[400] line-through">USD</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1">
+            <span className="price text-primary text-[15px] font-[600]">
+              {formatCurrency(props?.item?.price)}
+            </span>
+            <span className="text-[12px] text-gray-600 font-[500]">USD</span>
+          </div>
         </div>
 
         <div className="mt-3 w-[180px]">

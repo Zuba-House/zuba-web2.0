@@ -296,13 +296,16 @@ const CartPage = () => {
 
             <p className="flex items-center justify-between">
               <span className="text-[14px] font-[500]">Subtotal</span>
-              <span className="text-primary font-bold">
-                {formatCurrency(
-                  (context.cartData?.length !== 0 ?
-                    context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
-                      .reduce((total, value) => total + value, 0) : 0)
-                )}
-              </span>
+              <div className="flex items-center gap-1">
+                <span className="text-primary font-bold">
+                  {formatCurrency(
+                    (context.cartData?.length !== 0 ?
+                      context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
+                        .reduce((total, value) => total + value, 0) : 0)
+                  )}
+                </span>
+                <span className="text-[11px] text-gray-600 font-[500]">USD</span>
+              </div>
             </p>
 
             {/* Shipping Address Input with Google Maps Autocomplete */}
@@ -405,14 +408,17 @@ const CartPage = () => {
 
             <p className="flex items-center justify-between">
               <span className="text-[14px] font-[500]">Total</span>
-              <span className="text-primary font-bold">
-                {formatCurrency(
-                  (context.cartData?.length !== 0 ?
-                    context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
-                      .reduce((total, value) => total + value, 0) : 0) +
-                  (selectedShippingRate ? selectedShippingRate.cost : 0)
-                )}
-              </span>
+              <div className="flex items-center gap-1">
+                <span className="text-primary font-bold">
+                  {formatCurrency(
+                    (context.cartData?.length !== 0 ?
+                      context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
+                        .reduce((total, value) => total + value, 0) : 0) +
+                      (selectedShippingRate ? selectedShippingRate.cost : 0)
+                  )}
+                </span>
+                <span className="text-[11px] text-gray-600 font-[500]">USD</span>
+              </div>
             </p>
 
             <br />
