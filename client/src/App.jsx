@@ -9,6 +9,7 @@ import Footer from "./components/Footer";
 import Home from "./Pages/Home";
 import ProductListing from "./Pages/ProductListing";
 import { ProductDetails } from "./Pages/ProductDetails";
+import NGOMAProductsPage from "./Pages/NGOMAProducts";
 import { createContext } from "react";
 
 import Login from "./Pages/Login";
@@ -291,6 +292,16 @@ function App() {
             <Route
               path={"/products"}
               element={<ProductListing />}
+            />
+            <Route
+              path={"/ngoma"}
+              exact={true}
+              element={<NGOMAProductsPage />}
+            />
+            <Route
+              path={"/ngoma-products"}
+              exact={true}
+              element={<NGOMAProductsPage />}
             />
             <Route
               path={"/product/:id"}

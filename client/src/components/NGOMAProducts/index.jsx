@@ -78,7 +78,7 @@ const NGOMAProducts = () => {
               </p>
             </div>
             {totalProducts > (isMobile ? 12 : 24) && (
-              <Link to="/products?brand=NGOMA">
+              <Link to="/ngoma">
                 <Button className="!bg-gray-100 hover:!bg-gray-200 !text-gray-800 !capitalize !px-3 !border !border-[rgba(0,0,0,0.4)]" size="small">
                   View All <MdArrowRightAlt size={25} />
                 </Button>
