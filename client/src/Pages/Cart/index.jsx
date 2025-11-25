@@ -30,6 +30,11 @@ const CartPage = () => {
   const [shippingOptions, setShippingOptions] = useState([]);
   const [loadingShipping, setLoadingShipping] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
+  
+  // New customer info fields
+  const [customerName, setCustomerName] = useState('');
+  const [apartmentNumber, setApartmentNumber] = useState('');
+  const [deliveryNote, setDeliveryNote] = useState('');
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -50,6 +55,14 @@ const CartPage = () => {
       if (addr?.contactInfo?.phone) {
         setPhone(addr.contactInfo.phone);
       }
+      // Pre-fill customer name from contact info
+      if (addr?.contactInfo?.firstName || addr?.contactInfo?.lastName) {
+        setCustomerName(`${addr.contactInfo.firstName || ''} ${addr.contactInfo.lastName || ''}`.trim());
+      }
+    }
+    // Pre-fill customer name from user data if not set from address
+    if (context?.userData?.name && !customerName) {
+      setCustomerName(context.userData.name);
     }
   }, [context?.userData]);
 
@@ -328,8 +341,16 @@ const CartPage = () => {
                   setPhone(phoneValue || '');
                   setPhoneError('');
                 }}
+                onCustomerInfoChange={(info) => {
+                  if (info.customerName !== undefined) setCustomerName(info.customerName);
+                  if (info.apartmentNumber !== undefined) setApartmentNumber(info.apartmentNumber);
+                  if (info.deliveryNote !== undefined) setDeliveryNote(info.deliveryNote);
+                }}
                 initialAddress={shippingAddress}
                 initialPhone={phone}
+                initialCustomerName={customerName}
+                initialApartmentNumber={apartmentNumber}
+                initialDeliveryNote={deliveryNote}
               />
             </div>
 
@@ -460,6 +481,12 @@ const CartPage = () => {
                                      (selectedShippingRate.cost > 0 || selectedShippingRate.price > 0);
               
               const handleCheckoutClick = async () => {
+                // Validate customer name - REQUIRED
+                if (!customerName || customerName.trim() === '') {
+                  context?.alertBox("error", "Please enter your full name for delivery");
+                  return;
+                }
+                
                 // Validate address - REQUIRED
                 if (!hasValidAddress) {
                   if (!shippingAddress?.city || shippingAddress.city.trim() === '') {
@@ -499,18 +526,24 @@ const CartPage = () => {
                 if (shippingAddress?.city && phone && !savingAddress) {
                   await saveAddress(true); // Save silently
                 }
-                // Navigate to checkout
+                // Navigate to checkout with all customer info
                 history("/checkout", { 
                   state: { 
                     selectedShippingRate, 
                     shippingAddress,
-                    phone: phone
+                    phone: phone,
+                    customerName: customerName.trim(),
+                    apartmentNumber: apartmentNumber.trim(),
+                    deliveryNote: deliveryNote.trim()
                   }
                 });
               };
               
-              // Disable checkout if address or phone is missing
-              if (!hasValidAddress || !hasPhone) {
+              // Check if customer name is provided
+              const hasCustomerName = customerName && customerName.trim() !== '';
+              
+              // Disable checkout if required fields are missing
+              if (!hasCustomerName || !hasValidAddress || !hasPhone) {
                 return (
                   <Button 
                     className="btn-org btn-lg w-full flex gap-2" 
@@ -519,7 +552,7 @@ const CartPage = () => {
                     style={{ opacity: 0.6, cursor: 'not-allowed' }}
                   >
                     <BsFillBagCheckFill className="text-[20px]" /> 
-                    {!hasValidAddress ? "⚠️ Complete Shipping Address Required" : !hasPhone ? "⚠️ Phone Number Required" : "⚠️ Complete Required Fields"}
+                    {!hasCustomerName ? "⚠️ Full Name Required" : !hasValidAddress ? "⚠️ Complete Shipping Address Required" : !hasPhone ? "⚠️ Phone Number Required" : "⚠️ Complete Required Fields"}
                   </Button>
                 );
               }

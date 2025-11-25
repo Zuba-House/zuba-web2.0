@@ -109,6 +109,10 @@ export const createOrderController = async (request, response) => {
             shippingRate: request.body.shippingRate || null,
             shippingAddress: orderShippingAddress,
             phone: request.body.phone || '',
+            // New customer info fields for better delivery
+            customerName: request.body.customerName || '',
+            apartmentNumber: request.body.apartmentNumber || '',
+            deliveryNote: request.body.deliveryNote || '',
             date: request.body.date,
             // Guest checkout fields
             isGuestOrder: isGuestOrder,

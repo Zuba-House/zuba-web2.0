@@ -11,8 +11,18 @@ const GOOGLE_API_KEY = 'AIzaSyAXshkwQXMY74fgEi0e02sTz8sKNphLM_U';
  * Shipping Address Input with Google Maps Autocomplete
  * Worldwide support for shipping rate calculation
  * Includes phone number with country auto-complete
+ * Includes customer name, apartment/office number, and delivery notes
  */
-const ShippingAddressInput = ({ onAddressChange, onPhoneChange, initialAddress = null, initialPhone = '' }) => {
+const ShippingAddressInput = ({ 
+  onAddressChange, 
+  onPhoneChange, 
+  onCustomerInfoChange,
+  initialAddress = null, 
+  initialPhone = '',
+  initialCustomerName = '',
+  initialApartmentNumber = '',
+  initialDeliveryNote = ''
+}) => {
   const [address, setAddress] = React.useState({
     postal_code: initialAddress?.postal_code || initialAddress?.postalCode || initialAddress?.address?.postalCode || '',
     city: initialAddress?.city || initialAddress?.address?.city || '',
@@ -25,6 +35,11 @@ const ShippingAddressInput = ({ onAddressChange, onPhoneChange, initialAddress =
   });
   const [phone, setPhone] = React.useState(initialPhone || '');
   const [phoneError, setPhoneError] = React.useState('');
+  
+  // New customer info fields
+  const [customerName, setCustomerName] = React.useState(initialCustomerName || '');
+  const [apartmentNumber, setApartmentNumber] = React.useState(initialApartmentNumber || '');
+  const [deliveryNote, setDeliveryNote] = React.useState(initialDeliveryNote || '');
 
   const autocompleteInputRef = useRef(null);
   const autocompleteRef = useRef(null);
@@ -127,6 +142,29 @@ const ShippingAddressInput = ({ onAddressChange, onPhoneChange, initialAddress =
     }
     
     onPhoneChange && onPhoneChange(value || '');
+  };
+
+  // Handle customer info changes
+  const handleCustomerInfoChange = (field, value) => {
+    const updates = {};
+    
+    if (field === 'customerName') {
+      setCustomerName(value);
+      updates.customerName = value;
+    } else if (field === 'apartmentNumber') {
+      setApartmentNumber(value);
+      updates.apartmentNumber = value;
+    } else if (field === 'deliveryNote') {
+      setDeliveryNote(value);
+      updates.deliveryNote = value;
+    }
+    
+    // Notify parent of all customer info
+    onCustomerInfoChange && onCustomerInfoChange({
+      customerName: field === 'customerName' ? value : customerName,
+      apartmentNumber: field === 'apartmentNumber' ? value : apartmentNumber,
+      deliveryNote: field === 'deliveryNote' ? value : deliveryNote
+    });
   };
 
   // Validate phone number
@@ -476,8 +514,45 @@ const ShippingAddressInput = ({ onAddressChange, onPhoneChange, initialAddress =
           <option value="ZW">Zimbabwe</option>
         </select>
         
+        {/* Customer Name Input (Required) */}
+        <div className="mt-3">
+          <label htmlFor="customerName" className="block text-[13px] font-[600] mb-2">
+            Full Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            id="customerName"
+            value={customerName}
+            onChange={(e) => handleCustomerInfoChange('customerName', e.target.value)}
+            placeholder="Enter your full name for delivery"
+            className="w-full px-3 py-2 border border-gray-300 rounded text-[14px]"
+            required
+          />
+          <small className="text-gray-600 text-[12px] mt-1 block">
+            Required for delivery. Please enter your full name as it should appear on the package.
+          </small>
+        </div>
+
+        {/* Apartment/Office Number Input (Optional) */}
+        <div className="mt-3">
+          <label htmlFor="apartmentNumber" className="block text-[13px] font-[600] mb-2">
+            Apartment / Office / Unit Number <span className="text-gray-400 text-[11px]">(Optional)</span>
+          </label>
+          <input
+            type="text"
+            id="apartmentNumber"
+            value={apartmentNumber}
+            onChange={(e) => handleCustomerInfoChange('apartmentNumber', e.target.value)}
+            placeholder="e.g., Apt 4B, Suite 200, Unit 15"
+            className="w-full px-3 py-2 border border-gray-300 rounded text-[14px]"
+          />
+          <small className="text-gray-600 text-[12px] mt-1 block">
+            If you live in an apartment or work in an office building, please provide the unit number.
+          </small>
+        </div>
+
         {/* Phone Number Input with Country Auto-complete */}
-        <div className="mt-2">
+        <div className="mt-3">
           <label htmlFor="phone" className="block text-[13px] font-[600] mb-2">
             Phone Number <span className="text-red-500">*</span>
           </label>
@@ -496,6 +571,24 @@ const ShippingAddressInput = ({ onAddressChange, onPhoneChange, initialAddress =
           )}
           <small className="text-gray-600 text-[12px] mt-1 block">
             Required for shipping. Country code will be auto-detected.
+          </small>
+        </div>
+
+        {/* Delivery Note Input (Optional) */}
+        <div className="mt-3">
+          <label htmlFor="deliveryNote" className="block text-[13px] font-[600] mb-2">
+            Delivery Instructions <span className="text-gray-400 text-[11px]">(Optional)</span>
+          </label>
+          <textarea
+            id="deliveryNote"
+            value={deliveryNote}
+            onChange={(e) => handleCustomerInfoChange('deliveryNote', e.target.value)}
+            placeholder="e.g., Leave at the door, Ring doorbell twice, Call before delivery..."
+            className="w-full px-3 py-2 border border-gray-300 rounded text-[14px] min-h-[70px] resize-y"
+            maxLength={500}
+          />
+          <small className="text-gray-600 text-[12px] mt-1 block">
+            Add any special instructions for the delivery driver. Max 500 characters.
           </small>
         </div>
       </div>

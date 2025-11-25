@@ -270,10 +270,14 @@ const OrderConfirmationEmail = (username, orders) => {
                 // Get shipping address from order
                 const addr = orders?.shippingAddress;
                 const phone = orders?.phone || 'N/A';
+                const customerName = orders?.customerName || '';
+                const apartmentNumber = orders?.apartmentNumber || '';
+                const deliveryNote = orders?.deliveryNote || '';
                 
                 if (addr) {
                     const addressParts = [
                         addr.addressLine1,
+                        apartmentNumber ? `Apt/Unit: ${apartmentNumber}` : null,
                         addr.addressLine2,
                         addr.city,
                         addr.province || addr.provinceCode,
@@ -285,9 +289,15 @@ const OrderConfirmationEmail = (username, orders) => {
                         return `
             <div class="order-info" style="background: #e8f4f8; border-left: 4px solid #3498db;">
                 <h3 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 16px;">📍 Shipping Address</h3>
+                ${customerName ? `<p style="margin: 5px 0; color: #2c3e50;"><strong>Name:</strong> ${customerName}</p>` : ''}
                 <p style="margin: 5px 0; color: #2c3e50;"><strong>Address:</strong> ${addressParts.join(', ')}</p>
                 <p style="margin: 5px 0; color: #2c3e50;"><strong>Phone:</strong> ${phone}</p>
-            </div>`;
+            </div>
+            ${deliveryNote ? `
+            <div class="order-info" style="background: #fff9e6; border-left: 4px solid #f39c12;">
+                <h3 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 16px;">📝 Your Delivery Instructions</h3>
+                <p style="margin: 5px 0; color: #2c3e50; font-style: italic;">"${deliveryNote}"</p>
+            </div>` : ''}`;
                     }
                 }
                 return '';

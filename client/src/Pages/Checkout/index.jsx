@@ -25,6 +25,10 @@ const Checkout = () => {
   const [shippingAddress, setShippingAddress] = useState(null);
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  // New customer info fields
+  const [customerName, setCustomerName] = useState('');
+  const [apartmentNumber, setApartmentNumber] = useState('');
+  const [deliveryNote, setDeliveryNote] = useState('');
   const context = useContext(MyContext);
 
   const history = useNavigate();
@@ -48,8 +52,19 @@ const Checkout = () => {
       setSelectedShippingRate(location.state.selectedShippingRate);
     }
     
+    // Get new customer info fields from location state
+    if (location.state?.customerName) {
+      setCustomerName(location.state.customerName);
+    }
+    if (location.state?.apartmentNumber) {
+      setApartmentNumber(location.state.apartmentNumber);
+    }
+    if (location.state?.deliveryNote) {
+      setDeliveryNote(location.state.deliveryNote);
+    }
+    
     // If no data from cart, redirect back to cart
-    if (!location.state?.shippingAddress || !location.state?.phone || !location.state?.selectedShippingRate) {
+    if (!location.state?.shippingAddress || !location.state?.phone || !location.state?.selectedShippingRate || !location.state?.customerName) {
       context?.alertBox("error", "Please complete your shipping information in the cart first");
       setTimeout(() => {
         history("/cart");
@@ -222,6 +237,10 @@ const Checkout = () => {
       shippingRate: selectedShippingRate,
       phone: phone, // Include phone number
       shippingAddress: shippingAddress, // Include full address data
+      // New customer info fields
+      customerName: customerName, // Customer's full name for delivery
+      apartmentNumber: apartmentNumber, // Apartment/Office/Unit number (optional)
+      deliveryNote: deliveryNote, // Special delivery instructions (optional)
       date: new Date().toLocaleString("en-US", {
         month: "short",
         day: "2-digit",
@@ -335,6 +354,10 @@ const Checkout = () => {
       totalAmt: totalAmount,
       shippingAddress: shippingAddress,
       phone: phone,
+      // New customer info fields
+      customerName: customerName,
+      apartmentNumber: apartmentNumber,
+      deliveryNote: deliveryNote,
       date: new Date().toLocaleString("en-US", {
         month: "short",
         day: "2-digit",
@@ -362,6 +385,21 @@ const Checkout = () => {
               <h2>Delivery Information</h2>
               <br />
 
+              {/* Display Customer Info */}
+              {customerName && (
+                <div className="mb-4 p-4 border border-gray-200 rounded-md bg-gray-50">
+                  <h3 className="text-[14px] font-[600] mb-2">Customer Information</h3>
+                  <p className="text-[14px] text-gray-700 mb-1">
+                    <strong>Name:</strong> {customerName}
+                  </p>
+                  {phone && (
+                    <p className="text-[14px] text-gray-700 mb-1">
+                      <strong>Phone:</strong> {phone}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Display Shipping Address */}
               {shippingAddress && (
                 <div className="mb-4 p-4 border border-gray-200 rounded-md bg-gray-50">
@@ -370,22 +408,32 @@ const Checkout = () => {
                     {shippingAddress.addressLine1 || shippingAddress.city}
                     {shippingAddress.addressLine2 && `, ${shippingAddress.addressLine2}`}
                   </p>
+                  {apartmentNumber && (
+                    <p className="text-[14px] text-gray-700 mb-1">
+                      <strong>Apt/Unit:</strong> {apartmentNumber}
+                    </p>
+                  )}
                   <p className="text-[14px] text-gray-700 mb-1">
                     {shippingAddress.city}, {shippingAddress.province} {shippingAddress.postal_code}
                   </p>
                   <p className="text-[14px] text-gray-700">
                     {shippingAddress.country}
                   </p>
-                  {phone && (
-                    <p className="text-[14px] text-gray-700 mt-2 font-[500]">
-                      Phone: {phone}
-                    </p>
-                  )}
                   <Link to="/cart">
                     <Button variant="outlined" size="small" className="mt-2">
                       Change Address
                     </Button>
                   </Link>
+                </div>
+              )}
+
+              {/* Display Delivery Note */}
+              {deliveryNote && (
+                <div className="mb-4 p-4 border border-yellow-200 rounded-md bg-yellow-50">
+                  <h3 className="text-[14px] font-[600] mb-2">📝 Delivery Instructions</h3>
+                  <p className="text-[14px] text-gray-700">
+                    {deliveryNote}
+                  </p>
                 </div>
               )}
 

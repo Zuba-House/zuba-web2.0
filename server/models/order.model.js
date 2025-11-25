@@ -164,6 +164,22 @@ const orderSchema = new mongoose.Schema({
     phone: {
         type: String,
         default: ''
+    },
+    // Customer name for delivery (required for accurate delivery)
+    customerName: {
+        type: String,
+        default: ''
+    },
+    // Apartment/Office/Unit number for apartment or office buildings (optional)
+    apartmentNumber: {
+        type: String,
+        default: ''
+    },
+    // Special delivery instructions from customer (optional)
+    deliveryNote: {
+        type: String,
+        default: '',
+        maxlength: 500
     }
 }, {
     timestamps: true

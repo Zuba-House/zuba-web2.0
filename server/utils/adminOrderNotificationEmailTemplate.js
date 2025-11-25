@@ -21,8 +21,8 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
     const shippingCost = formatPrice(order?.shippingCost || 0);
     const total = formatPrice(order?.totalAmt || 0) || (subtotal + shippingCost);
 
-    // Format customer info
-    const customerName = customerInfo?.name || order?.guestCustomer?.name || 'N/A';
+    // Format customer info - prioritize customerName from order
+    const customerName = order?.customerName || customerInfo?.name || order?.guestCustomer?.name || 'N/A';
     const customerEmail = customerInfo?.email || order?.guestCustomer?.email || 'N/A';
     // Get phone from multiple sources: order.phone, customerInfo, shippingAddress, or guestCustomer
     const customerPhone = order?.phone || 
@@ -31,6 +31,9 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
                          shippingAddress?.contactInfo?.phone ||
                          order?.guestCustomer?.phone || 
                          'N/A';
+    // Get apartment/unit number and delivery note
+    const apartmentNumber = order?.apartmentNumber || '';
+    const deliveryNote = order?.deliveryNote || '';
 
     // Format shipping address - check order.shippingAddress first, then shippingAddress parameter
     let addressText = 'N/A';
@@ -42,6 +45,8 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
     if (addrData) {
         const parts = [];
         if (addrData.addressLine1) parts.push(addrData.addressLine1);
+        // Include apartment number in address if available
+        if (apartmentNumber) parts.push(`Apt/Unit: ${apartmentNumber}`);
         if (addrData.addressLine2) parts.push(addrData.addressLine2);
         if (addrData.city) parts.push(addrData.city);
         if (addrData.province || addrData.provinceCode) parts.push(addrData.province || addrData.provinceCode);
@@ -390,11 +395,27 @@ const AdminOrderNotificationEmail = (order, customerInfo, shippingAddress) => {
                     <div class="info-label">Address:</div>
                     <div class="info-value">${addressText}</div>
                 </div>
+                ${apartmentNumber ? `
+                <div class="info-row">
+                    <div class="info-label">Apt/Unit Number:</div>
+                    <div class="info-value"><strong style="color: #e74c3c;">${apartmentNumber}</strong></div>
+                </div>
+                ` : ''}
                 <div class="info-row">
                     <div class="info-label">Phone:</div>
                     <div class="info-value"><a href="tel:${addressPhone}" style="color: #3498db;">${addressPhone}</a></div>
                 </div>
             </div>
+
+            ${deliveryNote ? `
+            <div class="info-section" style="border-left-color: #f39c12; background: #fff9e6;">
+                <h3>📝 Delivery Instructions</h3>
+                <div class="info-row">
+                    <div class="info-label">Customer Note:</div>
+                    <div class="info-value" style="font-style: italic; color: #2c3e50;">"${deliveryNote}"</div>
+                </div>
+            </div>
+            ` : ''}
 
             <h3 style="color: #0b2735; margin: 30px 0 15px 0; font-size: 20px;">🛍️ Order Items</h3>
             <table class="order-details">
