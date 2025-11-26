@@ -85,20 +85,27 @@ const Header = () => {
   const logout = () => {
     setAnchorEl(null);
 
-    fetchDataFromApi(`/api/user/logout?token=${localStorage.getItem('accessToken')}`, { withCredentials: true }).then((res) => {
-      if (res?.error === false) {
-        context.setIsLogin(false);
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        context.setUserData(null);
-        context?.setCartData([]);
-        context?.setMyListData([]);
-        history("/");
-      }
+    // Always clear local state first to prevent stuck state
+    const clearLocalState = () => {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("userEmail");
+      context.setIsLogin(false);
+      context.setUserData(null);
+      context?.setCartData([]);
+      context?.setMyListData([]);
+      history("/");
+    };
 
-
-    })
-
+    // Try to call logout API, but always clear local state regardless
+    fetchDataFromApi(`/api/user/logout?token=${localStorage.getItem('accessToken')}`, { withCredentials: true })
+      .then((res) => {
+        clearLocalState();
+      })
+      .catch((error) => {
+        console.log('Logout API error (proceeding with local logout):', error);
+        clearLocalState();
+      });
   }
 
   return (

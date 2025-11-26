@@ -27,14 +27,20 @@ const Login = () => {
 
  
   useEffect(()=>{
-    window.scrollTo(0,0)
+    window.scrollTo(0,0);
+    
+    // Check if user is already logged in with a valid session
     const token = localStorage.getItem('accessToken');
-
-    if (token !== undefined && token !== null && token !== "") {
-      history("/")
+    
+    // If there's a token and user is marked as logged in, redirect to home
+    // If user is on login page, they might have a corrupted session - don't auto-redirect
+    if (token !== undefined && token !== null && token !== "" && context?.isLogin && context?.userData) {
+      history("/");
     }
-
-  },[]);
+    
+    // If there's a token but no user data, the session might be corrupted
+    // Allow them to stay on login page to re-authenticate
+  },[context?.isLogin, context?.userData]);
 
   const forgotPassword =()=>{
   
@@ -83,15 +89,20 @@ const Login = () => {
   
       if (formFields.email === "") {
         context.alertBox("error", "Please enter email id");
+        setIsLoading(false);
         return false
       }
   
   
       if (formFields.password === "") {
         context.alertBox("error", "Please enter password");
+        setIsLoading(false);
         return false
       }
   
+      // Clear any existing corrupted tokens before attempting login
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
   
       postData("/api/user/login", formFields, { withCredentials: true }).then((res) => {
         console.log(res)
@@ -104,10 +115,15 @@ const Login = () => {
             password: ""
           })
 
-          localStorage.setItem("accessToken",res?.data?.accesstoken);
-          localStorage.setItem("refreshToken",res?.data?.refreshToken);
+          localStorage.setItem("accessToken", res?.data?.accesstoken);
+          localStorage.setItem("refreshToken", res?.data?.refreshToken);
 
           context.setIsLogin(true);
+          
+          // Trigger user data fetch
+          if (context?.getUserDetails) {
+            context.getUserDetails();
+          }
   
           history("/")
         } else {
@@ -123,6 +139,11 @@ const Login = () => {
 
 
       const authWithGoogle = () => {
+        // Clear any existing corrupted tokens before attempting Google login
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        
+        setIsLoading(true);
     
         signInWithPopup(auth, googleProvider)
           .then((result) => {
@@ -152,6 +173,11 @@ const Login = () => {
                 localStorage.setItem("refreshToken", res?.data?.refreshToken);
     
                 context.setIsLogin(true);
+                
+                // Trigger user data fetch
+                if (context?.getUserDetails) {
+                  context.getUserDetails();
+                }
     
                 history("/")
               } else {
@@ -166,12 +192,11 @@ const Login = () => {
             // ...
           }).catch((error) => {
             // Handle Errors here.
+            setIsLoading(false);
             const errorCode = error.code;
             const errorMessage = error.message;
-            // The email of the user's account used.
-            const email = error.customData.email;
-            // The AuthCredential type that was used.
-            const credential = GoogleAuthProvider.credentialFromError(error);
+            console.error('Google auth error:', errorCode, errorMessage);
+            context.alertBox("error", "Google login failed. Please try again.");
             // ...
           });
     

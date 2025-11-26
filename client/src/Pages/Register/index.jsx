@@ -52,20 +52,26 @@ const Register = () => {
 
     if (formFields.name === "") {
       context.alertBox("error", "Please enter full name");
+      setIsLoading(false);
       return false
     }
 
     if (formFields.email === "") {
       context.alertBox("error", "Please enter email id");
+      setIsLoading(false);
       return false
     }
 
 
     if (formFields.password === "") {
       context.alertBox("error", "Please enter password");
+      setIsLoading(false);
       return false
     }
 
+    // Clear any existing tokens before registering
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
 
     postData("/api/user/register", formFields).then((res) => {
 
@@ -93,6 +99,11 @@ const Register = () => {
 
 
   const authWithGoogle = () => {
+    // Clear any existing corrupted tokens before attempting Google signup
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    
+    setIsLoading(true);
 
     signInWithPopup(auth, googleProvider)
       .then((result) => {
@@ -122,6 +133,11 @@ const Register = () => {
             localStorage.setItem("refreshToken", res?.data?.refreshToken);
 
             context.setIsLogin(true);
+            
+            // Trigger user data fetch
+            if (context?.getUserDetails) {
+              context.getUserDetails();
+            }
 
             history("/")
           } else {
@@ -136,12 +152,11 @@ const Register = () => {
         // ...
       }).catch((error) => {
         // Handle Errors here.
+        setIsLoading(false);
         const errorCode = error.code;
         const errorMessage = error.message;
-        // The email of the user's account used.
-        const email = error.customData.email;
-        // The AuthCredential type that was used.
-        const credential = GoogleAuthProvider.credentialFromError(error);
+        console.error('Google auth error:', errorCode, errorMessage);
+        context.alertBox("error", "Google signup failed. Please try again.");
         // ...
       });
 
