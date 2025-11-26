@@ -38,16 +38,7 @@ const ProductItem = (props) => {
   const context = useContext(MyContext);
 
   const addToCart = (product, userId, quantity) => {
-    // For guest users, show info message and redirect to login
-    if (userId === undefined) {
-      context?.alertBox(
-        "info", 
-        "Please login to add items to cart. Registration is quick and easy!"
-      );
-      // Redirect to login page
-      navigate("/login");
-      return false;
-    }
+    // Note: userId may be undefined for guest users - context.addToCart handles this
 
     const normalizedProduct = normalizeProduct(product);
     

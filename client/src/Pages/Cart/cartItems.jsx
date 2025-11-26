@@ -40,21 +40,29 @@ const CartItems = (props) => {
     if (value !== null) {
       setSelectedQty(value);
 
-      const cartObj = {
-        _id: props?.item?._id,
-        qty: value,
-        subTotal: parseFloat(props?.item?.price || 0) * value
-      }
+      // Check if this is a guest cart item (id starts with 'guest_')
+      const isGuestItem = props?.item?._id?.toString().startsWith('guest_');
 
-      editData("/api/cart/update-qty", cartObj).then((res) => {
-        if (res?.data?.error === false) {
-          context.alertBox("success", res?.data?.message);
-          context?.getCartItems();
+      if (isGuestItem || !context?.isLogin) {
+        // Update guest cart
+        if (context?.updateGuestCartQty) {
+          context.updateGuestCartQty(props?.item?._id, value);
         }
-      })
+      } else {
+        // Update server cart
+        const cartObj = {
+          _id: props?.item?._id,
+          qty: value,
+          subTotal: parseFloat(props?.item?.price || 0) * value
+        }
 
-
-
+        editData("/api/cart/update-qty", cartObj).then((res) => {
+          if (res?.data?.error === false) {
+            context.alertBox("success", res?.data?.message);
+            context?.getCartItems();
+          }
+        })
+      }
     }
   };
 
@@ -65,10 +73,21 @@ const CartItems = (props) => {
 
 
   const removeItem = (id) => {
-    deleteData(`/api/cart/delete-cart-item/${id}`).then((res) => {
-      context.alertBox("success", "Product removed from cart");
-      context?.getCartItems();
-    })
+    // Check if this is a guest cart item
+    const isGuestItem = id?.toString().startsWith('guest_');
+
+    if (isGuestItem || !context?.isLogin) {
+      // Remove from guest cart
+      if (context?.removeFromGuestCart) {
+        context.removeFromGuestCart(id);
+      }
+    } else {
+      // Remove from server cart
+      deleteData(`/api/cart/delete-cart-item/${id}`).then((res) => {
+        context.alertBox("success", "Product removed from cart");
+        context?.getCartItems();
+      })
+    }
   }
 
 

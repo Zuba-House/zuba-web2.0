@@ -138,6 +138,11 @@ const Register = () => {
             if (context?.getUserDetails) {
               context.getUserDetails();
             }
+            
+            // Merge guest cart with server cart
+            if (context?.mergeGuestCartWithServer) {
+              context.mergeGuestCartWithServer();
+            }
 
             history("/")
           } else {

@@ -122,6 +122,9 @@ function App() {
     } else {
       setIsLogin(false);
       setUserData(null);
+      // Load guest cart when not logged in
+      const guestCart = getGuestCart();
+      setCartData(guestCart);
     }
   }, []); // Run only on mount
 
@@ -158,7 +161,15 @@ function App() {
       if (res?.data) {
         setUserData(res.data);
         setIsLogin(true);
-        getCartItems();
+        
+        // Check if there's a guest cart to merge
+        const guestCart = getGuestCart();
+        if (guestCart.length > 0) {
+          // Merge guest cart with server cart
+          await mergeGuestCartAfterLogin();
+        } else {
+          getCartItems();
+        }
         getMyListData();
       } else {
         // No user data returned - something is wrong
@@ -167,6 +178,9 @@ function App() {
         localStorage.removeItem("refreshToken");
         setIsLogin(false);
         setUserData(null);
+        // Load guest cart
+        const guestCart = getGuestCart();
+        setCartData(guestCart);
       }
     } catch (error) {
       console.error('🔐 Error validating token:', error);
@@ -257,11 +271,206 @@ function App() {
 
 
 
-  const addToCart = (product, userId, quantity) => {
+  // Guest cart functions for localStorage
+  const getGuestCart = () => {
+    try {
+      const guestCart = localStorage.getItem('guestCart');
+      return guestCart ? JSON.parse(guestCart) : [];
+    } catch (error) {
+      console.error('Error reading guest cart:', error);
+      return [];
+    }
+  };
 
-    if (userId === undefined) {
-      alertBox("error", "you are not login please login first");
-      return false;
+  const saveGuestCart = (cart) => {
+    try {
+      localStorage.setItem('guestCart', JSON.stringify(cart));
+    } catch (error) {
+      console.error('Error saving guest cart:', error);
+    }
+  };
+
+  const clearGuestCart = () => {
+    localStorage.removeItem('guestCart');
+  };
+
+  // Add to guest cart (localStorage)
+  const addToGuestCart = (product, quantity) => {
+    const guestCart = getGuestCart();
+    
+    // Check if product already in cart
+    const existingIndex = guestCart.findIndex(item => 
+      item.productId === product?._id &&
+      item.size === product?.size &&
+      item.weight === product?.weight &&
+      item.ram === product?.ram &&
+      JSON.stringify(item.variation) === JSON.stringify(product?.variation)
+    );
+
+    const cartItem = {
+      _id: `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      productTitle: product?.name,
+      image: product?.image,
+      rating: product?.rating,
+      price: product?.price,
+      oldPrice: product?.oldPrice,
+      discount: product?.discount,
+      quantity: quantity,
+      subTotal: parseFloat(product?.price || 0) * quantity,
+      productId: product?._id,
+      countInStock: product?.countInStock,
+      brand: product?.brand,
+      size: product?.size,
+      weight: product?.weight,
+      ram: product?.ram,
+      variation: product?.variation,
+      productType: product?.productType,
+      variationId: product?.variationId
+    };
+
+    if (existingIndex !== -1) {
+      // Update existing item quantity
+      guestCart[existingIndex].quantity += quantity;
+      guestCart[existingIndex].subTotal = parseFloat(guestCart[existingIndex].price || 0) * guestCart[existingIndex].quantity;
+    } else {
+      // Add new item
+      guestCart.push(cartItem);
+    }
+
+    saveGuestCart(guestCart);
+    setCartData(guestCart);
+    alertBox("success", "Product added to cart");
+    return true;
+  };
+
+  // Update guest cart quantity
+  const updateGuestCartQty = (itemId, newQty) => {
+    const guestCart = getGuestCart();
+    const index = guestCart.findIndex(item => item._id === itemId);
+    
+    if (index !== -1) {
+      guestCart[index].quantity = newQty;
+      guestCart[index].subTotal = parseFloat(guestCart[index].price || 0) * newQty;
+      saveGuestCart(guestCart);
+      setCartData(guestCart);
+      alertBox("success", "Cart updated");
+    }
+  };
+
+  // Remove from guest cart
+  const removeFromGuestCart = (itemId) => {
+    const guestCart = getGuestCart();
+    const updatedCart = guestCart.filter(item => item._id !== itemId);
+    saveGuestCart(updatedCart);
+    setCartData(updatedCart);
+    alertBox("success", "Product removed from cart");
+  };
+
+  // Merge guest cart with server cart after login
+  const mergeGuestCartWithServer = async () => {
+    const guestCart = getGuestCart();
+    
+    if (guestCart.length === 0) return;
+
+    console.log('🛒 Merging guest cart with server cart...');
+    
+    for (const item of guestCart) {
+      try {
+        const data = {
+          productTitle: item.productTitle,
+          image: item.image,
+          rating: item.rating,
+          price: item.price,
+          oldPrice: item.oldPrice,
+          discount: item.discount,
+          quantity: item.quantity,
+          subTotal: item.subTotal,
+          productId: item.productId,
+          countInStock: item.countInStock,
+          brand: item.brand,
+          size: item.size,
+          weight: item.weight,
+          ram: item.ram,
+          variation: item.variation,
+          productType: item.productType,
+          variationId: item.variationId
+        };
+        
+        await postData("/api/cart/add", data);
+      } catch (error) {
+        console.error('Error merging cart item:', error);
+      }
+    }
+    
+    // Clear guest cart after merge
+    clearGuestCart();
+    // Refresh cart from server
+    fetchDataFromApi(`/api/cart/get`).then((res) => {
+      if (res?.error === false) {
+        setCartData(res?.data);
+      }
+    });
+    alertBox("success", "Your cart items have been saved to your account");
+  };
+
+  // Internal merge function for use after login validation
+  const mergeGuestCartAfterLogin = async () => {
+    const guestCart = getGuestCart();
+    
+    if (guestCart.length === 0) {
+      // No guest cart, just load server cart
+      fetchDataFromApi(`/api/cart/get`).then((res) => {
+        if (res?.error === false) {
+          setCartData(res?.data);
+        }
+      });
+      return;
+    }
+
+    console.log('🛒 Merging guest cart after login...');
+    
+    for (const item of guestCart) {
+      try {
+        const data = {
+          productTitle: item.productTitle,
+          image: item.image,
+          rating: item.rating,
+          price: item.price,
+          oldPrice: item.oldPrice,
+          discount: item.discount,
+          quantity: item.quantity,
+          subTotal: item.subTotal,
+          productId: item.productId,
+          countInStock: item.countInStock,
+          brand: item.brand,
+          size: item.size,
+          weight: item.weight,
+          ram: item.ram,
+          variation: item.variation,
+          productType: item.productType,
+          variationId: item.variationId
+        };
+        
+        await postData("/api/cart/add", data);
+      } catch (error) {
+        console.error('Error merging cart item:', error);
+      }
+    }
+    
+    // Clear guest cart after merge
+    clearGuestCart();
+    // Refresh cart from server
+    fetchDataFromApi(`/api/cart/get`).then((res) => {
+      if (res?.error === false) {
+        setCartData(res?.data);
+      }
+    });
+  };
+
+  const addToCart = (product, userId, quantity) => {
+    // If user is not logged in, use guest cart
+    if (userId === undefined || !isLogin) {
+      return addToGuestCart(product, quantity);
     }
 
     const data = {
@@ -313,12 +522,22 @@ function App() {
   };
 
   const getCartItems = () => {
+    // If not logged in, get guest cart from localStorage
+    if (!isLogin) {
+      const guestCart = getGuestCart();
+      setCartData(guestCart);
+      return;
+    }
+    
+    // If logged in, get cart from server
     fetchDataFromApi(`/api/cart/get`).then((res) => {
       if (res?.error === false) {
         setCartData(res?.data);
       } else if (res?.isAuthError) {
-        // Auth error - clear session
+        // Auth error - clear session and load guest cart
         clearSession();
+        const guestCart = getGuestCart();
+        setCartData(guestCart);
       }
     })
   }
@@ -362,7 +581,11 @@ function App() {
     setMyListData,
     getMyListData,
     getUserDetails,
-    clearSession, // Expose clearSession for use in other components
+    clearSession,
+    // Guest cart functions
+    updateGuestCartQty,
+    removeFromGuestCart,
+    mergeGuestCartWithServer,
     setAddressMode,
     addressMode,
     addressId,

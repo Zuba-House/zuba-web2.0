@@ -73,13 +73,6 @@ export const ProductDetailsComponent = (props) => {
   }, [context?.myListData, product?._id])
 
   const addToCart = (product, userId, quantity) => {
-
-
-    if (userId === undefined) {
-      context?.alertBox("error", "You are not logged in. Please login first.");
-      return false;
-    }
-
     // For variable products, require variation selection
     // Simplified check - only look at productType
     const isVariableProduct = product?.productType === 'variable' || product?.type === 'variable';
@@ -144,14 +137,12 @@ export const ProductDetailsComponent = (props) => {
       _id: selectedVariation?._id || product?._id,
       productId: product?._id,
       variationId: selectedVariation?._id || null,
-      productTitle: product?.name || '',
+      name: product?.name || '',
       image: getImageUrl(selectedVariation?.image) || getImageUrl(product?.images?.[0]) || getImageUrl(product?.featuredImage) || '',
       rating: product?.rating || 0,
       price: parseFloat(displayPrice) || 0,
       oldPrice: product?.oldPrice ? parseFloat(product.oldPrice) : null,
       discount: product?.discount || 0,
-      quantity: parseInt(quantity) || 1,
-      subTotal: parseFloat(displayPrice * quantity) || 0,
       countInStock: parseInt(stock) || 0,
       brand: product?.brand || '',
       productType: product?.productType || (product?.variations && product.variations.length > 0 ? 'variable' : 'simple'),
@@ -163,21 +154,20 @@ export const ProductDetailsComponent = (props) => {
     }
 
     setIsLoading(true);
-    postData("/api/cart/add", productItem).then((res) => {
-      if (res?.error === false) {
-        context?.alertBox("success", res?.message);
-        context?.getCartItems();
-        setTimeout(() => {
-          setIsLoading(false);
-          setIsAdded(true)
-        }, 500);
-      } else {
-        context?.alertBox("error", res?.message);
-        setTimeout(() => {
-          setIsLoading(false);
-        }, 500);
-      }
-    })
+    
+    // Use context.addToCart which handles both guest and logged-in users
+    const result = context?.addToCart(productItem, context?.userData?._id, quantity);
+    
+    if (result !== false) {
+      setTimeout(() => {
+        setIsLoading(false);
+        setIsAdded(true);
+      }, 500);
+    } else {
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 500);
+    }
   }
 
 

@@ -36,6 +36,14 @@ const Checkout = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    
+    // Check if user is logged in - redirect to login if not
+    if (!context?.isLogin || !context?.userData) {
+      context?.alertBox("error", "Please login to proceed with checkout");
+      history("/login");
+      return;
+    }
+    
     setUserData(context?.userData);
     
     // Get address, phone, and shipping rate from location state (passed from Cart page)
@@ -70,7 +78,7 @@ const Checkout = () => {
         history("/cart");
       }, 2000);
     }
-  }, [location.state]);
+  }, [location.state, context?.isLogin, context?.userData]);
 
 
 

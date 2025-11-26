@@ -11,10 +11,21 @@ const CartPanel = (props) => {
   const context = useContext(MyContext);
 
   const removeItem = (id) => {
-    deleteData(`/api/cart/delete-cart-item/${id}`).then((res) => {
-      context.alertBox("success", "Item Removed ");
-      context?.getCartItems();
-    })
+    // Check if this is a guest cart item
+    const isGuestItem = id?.toString().startsWith('guest_');
+    
+    if (isGuestItem || !context?.isLogin) {
+      // Remove from guest cart
+      if (context?.removeFromGuestCart) {
+        context.removeFromGuestCart(id);
+      }
+    } else {
+      // Remove from server cart
+      deleteData(`/api/cart/delete-cart-item/${id}`).then((res) => {
+        context.alertBox("success", "Item Removed ");
+        context?.getCartItems();
+      })
+    }
   }
 
 
@@ -98,9 +109,15 @@ const CartPanel = (props) => {
             <Link to="/cart" className=" w-[50%] d-block" onClick={context.toggleCartPanel(false)}>
               <Button className="btn-org btn-lg w-full">View Cart</Button>
             </Link>
-            <Link to="/checkout" className=" w-[50%] d-block"  onClick={context.toggleCartPanel(false)}>
-              <Button className="btn-org btn-border btn-lg w-full">Checkout</Button>
-            </Link>
+            {context?.isLogin ? (
+              <Link to="/cart" className=" w-[50%] d-block" onClick={context.toggleCartPanel(false)}>
+                <Button className="btn-org btn-border btn-lg w-full">Checkout</Button>
+              </Link>
+            ) : (
+              <Link to="/login" className=" w-[50%] d-block" onClick={context.toggleCartPanel(false)}>
+                <Button className="btn-org btn-border btn-lg w-full">Login</Button>
+              </Link>
+            )}
           </div>
         </div>
       </div>

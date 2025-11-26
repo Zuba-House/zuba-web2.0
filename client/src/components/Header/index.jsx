@@ -59,8 +59,8 @@ const Header = () => {
     "/my-list",
     "/checkout",
     "/order",
-    "/cart",
     "/address"
+    // Note: "/cart" is NOT protected - guests can add items to cart
   ];
 
   useEffect(() => {
