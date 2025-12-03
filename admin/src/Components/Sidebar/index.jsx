@@ -48,7 +48,7 @@ const Sidebar = () => {
 
   return (
     <>
-      <div className={`sidebar fixed top-0 left-0 z-[52] bg-[#fff] h-full border-r border-[rgba(0,0,0,0.1)] py-2 px-4 w-[${context.isSidebarOpen === true ? `${20}%` : '0px'}]`}>
+      <div className={`sidebar fixed top-0 left-0 z-[52] h-full border-r border-[rgba(255,255,255,0.1)] py-2 px-4 w-[${context.isSidebarOpen === true ? `${20}%` : '0px'}]`}>
         <div className="py-2 w-full"
           onClick={() => {
             context?.windowWidth < 992 && context?.setisSidebarOpen(false)
@@ -71,18 +71,18 @@ const Sidebar = () => {
                 setSubmenuIndex(null)
               }}
             >
-              <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]">
-                <RxDashboard className="text-[18px]" /> <span>Dashboard</span>
+              <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]">
+                <RxDashboard className="text-[18px] text-[#efb291]" /> <span>Dashboard</span>
               </Button>
             </Link>
           </li>
 
           <li>
             <Button
-              className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]"
+              className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]"
               onClick={() => isOpenSubMenu(1)}
             >
-              <FaRegImage className="text-[18px]" /> <span>Home Slides</span>
+              <FaRegImage className="text-[18px] text-[#efb291]" /> <span>Home Slides</span>
               <span className="ml-auto w-[30px] h-[30px] flex items-center justify-center">
                 <FaAngleDown
                   className={`transition-all ${submenuIndex === 1 ? "rotate-180" : ""
@@ -100,14 +100,14 @@ const Sidebar = () => {
                       setSubmenuIndex(null)
                     }}
                   >
-                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
-                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>{" "}
+                    <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>{" "}
                       Home Banners List
                     </Button>
                   </Link>
                 </li>
                 <li className="w-full">
-                  <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3" onClick={() => {
+                  <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3" onClick={() => {
                     context.setIsOpenFullScreenPanel({
                       open: true,
                       model: 'Add Home Slide'
@@ -115,7 +115,7 @@ const Sidebar = () => {
                     context?.windowWidth < 992 && context?.setisSidebarOpen(false)
                     setSubmenuIndex(null)
                   }}>
-                    <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
+                    <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>
                     Add Home Banner Slide
                   </Button>
                 </li>
@@ -126,10 +126,10 @@ const Sidebar = () => {
 
           <li>
             <Button
-              className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]"
+              className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]"
               onClick={() => isOpenSubMenu(3)}
             >
-              <TbCategory className="text-[18px]" /> <span>Category</span>
+              <TbCategory className="text-[18px] text-[#efb291]" /> <span>Category</span>
               <span className="ml-auto w-[30px] h-[30px] flex items-center justify-center">
                 <FaAngleDown
                   className={`transition-all ${submenuIndex === 3 ? "rotate-180" : ""
@@ -145,15 +145,15 @@ const Sidebar = () => {
                     context?.windowWidth < 992 && context?.setisSidebarOpen(false)
                     setSubmenuIndex(null)
                   }}>
-                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
-                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>{" "}
+                    <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>{" "}
                       Category List
 
                     </Button>
                   </Link>
                 </li>
                 <li className="w-full">
-                  <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3" onClick={() => {
+                  <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3" onClick={() => {
                     context.setIsOpenFullScreenPanel({
                       open: true,
                       model: 'Add New Category'
@@ -161,7 +161,7 @@ const Sidebar = () => {
                     context?.windowWidth < 992 && context?.setisSidebarOpen(false)
                     setSubmenuIndex(null)
                   }}>
-                    <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
+                    <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>
                     Add a Category
                   </Button>
                 </li>
@@ -169,14 +169,14 @@ const Sidebar = () => {
                   <Link to="/subCategory/list" onClick={() => {
                     context?.windowWidth < 992 && context?.setisSidebarOpen(false)
                   }}>
-                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
-                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
+                    <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>
                       Sub Category List
                     </Button>
                   </Link>
                 </li>
                 <li className="w-full">
-                  <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3" onClick={() => {
+                  <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3" onClick={() => {
                     context.setIsOpenFullScreenPanel({
                       open: true,
                       model: 'Add New Sub Category'
@@ -184,7 +184,7 @@ const Sidebar = () => {
                     context?.windowWidth < 992 && context?.setisSidebarOpen(false)
                     setSubmenuIndex(null)
                   }}>
-                    <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
+                    <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>
                     Add a Sub Category
                   </Button>
                 </li>
@@ -194,10 +194,10 @@ const Sidebar = () => {
 
           <li>
             <Button
-              className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]"
+              className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]"
               onClick={() => isOpenSubMenu(4)}
             >
-              <RiProductHuntLine className="text-[18px]" />{" "}
+              <RiProductHuntLine className="text-[18px] text-[#efb291]" />{" "}
               <span>Products</span>
               <span className="ml-auto w-[30px] h-[30px] flex items-center justify-center">
                 <FaAngleDown
@@ -214,8 +214,8 @@ const Sidebar = () => {
                     context?.windowWidth < 992 && context?.setisSidebarOpen(false)
                     setSubmenuIndex(null)
                   }}>
-                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
-                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>{" "}
+                    <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>{" "}
                       Product List
                     </Button>
                   </Link>
@@ -225,8 +225,8 @@ const Sidebar = () => {
                     context?.windowWidth < 992 && context?.setisSidebarOpen(false)
                     setSubmenuIndex(null)
                   }}>
-                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
-                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
+                    <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>
                       Add Product (Enhanced)
                     </Button>
                   </Link>
@@ -244,8 +244,8 @@ const Sidebar = () => {
                 setSubmenuIndex(null)
               }}
             >
-              <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]">
-                <FiUsers className="text-[18px]" /> <span>Users</span>
+              <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]">
+                <FiUsers className="text-[18px] text-[#efb291]" /> <span>Users</span>
               </Button>
             </Link>
           </li>
@@ -258,8 +258,8 @@ const Sidebar = () => {
                 setSubmenuIndex(null)
               }}
             >
-              <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]">
-                <IoBagCheckOutline className="text-[20px]" /> <span>Orders</span>
+              <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]">
+                <IoBagCheckOutline className="text-[20px] text-[#efb291]" /> <span>Orders</span>
               </Button>
             </Link>
           </li>
@@ -271,15 +271,15 @@ const Sidebar = () => {
                 setSubmenuIndex(null)
               }}
             >
-              <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]">
-                <IoAnalytics className="text-[20px] text-blue-500" /> <span>📊 Analytics</span>
+              <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]">
+                <IoAnalytics className="text-[20px] text-[#efb291]" /> <span>Analytics</span>
               </Button>
             </Link>
           </li>
 
           <li>
             <Button
-              className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]"
+              className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]"
               onClick={() => isOpenSubMenu(5)}
             >
               <RiProductHuntLine className="text-[18px]" />
@@ -301,14 +301,14 @@ const Sidebar = () => {
                       setSubmenuIndex(null)
                     }}
                   >
-                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
-                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>{" "}
+                    <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>{" "}
                       Home Banner List
                     </Button>
                   </Link>
                 </li>
                 <li className="w-full">
-                  <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3" onClick={() => {
+                  <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3" onClick={() => {
                     context.setIsOpenFullScreenPanel({
                       open: true,
                       model: "Add Home Banner List 1"
@@ -316,7 +316,7 @@ const Sidebar = () => {
                     context?.windowWidth < 992 && context?.setisSidebarOpen(false)
                     setSubmenuIndex(null)
                   }}>
-                    <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
+                    <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>
                     Add Home Banner
                   </Button>
                 </li>
@@ -326,14 +326,14 @@ const Sidebar = () => {
                     context?.windowWidth < 992 && context?.setisSidebarOpen(false)
                     setSubmenuIndex(null)
                   }}>
-                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
-                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>{" "}
+                    <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>{" "}
                       Home Banner List 2
                     </Button>
                   </Link>
                 </li>
                 <li className="w-full">
-                  <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3" onClick={() => {
+                  <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3" onClick={() => {
                     context.setIsOpenFullScreenPanel({
                       open: true,
                       model: "Add Home Banner List2"
@@ -341,7 +341,7 @@ const Sidebar = () => {
                     context?.windowWidth < 992 && context?.setisSidebarOpen(false)
                     setSubmenuIndex(null)
                   }}>
-                    <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
+                    <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>
                     Add Banner
                   </Button>
                 </li>
@@ -353,8 +353,8 @@ const Sidebar = () => {
                       setSubmenuIndex(null)
                     }}
                   >
-                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
-                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>{" "}
+                    <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>{" "}
                       📱 Responsive Banners
                     </Button>
                   </Link>
@@ -368,10 +368,10 @@ const Sidebar = () => {
 
           <li>
             <Button
-              className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]"
+              className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]"
               onClick={() => isOpenSubMenu(6)}
             >
-              <SiBloglovin className="text-[18px]" />
+              <SiBloglovin className="text-[18px] text-[#efb291]" />
               <span>Blogs</span>
               <span className="ml-auto w-[30px] h-[30px] flex items-center justify-center">
                 <FaAngleDown
@@ -388,14 +388,14 @@ const Sidebar = () => {
                     context?.windowWidth < 992 && context?.setisSidebarOpen(false)
                     setSubmenuIndex(null)
                   }}>
-                    <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
-                      <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
+                    <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>
                       Blog List
                     </Button>
                   </Link>
                 </li>
                 <li className="w-full">
-                  <Button className="!text-[rgba(0,0,0,0.7)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3" onClick={() => {
+                  <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3" onClick={() => {
                     context.setIsOpenFullScreenPanel({
                       open: true,
                       model: "Add Blog"
@@ -403,7 +403,7 @@ const Sidebar = () => {
                     context?.windowWidth < 992 && context?.setisSidebarOpen(false)
                     setSubmenuIndex(null)
                   }}>
-                    <span className="block w-[5px] h-[5px] rounded-full bg-[rgba(0,0,0,0.2)]"></span>
+                    <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>
                     Add Blog
                   </Button>
                 </li>
@@ -417,17 +417,17 @@ const Sidebar = () => {
           <li>
             <Link to="/logo/manage">
               <Button
-                className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]"
+                className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]"
               >
-                <IoLogoBuffer className="text-[18px]" />
+                <IoLogoBuffer className="text-[18px] text-[#efb291]" />
                 <span>Manage Logo</span>
               </Button>
             </Link>
           </li>
 
           <li>
-            <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]" onClick={logout}>
-              <IoMdLogOut className="text-[20px]" /> <span>Logout</span>
+            <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]" onClick={logout}>
+              <IoMdLogOut className="text-[20px] text-[#efb291]" /> <span>Logout</span>
             </Button>
           </li>
         </ul>
