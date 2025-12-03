@@ -206,7 +206,7 @@ const Dashboard = () => {
       </div>
 
       {
-        productData?.products?.length !== 0 && users?.length !== 0 && allReviews?.length !== 0 && <DashboardBoxes orders={ordersCount} products={productData?.totalProducts || productData?.total || productData?.products?.length} users={users?.length} reviews={allReviews?.length} category={context?.catData?.length} />
+        productData?.products?.length !== 0 && users?.length !== 0 && allReviews?.length !== 0 && <DashboardBoxes orders={ordersCount} products={productData?.totalCount || productData?.total || productData?.products?.length} users={users?.length} reviews={allReviews?.length} category={context?.catData?.length} />
       }
 
       <Products/>
