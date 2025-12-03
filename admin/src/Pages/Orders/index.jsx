@@ -359,6 +359,12 @@ export const Orders = () => {
                                     scope="col"
                                     className="px-6 py-3 whitespace-nowrap"
                                   >
+                                    Variation / SKU
+                                  </th>
+                                  <th
+                                    scope="col"
+                                    className="px-6 py-3 whitespace-nowrap"
+                                  >
                                     Image
                                   </th>
                                   <th
@@ -384,11 +390,32 @@ export const Orders = () => {
                               <tbody>
                                 {
                                   order?.products?.map((item, index) => {
+                                    // Get variation attributes for display
+                                    const variationInfo = [];
+                                    
+                                    // Check new variation system first
+                                    if (item?.variation?.attributes && item.variation.attributes.length > 0) {
+                                      item.variation.attributes.forEach(attr => {
+                                        if (attr.name && attr.value) {
+                                          variationInfo.push(`${attr.name}: ${attr.value}`);
+                                        }
+                                      });
+                                    }
+                                    
+                                    // Fallback to legacy fields if no new variation data
+                                    if (variationInfo.length === 0) {
+                                      if (item?.size) variationInfo.push(`Size: ${item.size}`);
+                                      if (item?.weight) variationInfo.push(`Weight: ${item.weight}`);
+                                      if (item?.ram) variationInfo.push(`RAM: ${item.ram}`);
+                                    }
+                                    
+                                    const sku = item?.variation?.sku || item?.sku || 'N/A';
+                                    
                                     return (
-                                      <tr className="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
+                                      <tr key={index} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
                                         <td className="px-6 py-4 font-[500]">
-                                          <span className="text-gray-600">
-                                            {item?._id}
+                                          <span className="text-gray-600 text-[11px]">
+                                            {item?.productId || item?._id}
                                           </span>
                                         </td>
                                         <td className="px-6 py-4 font-[500]">
@@ -398,9 +425,32 @@ export const Orders = () => {
                                         </td>
 
                                         <td className="px-6 py-4 font-[500]">
+                                          <div className="min-w-[150px]">
+                                            {variationInfo.length > 0 ? (
+                                              <div className="flex flex-wrap gap-1">
+                                                {variationInfo.map((info, idx) => (
+                                                  <span 
+                                                    key={idx} 
+                                                    className="inline-block bg-blue-100 text-blue-800 text-[11px] font-medium px-2 py-0.5 rounded"
+                                                  >
+                                                    {info}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <span className="text-gray-400 text-[12px]">No variation</span>
+                                            )}
+                                            <div className="text-[10px] text-gray-500 mt-1">
+                                              SKU: {sku}
+                                            </div>
+                                          </div>
+                                        </td>
+
+                                        <td className="px-6 py-4 font-[500]">
                                           <img
-                                            src={item?.image}
+                                            src={item?.variation?.image || item?.image}
                                             className="w-[40px] h-[40px] object-cover rounded-md"
+                                            alt={item?.productTitle}
                                           />
                                         </td>
 

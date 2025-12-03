@@ -72,6 +72,38 @@ export const ProductDetailsComponent = (props) => {
 
   }, [context?.myListData, product?._id])
 
+  // Helper function to check if stock is truly available (checks both quantity AND status)
+  const isStockAvailable = (variation, prod) => {
+    if (variation) {
+      // Check variation stock status first (admin can mark as out_of_stock)
+      if (variation.stockStatus === 'out_of_stock') return false;
+      if (variation.isActive === false) return false;
+      // Endless stock is always available
+      if (variation.endlessStock) return true;
+      // Check actual stock quantity
+      return Number(variation.stock || 0) > 0;
+    } else {
+      // Check product stock status
+      if (prod?.stockStatus === 'out_of_stock') return false;
+      if (prod?.inventory?.stockStatus === 'out_of_stock') return false;
+      // Endless stock is always available
+      if (prod?.inventory?.endlessStock) return true;
+      // Check actual stock quantity
+      return Number(prod?.countInStock || prod?.stock || 0) > 0;
+    }
+  };
+
+  // Helper to get current stock quantity
+  const getStockQuantity = (variation, prod) => {
+    if (variation) {
+      if (variation.endlessStock) return null; // null = unlimited
+      return Number(variation.stock || 0);
+    } else {
+      if (prod?.inventory?.endlessStock) return null;
+      return Number(prod?.countInStock || prod?.stock || 0);
+    }
+  };
+
   const addToCart = (product, userId, quantity) => {
     // For variable products, require variation selection
     // Simplified check - only look at productType
@@ -108,13 +140,11 @@ export const ProductDetailsComponent = (props) => {
       ? (selectedVariation.salePrice || selectedVariation.regularPrice || selectedVariation.price)
       : (product?.salePrice || product?.oldPrice || product?.price);
 
-    // Determine stock: use selected variation stock if available
-    const stock = selectedVariation 
-      ? (selectedVariation.endlessStock ? null : selectedVariation.stock)
-      : (product?.inventory?.endlessStock ? null : (product?.countInStock || product?.stock));
+    // Determine stock using helper (respects both quantity AND stockStatus)
+    const stock = getStockQuantity(selectedVariation, product);
 
-    // Check stock availability (null means endless/unlimited stock)
-    if (stock !== null && stock <= 0) {
+    // Check stock availability using helper (checks BOTH stockStatus AND quantity)
+    if (!isStockAvailable(selectedVariation, product)) {
       context?.alertBox("error", "This product is out of stock");
       return false;
     }
@@ -159,15 +189,15 @@ export const ProductDetailsComponent = (props) => {
     const result = context?.addToCart(productItem, context?.userData?._id, quantity);
     
     if (result !== false) {
-      setTimeout(() => {
-        setIsLoading(false);
+        setTimeout(() => {
+          setIsLoading(false);
         setIsAdded(true);
-      }, 500);
-    } else {
-      setTimeout(() => {
-        setIsLoading(false);
-      }, 500);
-    }
+        }, 500);
+      } else {
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 500);
+      }
   }
 
 
@@ -313,17 +343,23 @@ export const ProductDetailsComponent = (props) => {
             Availability:
           </span>
           <span className={`text-[13px] sm:text-[14px] font-bold ${
-            (selectedVariation 
-              ? (selectedVariation.endlessStock || (selectedVariation.stock > 0))
-              : (product?.inventory?.endlessStock || (product?.countInStock || product?.stock) > 0)) 
-              ? 'text-green-600' 
-              : 'text-red-600'
+            isStockAvailable(selectedVariation, product) ? 'text-green-600' : 'text-red-600'
           }`}>
-            {selectedVariation 
-              ? `${selectedVariation.stock} Items Available` 
-              : (product?.inventory?.endlessStock 
-                ? 'Available (Unlimited)' 
-                : `${product?.countInStock || product?.stock || 0} Items Available`)}
+            {(() => {
+              // Check if truly available (respects stockStatus)
+              const available = isStockAvailable(selectedVariation, product);
+              const stockQty = getStockQuantity(selectedVariation, product);
+              
+              if (!available) {
+                return 'Out of Stock';
+              }
+              
+              if (stockQty === null) {
+                return 'Available (Unlimited)';
+              }
+              
+              return `${stockQty} Items Available`;
+            })()}
           </span>
         </div>
       </div>
@@ -341,7 +377,7 @@ export const ProductDetailsComponent = (props) => {
           <Button 
             className="btn-org flex gap-2 !min-w-[200px] !py-3 !text-[15px] sm:!text-[16px] !font-[600]" 
             onClick={() => addToCart(product, context?.userData?._id, quantity)}
-            disabled={isLoading}
+            disabled={isLoading || !isStockAvailable(selectedVariation, product)}
             fullWidth
             sx={{
               backgroundColor: '#efb291',
@@ -358,6 +394,8 @@ export const ProductDetailsComponent = (props) => {
             {
               isLoading === true ? (
                 <CircularProgress size={20} sx={{ color: '#0b2735' }} />
+              ) : !isStockAvailable(selectedVariation, product) ? (
+                <>Out of Stock</>
               ) : (
                 <>
                   {

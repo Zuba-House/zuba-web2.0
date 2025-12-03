@@ -30,7 +30,7 @@ const CartPage = () => {
   const [shippingOptions, setShippingOptions] = useState([]);
   const [loadingShipping, setLoadingShipping] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
-  
+
   // New customer info fields
   const [customerName, setCustomerName] = useState('');
   const [apartmentNumber, setApartmentNumber] = useState('');

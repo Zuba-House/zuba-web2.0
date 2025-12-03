@@ -65,9 +65,21 @@ export const addToCartItemController = async (request, response) => {
             : (image?.url || image?.secureUrl || image || '');
 
         // ========================================
-        // STEP 1: Validate stock availability
+        // STEP 1: Validate stock availability from DATABASE
         // ========================================
-        if (normalizedStock <= 0) {
+        // Fetch actual product from database to verify stock (security check)
+        const actualProduct = await ProductModel.findById(productId);
+        
+        if (!actualProduct) {
+            return response.status(404).json({
+                error: true,
+                success: false,
+                message: "Product not found"
+            });
+        }
+
+        // Check product-level stock status
+        if (actualProduct.stockStatus === 'out_of_stock') {
             return response.status(400).json({
                 error: true,
                 success: false,
@@ -75,11 +87,58 @@ export const addToCartItemController = async (request, response) => {
             });
         }
 
-        if (normalizedQuantity > normalizedStock) {
+        // For variable products, check variation stock status
+        let actualStock = normalizedStock;
+        if (productType === 'variable' && variationId) {
+            const variation = actualProduct.variations?.find(
+                v => v._id && v._id.toString() === variationId
+            );
+            
+            if (!variation) {
+                return response.status(404).json({
+                    error: true,
+                    success: false,
+                    message: "Product variation not found"
+                });
+            }
+            
+            // Check variation stock status
+            if (variation.stockStatus === 'out_of_stock') {
+                return response.status(400).json({
+                    error: true,
+                    success: false,
+                    message: "This product variation is out of stock"
+                });
+            }
+            
+            // Use variation stock from database (more secure than client-sent value)
+            if (!variation.endlessStock) {
+                actualStock = Number(variation.stock || 0);
+            } else {
+                actualStock = 999999; // Endless stock
+            }
+        } else {
+            // For simple products, use database stock
+            if (!actualProduct.inventory?.endlessStock) {
+                actualStock = Number(actualProduct.countInStock || actualProduct.stock || 0);
+            } else {
+                actualStock = 999999; // Endless stock
+            }
+        }
+
+        if (actualStock <= 0) {
             return response.status(400).json({
                 error: true,
                 success: false,
-                message: `Only ${normalizedStock} items available in stock`
+                message: "This product is out of stock"
+            });
+        }
+
+        if (normalizedQuantity > actualStock) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: `Only ${actualStock} items available in stock`
             });
         }
 
@@ -111,12 +170,12 @@ export const addToCartItemController = async (request, response) => {
             // Item already in cart - update quantity
             const newQuantity = existingCartItem.quantity + normalizedQuantity;
             
-            // Validate new quantity doesn't exceed stock
-            if (newQuantity > normalizedStock) {
+            // Validate new quantity doesn't exceed actual database stock
+            if (newQuantity > actualStock) {
                 return response.status(400).json({
                     error: true,
                     success: false,
-                    message: `Cannot add ${normalizedQuantity} more. Only ${normalizedStock - existingCartItem.quantity} items remaining in stock.`
+                    message: `Cannot add ${normalizedQuantity} more. Only ${actualStock - existingCartItem.quantity} items remaining in stock.`
                 });
             }
             
@@ -145,7 +204,7 @@ export const addToCartItemController = async (request, response) => {
             subTotal: normalizedPrice * normalizedQuantity,
             productId,
             userId,
-            countInStock: normalizedStock,
+            countInStock: actualStock, // Use verified database stock
             discount: discount ? parseFloat(discount) : 0,
             brand: brand || '',
             // New fields
