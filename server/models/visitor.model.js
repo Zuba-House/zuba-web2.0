@@ -138,9 +138,8 @@ visitorSchema.index({
 const dailyStatsSchema = new mongoose.Schema({
     date: {
         type: Date,
-        required: true,
-        unique: true
-        // Note: index is created via schema.index() below with TTL
+        required: true
+        // Note: unique + TTL index is created via schema.index() below
     },
     
     // Visitor counts
@@ -215,8 +214,8 @@ const dailyStatsSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// TTL index for auto-deletion after 1 year (also serves as the date index)
-dailyStatsSchema.index({ date: 1 }, { expireAfterSeconds: 31536000 });
+// Single index with unique constraint + TTL for auto-deletion after 1 year
+dailyStatsSchema.index({ date: 1 }, { unique: true, expireAfterSeconds: 31536000 });
 
 const VisitorModel = mongoose.model('visitor', visitorSchema);
 const DailyStatsModel = mongoose.model('dailyStats', dailyStatsSchema);
