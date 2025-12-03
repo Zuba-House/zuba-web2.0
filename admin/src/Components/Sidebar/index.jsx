@@ -14,6 +14,7 @@ import { MyContext } from "../../App";
 import { SiBloglovin } from "react-icons/si";
 import { fetchDataFromApi } from "../../utils/api";
 import { IoLogoBuffer } from "react-icons/io";
+import { IoAnalytics } from "react-icons/io5";
 
 
 
@@ -263,8 +264,18 @@ const Sidebar = () => {
             </Link>
           </li>
 
-
-
+          <li>
+            <Link to="/analytics"
+              onClick={() => {
+                context?.windowWidth < 992 && context?.setisSidebarOpen(false)
+                setSubmenuIndex(null)
+              }}
+            >
+              <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]">
+                <IoAnalytics className="text-[20px] text-blue-500" /> <span>📊 Analytics</span>
+              </Button>
+            </Link>
+          </li>
 
           <li>
             <Button

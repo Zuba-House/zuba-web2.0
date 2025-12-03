@@ -43,6 +43,7 @@ import PrivacyChoices from "./Pages/PrivacyChoices";
 
 import toast, { Toaster } from 'react-hot-toast';
 import { fetchDataFromApi, postData } from "./utils/api";
+import { trackPageView } from "./utils/analytics";
 import Address from "./Pages/MyAccount/address";
 import { OrderSuccess } from "./Pages/Orders/success";
 import { OrderFailed } from "./Pages/Orders/failed";
@@ -109,6 +110,40 @@ function App() {
   useEffect(() => {
     emailjs.init('BEDoJ4iqpx2e53MtC');
     console.log('✅ EmailJS initialized');
+  }, []);
+
+  // Analytics - Track page views
+  useEffect(() => {
+    // Track initial page load
+    trackPageView(window.location.pathname, document.title);
+    
+    // Track route changes using History API
+    const handleRouteChange = () => {
+      trackPageView(window.location.pathname, document.title);
+    };
+    
+    // Listen for popstate (back/forward navigation)
+    window.addEventListener('popstate', handleRouteChange);
+    
+    // Override pushState and replaceState to track SPA navigation
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+    
+    history.pushState = function(...args) {
+      originalPushState.apply(this, args);
+      setTimeout(() => trackPageView(window.location.pathname, document.title), 100);
+    };
+    
+    history.replaceState = function(...args) {
+      originalReplaceState.apply(this, args);
+      setTimeout(() => trackPageView(window.location.pathname, document.title), 100);
+    };
+    
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+      history.pushState = originalPushState;
+      history.replaceState = originalReplaceState;
+    };
   }, []);
 
   // Check and validate token on initial load

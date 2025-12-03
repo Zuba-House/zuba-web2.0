@@ -31,6 +31,8 @@ import shippingRouter from './route/shipping.route.js';
 import testRouter from './route/test.route.js';
 import bannerRouter from './route/banner.route.js';
 import { transporter } from './config/emailService.js';
+import analyticsRouter from './route/analytics.route.js';
+import { analyticsMiddleware } from './middlewares/analytics.js';
 
 // Validate environment variables at startup
 try {
@@ -285,7 +287,11 @@ app.get("/test-email", async (req, res) => {
 });
 
 
+// Analytics middleware - Track all visitors (non-blocking)
+app.use(analyticsMiddleware);
+
 // API Routes
+app.use('/api/analytics', analyticsRouter);
 app.use('/api/user', userRouter);
 app.use('/api/category', categoryRouter);
 app.use('/api/product', productRouter);
