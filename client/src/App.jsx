@@ -509,37 +509,35 @@ function App() {
     }
 
     const data = {
-      productTitle: product?.name,
+      productTitle: product?.name || product?.productTitle,
       image: product?.image,
       rating: product?.rating,
       price: product?.price,
       oldPrice: product?.oldPrice,
       discount: product?.discount,
       quantity: quantity,
-      subTotal: parseInt(product?.price * quantity),
-      productId: product?._id,
+      subTotal: parseFloat(product?.price || 0) * quantity,
+      productId: product?.productId || product?._id,
       countInStock: product?.countInStock,
       brand: product?.brand,
+      // Old fields (backward compatibility)
       size: product?.size,
       weight: product?.weight,
-      ram: product?.ram
+      ram: product?.ram,
+      // NEW: Variation fields for variable products
+      productType: product?.productType || 'simple',
+      variationId: product?.variationId || null,
+      variation: product?.variation || null
     }
-
 
     postData("/api/cart/add", data).then((res) => {
       if (res?.error === false) {
         alertBox("success", res?.message);
-
         getCartItems();
-
-
       } else {
         alertBox("error", res?.message);
       }
-
     })
-
-
   }
 
 
