@@ -78,8 +78,10 @@ export const addToCartItemController = async (request, response) => {
             });
         }
 
-        // Check product-level stock status
-        if (actualProduct.stockStatus === 'out_of_stock') {
+        // Check product-level stock status (inventory.stockStatus for simple products)
+        // For variable products, we check each variation's stockStatus separately below
+        if (actualProduct.productType !== 'variable' && 
+            actualProduct.inventory?.stockStatus === 'out_of_stock') {
             return response.status(400).json({
                 error: true,
                 success: false,
@@ -90,11 +92,21 @@ export const addToCartItemController = async (request, response) => {
         // For variable products, check variation stock status
         let actualStock = normalizedStock;
         if (productType === 'variable' && variationId) {
-            const variation = actualProduct.variations?.find(
-                v => v._id && v._id.toString() === variationId
+            // Use 'foundVariation' to avoid shadowing the 'variation' from request body
+            const foundVariation = actualProduct.variations?.find(
+                v => v._id && v._id.toString() === variationId.toString()
             );
             
-            if (!variation) {
+            if (!foundVariation) {
+                // Log for debugging
+                console.log('Variation lookup failed:', {
+                    variationId,
+                    availableVariations: actualProduct.variations?.map(v => ({
+                        id: v._id?.toString(),
+                        sku: v.sku
+                    }))
+                });
+                
                 return response.status(404).json({
                     error: true,
                     success: false,
@@ -103,7 +115,7 @@ export const addToCartItemController = async (request, response) => {
             }
             
             // Check variation stock status
-            if (variation.stockStatus === 'out_of_stock') {
+            if (foundVariation.stockStatus === 'out_of_stock') {
                 return response.status(400).json({
                     error: true,
                     success: false,
@@ -112,15 +124,19 @@ export const addToCartItemController = async (request, response) => {
             }
             
             // Use variation stock from database (more secure than client-sent value)
-            if (!variation.endlessStock) {
-                actualStock = Number(variation.stock || 0);
+            if (!foundVariation.endlessStock) {
+                actualStock = Number(foundVariation.stock || 0);
             } else {
                 actualStock = 999999; // Endless stock
             }
         } else {
             // For simple products, use database stock
             if (!actualProduct.inventory?.endlessStock) {
-                actualStock = Number(actualProduct.countInStock || actualProduct.stock || 0);
+                actualStock = Number(
+                    actualProduct.inventory?.stock || 
+                    actualProduct.countInStock || 
+                    0
+                );
             } else {
                 actualStock = 999999; // Endless stock
             }
