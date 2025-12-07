@@ -29,7 +29,8 @@ const DiscountInput = ({
     setError('');
 
     try {
-      const response = await fetch(`${apiUrl}/discounts/calculate`, {
+      // Try the combined discount endpoint first
+      let response = await fetch(`${apiUrl}/discounts/calculate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -42,6 +43,147 @@ const DiscountInput = ({
           giftCardCode: giftCardCode.trim() || null
         })
       });
+
+      // If combined endpoint fails (405 or other errors), try individual endpoints as fallback
+      if (!response.ok) {
+        // Only use fallback for 405 (Method Not Allowed) or 404 (Not Found)
+        if (response.status === 405 || response.status === 404) {
+          console.warn('Combined discount endpoint not available, using individual endpoints');
+          
+          // Calculate discounts separately
+          const discounts = {
+            coupon: null,
+            couponDiscount: 0,
+            giftCard: null,
+            giftCardDiscount: 0,
+            automaticDiscounts: [],
+            totalDiscount: 0,
+            freeShipping: false,
+            finalTotal: cartTotal + shippingCost
+          };
+
+          // Apply coupon if provided
+          if (promoCode.trim()) {
+            try {
+              const couponResponse = await fetch(`${apiUrl}/coupons/apply`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  code: promoCode.trim(),
+                  cartItems,
+                  cartTotal
+                })
+              });
+
+              if (couponResponse.ok) {
+                try {
+                  const couponData = await couponResponse.json();
+                  if (couponData.success && couponData.discount) {
+                    discounts.coupon = couponData.coupon;
+                    discounts.couponDiscount = couponData.discountAmount || 0;
+                    discounts.freeShipping = couponData.freeShipping || false;
+                  } else if (couponData.error) {
+                    setError(couponData.error);
+                    setDiscounts(null);
+                    return;
+                  }
+                } catch (e) {
+                  console.error('Error parsing coupon response:', e);
+                }
+              } else {
+                try {
+                  const errorData = await couponResponse.json();
+                  if (errorData.error) {
+                    setError(errorData.error);
+                    setDiscounts(null);
+                    return;
+                  }
+                } catch (e) {
+                  // Response is not JSON, ignore
+                }
+              }
+            } catch (e) {
+              console.error('Coupon apply error:', e);
+            }
+          }
+
+          // Apply gift card if provided
+          if (giftCardCode.trim()) {
+            try {
+              const giftCardResponse = await fetch(`${apiUrl}/gift-cards/apply`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  code: giftCardCode.trim(),
+                  cartTotal: cartTotal - discounts.couponDiscount
+                })
+              });
+
+              if (giftCardResponse.ok) {
+                try {
+                  const giftCardData = await giftCardResponse.json();
+                  if (giftCardData.success && giftCardData.discount) {
+                    discounts.giftCard = giftCardData.giftCard;
+                    discounts.giftCardDiscount = giftCardData.discountAmount || 0;
+                  } else if (giftCardData.error) {
+                    setError(giftCardData.error);
+                    setDiscounts(null);
+                    return;
+                  }
+                } catch (e) {
+                  console.error('Error parsing gift card response:', e);
+                }
+              } else {
+                try {
+                  const errorData = await giftCardResponse.json();
+                  if (errorData.error) {
+                    setError(errorData.error);
+                    setDiscounts(null);
+                    return;
+                  }
+                } catch (e) {
+                  // Response is not JSON, ignore
+                }
+              }
+            } catch (e) {
+              console.error('Gift card apply error:', e);
+            }
+          }
+
+          // Calculate totals
+          discounts.totalDiscount = discounts.couponDiscount + discounts.giftCardDiscount;
+          discounts.finalTotal = Math.max(0, cartTotal - discounts.totalDiscount + (discounts.freeShipping ? 0 : shippingCost));
+
+          // Only set discounts if we have at least one valid discount
+          if (discounts.couponDiscount > 0 || discounts.giftCardDiscount > 0) {
+            setDiscounts(discounts);
+            if (onDiscountsCalculated) {
+              onDiscountsCalculated(discounts);
+            }
+          }
+          return;
+        }
+      }
+
+      // Check if response is ok before parsing JSON
+      if (!response.ok) {
+        // Try to parse error response, but handle if it's not JSON
+        let errorMessage = `Server error: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch (e) {
+          // If response is not JSON, use status text
+          errorMessage = response.statusText || errorMessage;
+        }
+        setError(errorMessage);
+        setDiscounts(null);
+        return;
+      }
 
       const data = await response.json();
 
