@@ -9,6 +9,7 @@ import { fetchDataFromApi, postData } from "../../utils/api";
 import { Link, useNavigate } from "react-router-dom";
 import { formatCurrency } from "../../utils/currency";
 import ShippingAddressInput from "../../components/ShippingAddressInput/ShippingAddressInput";
+import DiscountInput from "../../components/DiscountInput/DiscountInput";
 
 const CartPage = () => {
 
@@ -30,6 +31,7 @@ const CartPage = () => {
   const [shippingOptions, setShippingOptions] = useState([]);
   const [loadingShipping, setLoadingShipping] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
+  const [discounts, setDiscounts] = useState(null);
 
   // New customer info fields
   const [customerName, setCustomerName] = useState('');
@@ -416,26 +418,83 @@ const CartPage = () => {
 
             <hr className="my-4" />
 
+            {/* Discount Input Section */}
+            {context.cartData?.length > 0 && (
+              <div className="mb-4">
+                <DiscountInput
+                  cartItems={context.cartData.map(item => ({
+                    productId: item.productId,
+                    quantity: item.quantity,
+                    price: parseFloat(item.price || 0),
+                    product: item.product || {}
+                  }))}
+                  cartTotal={
+                    context.cartData?.length !== 0 ?
+                      context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
+                        .reduce((total, value) => total + value, 0) : 0
+                  }
+                  shippingCost={selectedShippingRate ? (selectedShippingRate.cost || 0) : 0}
+                  onDiscountsCalculated={(calculatedDiscounts) => {
+                    setDiscounts(calculatedDiscounts);
+                  }}
+                />
+              </div>
+            )}
+
+            <hr className="my-4" />
+
             <p className="flex items-center justify-between">
               <span className="text-[14px] font-[500]">Shipping</span>
               <span className="font-bold">
                 {selectedShippingRate ? (
-                  formatCurrency(selectedShippingRate.cost)
+                  discounts?.freeShipping ? (
+                    <span className="text-green-600">FREE</span>
+                  ) : (
+                    formatCurrency(selectedShippingRate.cost)
+                  )
                 ) : (
                   <span className="text-gray-400">Enter address</span>
                 )}
               </span>
             </p>
 
-            <p className="flex items-center justify-between">
-              <span className="text-[14px] font-[500]">Total</span>
+            {/* Discount Breakdown */}
+            {discounts && discounts.totalDiscount > 0 && (
+              <>
+                {discounts.couponDiscount > 0 && (
+                  <p className="flex items-center justify-between text-green-600">
+                    <span className="text-[14px] font-[500]">Coupon Discount ({discounts.coupon?.code})</span>
+                    <span className="font-bold">-{formatCurrency(discounts.couponDiscount)}</span>
+                  </p>
+                )}
+                {discounts.giftCardDiscount > 0 && (
+                  <p className="flex items-center justify-between text-green-600">
+                    <span className="text-[14px] font-[500]">Gift Card</span>
+                    <span className="font-bold">-{formatCurrency(discounts.giftCardDiscount)}</span>
+                  </p>
+                )}
+                {discounts.automaticDiscounts?.length > 0 && discounts.automaticDiscounts.reduce((sum, d) => sum + d.discount, 0) > 0 && (
+                  <p className="flex items-center justify-between text-green-600">
+                    <span className="text-[14px] font-[500]">Automatic Discounts</span>
+                    <span className="font-bold">
+                      -{formatCurrency(discounts.automaticDiscounts.reduce((sum, d) => sum + d.discount, 0))}
+                    </span>
+                  </p>
+                )}
+              </>
+            )}
+
+            <p className="flex items-center justify-between pt-2 border-t border-[rgba(0,0,0,0.1)]">
+              <span className="text-[16px] font-[700]">Total</span>
               <div className="flex items-center gap-1">
-                <span className="text-primary font-bold">
+                <span className="text-primary font-bold text-[16px]">
                   {formatCurrency(
-                    (context.cartData?.length !== 0 ?
-                      context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
-                        .reduce((total, value) => total + value, 0) : 0) +
-                      (selectedShippingRate ? selectedShippingRate.cost : 0)
+                    discounts?.finalTotal !== undefined 
+                      ? discounts.finalTotal 
+                      : ((context.cartData?.length !== 0 ?
+                          context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
+                            .reduce((total, value) => total + value, 0) : 0) +
+                        (selectedShippingRate && !discounts?.freeShipping ? (selectedShippingRate.cost || 0) : 0))
                   )}
                 </span>
                 <span className="text-[11px] text-gray-600 font-[500]">USD</span>
@@ -534,7 +593,8 @@ const CartPage = () => {
                     phone: phone,
                     customerName: customerName.trim(),
                     apartmentNumber: apartmentNumber.trim(),
-                    deliveryNote: deliveryNote.trim()
+                    deliveryNote: deliveryNote.trim(),
+                    discounts: discounts // Pass discount information
                   }
                 });
               };

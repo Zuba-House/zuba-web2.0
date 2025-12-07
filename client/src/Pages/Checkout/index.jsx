@@ -29,6 +29,7 @@ const Checkout = () => {
   const [customerName, setCustomerName] = useState('');
   const [apartmentNumber, setApartmentNumber] = useState('');
   const [deliveryNote, setDeliveryNote] = useState('');
+  const [discounts, setDiscounts] = useState(null);
   const context = useContext(MyContext);
 
   const history = useNavigate();
@@ -70,6 +71,9 @@ const Checkout = () => {
     if (location.state?.deliveryNote) {
       setDeliveryNote(location.state.deliveryNote);
     }
+    if (location.state?.discounts) {
+      setDiscounts(location.state.discounts);
+    }
     
     // If no data from cart, redirect back to cart
     if (!location.state?.shippingAddress || !location.state?.phone || !location.state?.selectedShippingRate || !location.state?.customerName) {
@@ -88,11 +92,16 @@ const Checkout = () => {
         .reduce((sum, value) => sum + value, 0) : 0;
     
     const shippingCost = selectedShippingRate ? (selectedShippingRate.cost || selectedShippingRate.price || 0) : 0;
-    const total = subtotal + shippingCost;
+    
+    // Calculate total with discounts
+    let total = subtotal + shippingCost;
+    if (discounts) {
+      total = discounts.finalTotal !== undefined ? discounts.finalTotal : total;
+    }
     
     // keep numeric for backend; format only when rendering
     setTotalAmount(total);
-  }, [context.cartData, selectedShippingRate])
+  }, [context.cartData, selectedShippingRate, discounts])
 
 
 
@@ -208,12 +217,12 @@ const Checkout = () => {
     // Set processing state to prevent double-click
     setIsProcessingOrder(true);
 
-    // Calculate total amount including shipping (use totalAmount state which already includes shipping)
+    // Calculate total amount including shipping and discounts
     const subtotal = context.cartData?.length > 0
       ? context.cartData.map(item => parseFloat(item.price || 0) * (item.quantity || 0)).reduce((a, b) => a + b, 0)
       : 0;
-    const shippingCost = selectedShippingRate ? (selectedShippingRate.cost || selectedShippingRate.price || 0) : 0;
-    const finalTotal = subtotal + shippingCost;
+    const shippingCost = discounts?.freeShipping ? 0 : (selectedShippingRate ? (selectedShippingRate.cost || selectedShippingRate.price || 0) : 0);
+    const finalTotal = discounts?.finalTotal !== undefined ? discounts.finalTotal : (subtotal + shippingCost);
     
     console.log('Order creation - Amounts:', {
       subtotal,
@@ -240,7 +249,7 @@ const Checkout = () => {
       paymentId: paymentIntent?.id || '',
       payment_status: "COMPLETED",
       delivery_address: addressId, // Use address ID if found, otherwise will be created
-      totalAmt: finalTotal, // Use calculated total with shipping
+      totalAmt: finalTotal, // Use calculated total with shipping and discounts
       shippingCost: shippingCost,
       shippingRate: selectedShippingRate,
       phone: phone, // Include phone number
@@ -249,6 +258,18 @@ const Checkout = () => {
       customerName: customerName, // Customer's full name for delivery
       apartmentNumber: apartmentNumber, // Apartment/Office/Unit number (optional)
       deliveryNote: deliveryNote, // Special delivery instructions (optional)
+      // Discount information
+      discounts: discounts ? {
+        couponCode: discounts.coupon?.code || null,
+        couponDiscount: discounts.couponDiscount || 0,
+        giftCardCode: discounts.giftCard?.code || null,
+        giftCardDiscount: discounts.giftCardDiscount || 0,
+        automaticDiscounts: discounts.automaticDiscounts || [],
+        totalDiscount: discounts.totalDiscount || 0,
+        freeShipping: discounts.freeShipping || false,
+        subtotal: subtotal,
+        finalTotal: finalTotal
+      } : null,
       date: new Date().toLocaleString("en-US", {
         month: "short",
         day: "2-digit",
@@ -276,6 +297,23 @@ const Checkout = () => {
       
       if (isSuccess) {
         console.log('✅ Order created successfully!');
+        
+        // Record discount usage
+        if (discounts && (discounts.couponDiscount > 0 || discounts.giftCardDiscount > 0)) {
+          try {
+            await postData('/api/discounts/record-usage', {
+              orderId: res?.orderId || res?._id || res?.order?._id,
+              couponCode: discounts.coupon?.code,
+              giftCardCode: discounts.giftCard?.code,
+              couponDiscount: discounts.couponDiscount,
+              giftCardDiscount: discounts.giftCardDiscount
+            }).catch(err => {
+              console.warn('⚠️ Discount usage recording failed (non-critical):', err);
+            });
+          } catch (err) {
+            console.warn('⚠️ Discount usage recording error (non-critical):', err);
+          }
+        }
         
         // Clear cart in background (don't wait for it)
         try {
@@ -528,12 +566,41 @@ const Checkout = () => {
                   <span className="text-[14px] font-[500]">Shipping</span>
                   <span className="text-[14px] font-[600]">
                     {selectedShippingRate ? (
-                      formatCurrency(selectedShippingRate.cost || selectedShippingRate.price || 0)
+                      discounts?.freeShipping ? (
+                        <span className="text-green-600">FREE</span>
+                      ) : (
+                        formatCurrency(selectedShippingRate.cost || selectedShippingRate.price || 0)
+                      )
                     ) : (
                       <span className="text-gray-400">Select address</span>
                     )}
                   </span>
                 </div>
+                {/* Discount Breakdown */}
+                {discounts && discounts.totalDiscount > 0 && (
+                  <>
+                    {discounts.couponDiscount > 0 && (
+                      <div className="flex items-center justify-between mb-2 text-green-600">
+                        <span className="text-[14px] font-[500]">Coupon ({discounts.coupon?.code})</span>
+                        <span className="text-[14px] font-[600]">-{formatCurrency(discounts.couponDiscount)}</span>
+                      </div>
+                    )}
+                    {discounts.giftCardDiscount > 0 && (
+                      <div className="flex items-center justify-between mb-2 text-green-600">
+                        <span className="text-[14px] font-[500]">Gift Card</span>
+                        <span className="text-[14px] font-[600]">-{formatCurrency(discounts.giftCardDiscount)}</span>
+                      </div>
+                    )}
+                    {discounts.automaticDiscounts?.length > 0 && discounts.automaticDiscounts.reduce((sum, d) => sum + d.discount, 0) > 0 && (
+                      <div className="flex items-center justify-between mb-2 text-green-600">
+                        <span className="text-[14px] font-[500]">Automatic Discounts</span>
+                        <span className="text-[14px] font-[600]">
+                          -{formatCurrency(discounts.automaticDiscounts.reduce((sum, d) => sum + d.discount, 0))}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
                 <div className="flex items-center justify-between pt-2 border-t border-[rgba(0,0,0,0.1)]">
                   <span className="text-[16px] font-[700]">Total</span>
                   <div className="flex items-center gap-1">
@@ -570,12 +637,17 @@ const Checkout = () => {
                         amount={
                           (() => {
                             try {
+                              // Use discounted total if available
+                              if (discounts?.finalTotal !== undefined) {
+                                return parseFloat(discounts.finalTotal.toFixed(2)) || 0;
+                              }
+                              // Otherwise calculate normally
                               const subtotal = context.cartData?.length > 0
                                 ? context.cartData
                                   .map((item) => (item.price || 0) * (item.quantity || 0))
                                   .reduce((a, b) => a + b, 0)
                                 : 0;
-                              const shippingCost = selectedShippingRate ? (selectedShippingRate.cost || selectedShippingRate.price || 0) : 0;
+                              const shippingCost = discounts?.freeShipping ? 0 : (selectedShippingRate ? (selectedShippingRate.cost || selectedShippingRate.price || 0) : 0);
                               const total = subtotal + shippingCost;
                               const amount = parseFloat(total?.toFixed(2)) || 0;
                               return amount > 0 ? amount : 0;

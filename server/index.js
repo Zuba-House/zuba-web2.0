@@ -30,6 +30,9 @@ import notificationRouter from './route/notification.route.js';
 import shippingRouter from './route/shipping.route.js';
 import testRouter from './route/test.route.js';
 import bannerRouter from './route/banner.route.js';
+import couponRouter from './route/coupon.route.js';
+import giftCardRouter from './route/giftCard.route.js';
+import discountRouter from './route/discount.route.js';
 import { transporter } from './config/emailService.js';
 import analyticsRouter from './route/analytics.route.js';
 import { analyticsMiddleware } from './middlewares/analytics.js';
@@ -315,6 +318,9 @@ app.use("/api", notificationRouter);
 app.use("/api/shipping", shippingRouter);
 app.use("/api", testRouter);
 app.use("/api/banners", bannerRouter);
+app.use("/api/coupons", couponRouter);
+app.use("/api/gift-cards", giftCardRouter);
+app.use("/api/discounts", discountRouter);
 
 // 404 handler (must be after all routes)
 app.use(notFoundHandler);

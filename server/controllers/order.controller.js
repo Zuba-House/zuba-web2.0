@@ -117,6 +117,8 @@ export const createOrderController = async (request, response) => {
             // Guest checkout fields
             isGuestOrder: isGuestOrder,
             guestCustomer: request.body.guestCustomer || null,
+            // Discount information
+            discounts: request.body.discounts || null,
             // Status tracking
             status: 'Received',
             statusHistory: [{

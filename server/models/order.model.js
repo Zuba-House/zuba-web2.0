@@ -180,6 +180,49 @@ const orderSchema = new mongoose.Schema({
         type: String,
         default: '',
         maxlength: 500
+    },
+    // Discount information
+    discounts: {
+        couponCode: {
+            type: String,
+            default: null
+        },
+        couponDiscount: {
+            type: Number,
+            default: 0
+        },
+        giftCardCode: {
+            type: String,
+            default: null
+        },
+        giftCardDiscount: {
+            type: Number,
+            default: 0
+        },
+        automaticDiscounts: [{
+            type: {
+                type: String,
+                enum: ['cart_threshold', 'first_time_buyer', 'bulk_quantity', 'other']
+            },
+            name: String,
+            discount: Number
+        }],
+        totalDiscount: {
+            type: Number,
+            default: 0
+        },
+        freeShipping: {
+            type: Boolean,
+            default: false
+        },
+        subtotal: {
+            type: Number,
+            default: 0
+        },
+        finalTotal: {
+            type: Number,
+            default: 0
+        }
     }
 }, {
     timestamps: true
