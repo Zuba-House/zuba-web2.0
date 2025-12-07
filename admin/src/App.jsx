@@ -34,6 +34,12 @@ import ManageLogo from "./Pages/ManageLogo";
 import LoadingBar from "react-top-loading-bar";
 import NotFound from "./Pages/NotFound";
 import Analytics from "./Pages/Analytics";
+import Coupons from "./Pages/Coupons";
+import AddCoupon from "./Pages/Coupons/addCoupon";
+import EditCoupon from "./Pages/Coupons/editCoupon";
+import GiftCards from "./Pages/GiftCards";
+import AddGiftCard from "./Pages/GiftCards/addGiftCard";
+import EditGiftCard from "./Pages/GiftCards/editGiftCard";
 
 import { useParams } from 'react-router-dom';
 
@@ -552,6 +558,156 @@ function App() {
                 style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
               >
                 <Analytics />
+              </div>
+            </div>
+          </section>
+        </>
+      ),
+    },
+    {
+      path: "/coupons",
+      exact: true,
+      element: (
+        <>
+          <section className="main">
+            <Header />
+            <div className="contentMain flex">
+              <div
+                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
+                  } transition-all`}
+              >
+                <Sidebar />
+              </div>
+              <div
+                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
+                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
+              >
+                <Coupons />
+              </div>
+            </div>
+          </section>
+        </>
+      ),
+    },
+    {
+      path: "/coupons/add",
+      exact: true,
+      element: (
+        <>
+          <section className="main">
+            <Header />
+            <div className="contentMain flex">
+              <div
+                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
+                  } transition-all`}
+              >
+                <Sidebar />
+              </div>
+              <div
+                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
+                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
+              >
+                <AddCoupon />
+              </div>
+            </div>
+          </section>
+        </>
+      ),
+    },
+    {
+      path: "/coupons/edit/:id",
+      exact: true,
+      element: (
+        <>
+          <section className="main">
+            <Header />
+            <div className="contentMain flex">
+              <div
+                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
+                  } transition-all`}
+              >
+                <Sidebar />
+              </div>
+              <div
+                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
+                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
+              >
+                <EditCoupon />
+              </div>
+            </div>
+          </section>
+        </>
+      ),
+    },
+    {
+      path: "/gift-cards",
+      exact: true,
+      element: (
+        <>
+          <section className="main">
+            <Header />
+            <div className="contentMain flex">
+              <div
+                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
+                  } transition-all`}
+              >
+                <Sidebar />
+              </div>
+              <div
+                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
+                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
+              >
+                <GiftCards />
+              </div>
+            </div>
+          </section>
+        </>
+      ),
+    },
+    {
+      path: "/gift-cards/add",
+      exact: true,
+      element: (
+        <>
+          <section className="main">
+            <Header />
+            <div className="contentMain flex">
+              <div
+                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
+                  } transition-all`}
+              >
+                <Sidebar />
+              </div>
+              <div
+                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
+                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
+              >
+                <AddGiftCard />
+              </div>
+            </div>
+          </section>
+        </>
+      ),
+    },
+    {
+      path: "/gift-cards/edit/:id",
+      exact: true,
+      element: (
+        <>
+          <section className="main">
+            <Header />
+            <div className="contentMain flex">
+              <div
+                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
+                  } transition-all`}
+              >
+                <Sidebar />
+              </div>
+              <div
+                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
+                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
+              >
+                <EditGiftCard />
               </div>
             </div>
           </section>

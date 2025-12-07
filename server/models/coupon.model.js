@@ -116,7 +116,8 @@ const CouponSchema = new mongoose.Schema({
   }]
 }, { timestamps: true });
 
-CouponSchema.index({ code: 1 });
+// Note: code field already has unique: true which creates an index automatically
+// Only add additional compound indexes
 CouponSchema.index({ isActive: 1, startDate: 1, endDate: 1 });
 CouponSchema.index({ 'usedBy.userId': 1 });
 

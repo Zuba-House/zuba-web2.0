@@ -89,7 +89,8 @@ const GiftCardSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-GiftCardSchema.index({ code: 1 });
+// Note: code field already has unique: true which creates an index automatically
+// Only add additional compound indexes
 GiftCardSchema.index({ isActive: 1, expiryDate: 1 });
 GiftCardSchema.index({ issuedTo: 1 });
 GiftCardSchema.index({ recipientEmail: 1 });
