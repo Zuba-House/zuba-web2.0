@@ -48,7 +48,7 @@ const DiscountInput = ({
       if (!response.ok) {
         // Only use fallback for 405 (Method Not Allowed) or 404 (Not Found)
         if (response.status === 405 || response.status === 404) {
-          console.warn('Combined discount endpoint not available, using individual endpoints');
+          console.warn('Discount routes not available on server. Please ensure server files are deployed and server is restarted.');
           
           // Calculate discounts separately
           const discounts = {
@@ -164,7 +164,22 @@ const DiscountInput = ({
             if (onDiscountsCalculated) {
               onDiscountsCalculated(discounts);
             }
+          } else {
+            // If fallback also failed, show helpful error
+            setError('Discount system is not available. Please contact support or try again later.');
           }
+          return;
+        } else {
+          // For other errors (not 405/404), show the actual error
+          let errorMessage = `Server error: ${response.status}`;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorData.message || errorMessage;
+          } catch (e) {
+            errorMessage = response.statusText || errorMessage;
+          }
+          setError(errorMessage);
+          setDiscounts(null);
           return;
         }
       }
