@@ -51,26 +51,54 @@ export const sendVendorOTP = async (req, res) => {
       // Create temporary vendor record for OTP (will be updated on application submission)
       // Use unique temporary values to avoid conflicts
       const timestamp = Date.now();
-      const emailHash = normalizedEmail.replace(/[^a-z0-9]/g, '').substring(0, 10);
+      const randomSuffix = Math.random().toString(36).substring(2, 15);
+      const emailHash = normalizedEmail.replace(/[^a-z0-9]/g, '').substring(0, 8);
       
-      vendor = new VendorModel({
-        email: normalizedEmail,
-        otp: otp,
-        otpExpires: otpExpires,
-        status: 'pending',
-        // Set unique temporary values that will be replaced on application submission
-        shopName: `temp-${emailHash}-${timestamp}`, // Unique temporary value
-        shopSlug: `temp-${emailHash}-${timestamp}`, // Unique temporary value
-        businessName: `Temp-${timestamp}`, // Temporary, will be updated
-        businessType: 'individual', // Default, will be updated
-        phone: `temp${timestamp}` // Temporary, will be updated
-      });
-      await vendor.save();
-      console.log(`[OTP Send] Created new vendor record: ${vendor._id}, Email: ${normalizedEmail}, OTP: ${otp}`);
+      // Create a unique temporary shop name (must be at least 3 chars, lowercase, max 50)
+      // Combine email hash, random suffix, and timestamp for uniqueness
+      const baseName = `temp${emailHash}${randomSuffix}${timestamp}`;
+      const tempShopName = baseName.toLowerCase().substring(0, 50);
+      // Ensure it's at least 3 characters
+      const finalShopName = tempShopName.length >= 3 ? tempShopName : `${tempShopName}xx`.substring(0, 50);
+      const tempShopSlug = finalShopName; // Same as shopName for consistency
       
-      // Verify the OTP was saved
-      const verifyVendor = await VendorModel.findById(vendor._id);
-      console.log(`[OTP Send] Verification - New Vendor ID: ${verifyVendor._id}, OTP in DB: ${verifyVendor.otp}`);
+      try {
+        vendor = new VendorModel({
+          email: normalizedEmail,
+          otp: otp,
+          otpExpires: otpExpires,
+          status: 'pending',
+          // Set unique temporary values that will be replaced on application submission
+          shopName: tempShopName, // Unique temporary value (already lowercase)
+          shopSlug: tempShopSlug, // Unique temporary value
+          businessName: `Temp-${timestamp}`, // Temporary, will be updated
+          businessType: 'individual', // Default, will be updated
+          phone: `temp${timestamp}` // Temporary, will be updated
+        });
+        await vendor.save();
+        console.log(`[OTP Send] Created new vendor record: ${vendor._id}, Email: ${normalizedEmail}, OTP: ${otp}`);
+        
+        // Verify the OTP was saved
+        const verifyVendor = await VendorModel.findById(vendor._id);
+        console.log(`[OTP Send] Verification - New Vendor ID: ${verifyVendor._id}, OTP in DB: ${verifyVendor.otp}`);
+      } catch (saveError) {
+        console.error('[OTP Send] Error saving vendor:', saveError);
+        
+        // If it's a duplicate key error, try to find existing vendor
+        if (saveError.code === 11000) {
+          vendor = await VendorModel.findOne({ email: normalizedEmail }).sort({ createdAt: -1 });
+          if (vendor) {
+            vendor.otp = otp;
+            vendor.otpExpires = otpExpires;
+            await vendor.save();
+            console.log(`[OTP Send] Updated existing vendor after duplicate error: ${vendor._id}`);
+          } else {
+            throw saveError;
+          }
+        } else {
+          throw saveError;
+        }
+      }
     }
 
     // Send OTP email
@@ -99,9 +127,34 @@ export const sendVendorOTP = async (req, res) => {
 
   } catch (error) {
     console.error('Send vendor OTP error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      keyPattern: error.keyPattern,
+      keyValue: error.keyValue
+    });
+    
+    // Handle specific MongoDB errors
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0] || 'field';
+      return res.status(400).json({
+        success: false,
+        error: `${field} already exists. Please try again.`
+      });
+    }
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors || {}).map(e => e.message).join(', ');
+      return res.status(400).json({
+        success: false,
+        error: `Validation error: ${validationErrors}`
+      });
+    }
+    
     return res.status(500).json({
       success: false,
-      error: error.message || 'Failed to send OTP'
+      error: error.message || 'Failed to send OTP. Please try again.'
     });
   }
 };

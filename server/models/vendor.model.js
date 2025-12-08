@@ -24,10 +24,15 @@ const VendorSchema = new mongoose.Schema({
     required: false, // Will be required on final application submission
     trim: true,
     unique: true,
-    sparse: true, // Allow multiple null values
+    sparse: true, // Allow multiple null/empty values
     lowercase: true,
-    minlength: [3, 'Shop name must be at least 3 characters'],
-    maxlength: [50, 'Shop name cannot exceed 50 characters']
+    validate: {
+      validator: function(v) {
+        // Allow empty/null or valid shop names (at least 3 chars)
+        return !v || (v.length >= 3 && v.length <= 50);
+      },
+      message: 'Shop name must be between 3 and 50 characters'
+    }
   },
   shopSlug: {
     type: String,
