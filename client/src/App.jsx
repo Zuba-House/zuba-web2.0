@@ -40,6 +40,7 @@ import VendorDashboard from "./Pages/VendorDashboard";
 import VendorProducts from "./Pages/VendorDashboard/Products";
 import VendorEarnings from "./Pages/VendorDashboard/Earnings";
 import VendorShopPage from "./Pages/VendorShop";
+import VendorSetupAccount from "./Pages/VendorSetupAccount";
 import DeleteAccount from "./Pages/DeleteAccount";
 import TermsOfUse from "./Pages/TermsOfUse";
 import PrivacyPolicy from "./Pages/PrivacyPolicy";
@@ -693,7 +694,10 @@ function App() {
             <Route path={"/how-to-track"} exact={true} element={<HowToTrack />} />
             <Route path={"/partner-with-us"} exact={true} element={<PartnerWithUs />} />
             <Route path={"/become-vendor"} exact={true} element={<BecomeVendor />} />
+            <Route path={"/vendor/setup-account"} exact={true} element={<VendorSetupAccount />} />
             <Route path={"/vendor/dashboard"} exact={true} element={<VendorDashboard />} />
+            <Route path={"/vendor/products"} exact={true} element={<VendorProducts />} />
+            <Route path={"/vendor/earnings"} exact={true} element={<VendorEarnings />} />
             <Route path={"/vendor/:shopSlug"} exact={true} element={<VendorShopPage />} />
             <Route path={"/delete-account"} exact={true} element={<DeleteAccount />} />
             <Route path={"/terms"} exact={true} element={<TermsOfUse />} />

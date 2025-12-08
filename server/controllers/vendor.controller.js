@@ -7,6 +7,9 @@ import VendorModel from '../models/vendor.model.js';
 import UserModel from '../models/user.model.js';
 import ProductModel from '../models/product.model.js';
 import sendEmailFun from '../config/sendEmail.js';
+import bcryptjs from 'bcryptjs';
+import generatedAccessToken from '../utils/generatedAccessToken.js';
+import genertedRefreshToken from '../utils/generatedRefreshToken.js';
 
 /**
  * Apply to become a vendor
@@ -253,6 +256,210 @@ export const completeVendorRegistration = async (req, res) => {
 };
 
 /**
+ * Setup vendor account (for guest applications after approval)
+ * POST /api/vendors/setup-account
+ */
+export const setupVendorAccount = async (req, res) => {
+  try {
+    const { token, email, password, name } = req.body;
+
+    if (!token || !email || !password || !name) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: token, email, password, name'
+      });
+    }
+
+    // Find vendor by setup token
+    const vendor = await VendorModel.findOne({
+      setupToken: token,
+      email: email.toLowerCase().trim(),
+      status: 'approved'
+    });
+
+    if (!vendor) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid or expired setup token'
+      });
+    }
+
+    // Check if token is expired
+    if (vendor.setupTokenExpires && new Date() > vendor.setupTokenExpires) {
+      return res.status(400).json({
+        success: false,
+        error: 'Setup token has expired. Please contact support for a new link.'
+      });
+    }
+
+    // Check if account already created
+    if (vendor.accountCreated || vendor.userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Account has already been created for this vendor application'
+      });
+    }
+
+    // Check if user with this email already exists
+    let user = await UserModel.findOne({ email: email.toLowerCase().trim() });
+    
+    if (user) {
+      // User exists, link vendor to existing account
+      vendor.userId = user._id;
+      vendor.accountCreated = true;
+      vendor.setupToken = null; // Clear token
+      vendor.setupTokenExpires = null;
+      await vendor.save();
+
+      // Update user
+      user.vendorId = vendor._id;
+      user.role = 'VENDOR';
+      await user.save();
+
+      // Generate tokens
+      const accesstoken = await generatedAccessToken(user._id);
+      const refreshToken = await genertedRefreshToken(user._id);
+
+      return res.json({
+        success: true,
+        message: 'Vendor account linked successfully',
+        data: {
+          accesstoken,
+          refreshToken,
+          user: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role
+          },
+          vendor: {
+            id: vendor._id,
+            shopName: vendor.shopName,
+            status: vendor.status
+          }
+        }
+      });
+    } else {
+      // Create new user account
+      const salt = await bcryptjs.genSalt(10);
+      const hashPassword = await bcryptjs.hash(password, salt);
+
+      user = new UserModel({
+        email: email.toLowerCase().trim(),
+        password: hashPassword,
+        name: name.trim(),
+        verify_email: true, // Auto-verify since they came from approved vendor application
+        role: 'VENDOR',
+        vendorId: vendor._id
+      });
+
+      await user.save();
+
+      // Link vendor to user
+      vendor.userId = user._id;
+      vendor.accountCreated = true;
+      vendor.setupToken = null; // Clear token
+      vendor.setupTokenExpires = null;
+      await vendor.save();
+
+      // Generate tokens
+      const accesstoken = await generatedAccessToken(user._id);
+      const refreshToken = await genertedRefreshToken(user._id);
+
+      return res.json({
+        success: true,
+        message: 'Vendor account created successfully',
+        data: {
+          accesstoken,
+          refreshToken,
+          user: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role
+          },
+          vendor: {
+            id: vendor._id,
+            shopName: vendor.shopName,
+            status: vendor.status
+          }
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('Setup vendor account error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to setup vendor account'
+    });
+  }
+};
+
+/**
+ * Verify setup token
+ * GET /api/vendors/verify-setup-token
+ */
+export const verifySetupToken = async (req, res) => {
+  try {
+    const { token, email } = req.query;
+
+    if (!token || !email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Token and email are required'
+      });
+    }
+
+    const vendor = await VendorModel.findOne({
+      setupToken: token,
+      email: email.toLowerCase().trim(),
+      status: 'approved'
+    }).select('shopName setupTokenExpires accountCreated userId');
+
+    if (!vendor) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid setup token'
+      });
+    }
+
+    // Check if token is expired
+    if (vendor.setupTokenExpires && new Date() > vendor.setupTokenExpires) {
+      return res.status(400).json({
+        success: false,
+        error: 'Setup token has expired',
+        expired: true
+      });
+    }
+
+    // Check if account already created
+    if (vendor.accountCreated || vendor.userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Account has already been created',
+        alreadyCreated: true
+      });
+    }
+
+    return res.json({
+      success: true,
+      vendor: {
+        shopName: vendor.shopName,
+        email: email
+      }
+    });
+
+  } catch (error) {
+    console.error('Verify setup token error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to verify setup token'
+    });
+  }
+};
+
+/**
  * Get vendor profile (public)
  * GET /api/vendors/:shopSlug
  */
@@ -265,7 +472,7 @@ export const getVendorProfile = async (req, res) => {
       status: 'approved'
     })
       .populate('userId', 'name avatar')
-      .select('-bankAccount -adminNotes -rejectionReason');
+      .select('-bankAccount -adminNotes -rejectionReason -setupToken');
 
     if (!vendor) {
       return res.status(404).json({
@@ -375,7 +582,7 @@ export const getAllVendors = async (req, res) => {
     const vendors = await VendorModel.find(query)
       .populate('userId', 'name email avatar')
       .populate('approvedBy', 'name email')
-      .select('-bankAccount')
+      .select('-bankAccount -setupToken')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -430,39 +637,150 @@ export const approveVendor = async (req, res) => {
     vendor.status = 'approved';
     vendor.approvalDate = new Date();
     vendor.approvedBy = adminId;
+    
+    // Generate secure setup token for account creation (valid for 7 days)
+    const crypto = await import('crypto');
+    const setupToken = crypto.randomBytes(32).toString('hex');
+    vendor.setupToken = setupToken;
+    vendor.setupTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    
     await vendor.save();
 
-    // Send approval email
+    // Send comprehensive approval email
     try {
-      const user = await UserModel.findById(vendor.userId);
-      if (user && user.email) {
-        const approvalLink = `${process.env.CLIENT_URL || 'https://www.zubahouse.com'}/vendor/complete-registration?token=${vendor._id}`;
-        
-        await sendEmailFun({
-          sendTo: user.email,
-          subject: 'Congratulations! Your Vendor Application Has Been Approved - Zuba House',
-          text: '',
-          html: `
-            <div style="font-family: Arial, sans-serif; padding: 20px;">
-              <h2>Congratulations!</h2>
-              <p>Dear ${user.name},</p>
-              <p>We are pleased to inform you that your vendor application has been <strong>approved</strong>!</p>
-              <p>Your shop "<strong>${vendor.shopName}</strong>" is now ready to be set up.</p>
-              <p>Please complete your vendor registration by clicking the link below:</p>
-              <p><a href="${approvalLink}" style="background-color: #efb291; color: #0b2735; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0;">Complete Registration</a></p>
-              <p>After completing your registration, you'll be able to:</p>
-              <ul>
-                <li>Upload and manage your products</li>
-                <li>Set up promotions and discounts</li>
-                <li>Track your sales and earnings</li>
-                <li>Withdraw your earnings</li>
-              </ul>
-              <p>Welcome to Zuba House!</p>
-              <p>Best regards,<br>Zuba House Team</p>
-            </div>
-          `
-        });
-      }
+      const user = vendor.userId ? await UserModel.findById(vendor.userId) : null;
+      const recipientEmail = vendor.email;
+      const recipientName = user ? user.name : (vendor.businessName || 'Vendor');
+      
+      // Create account setup link
+      const setupLink = `${process.env.CLIENT_URL || 'https://www.zubahouse.com'}/vendor/setup-account?token=${setupToken}&email=${encodeURIComponent(recipientEmail)}`;
+      
+      // Dashboard link (for existing users)
+      const dashboardLink = `${process.env.CLIENT_URL || 'https://www.zubahouse.com'}/vendor/dashboard`;
+      
+      await sendEmailFun({
+        sendTo: recipientEmail,
+        subject: '🎉 Congratulations! Your Vendor Application Has Been Approved - Zuba House',
+        text: '',
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;">
+            <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f5f5f5;">
+              <tr>
+                <td align="center" style="padding: 40px 20px;">
+                  <table role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                      <td style="background: linear-gradient(135deg, #0b2735 0%, #1a4a5c 100%); padding: 40px 30px; text-align: center; border-radius: 10px 10px 0 0;">
+                        <h1 style="margin: 0; color: #efb291; font-size: 28px; font-weight: bold;">🎉 Congratulations!</h1>
+                        <p style="margin: 10px 0 0 0; color: #e5e2db; font-size: 16px;">Your Vendor Application Has Been Approved</p>
+                      </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                      <td style="padding: 40px 30px;">
+                        <p style="margin: 0 0 20px 0; color: #333; font-size: 16px; line-height: 1.6;">
+                          Dear <strong>${recipientName}</strong>,
+                        </p>
+                        
+                        <p style="margin: 0 0 20px 0; color: #333; font-size: 16px; line-height: 1.6;">
+                          We are thrilled to inform you that your vendor application has been <strong style="color: #0b2735;">APPROVED</strong>! 🎊
+                        </p>
+                        
+                        <div style="background-color: #f8f9fa; border-left: 4px solid #efb291; padding: 20px; margin: 25px 0; border-radius: 5px;">
+                          <p style="margin: 0 0 10px 0; color: #0b2735; font-size: 18px; font-weight: bold;">Your Shop Details:</p>
+                          <p style="margin: 5px 0; color: #555; font-size: 15px;"><strong>Shop Name:</strong> ${vendor.shopName}</p>
+                          <p style="margin: 5px 0; color: #555; font-size: 15px;"><strong>Shop URL:</strong> <a href="${process.env.CLIENT_URL || 'https://www.zubahouse.com'}/vendor/${vendor.shopSlug}" style="color: #efb291; text-decoration: none;">zubahouse.com/vendor/${vendor.shopSlug}</a></p>
+                          <p style="margin: 5px 0; color: #555; font-size: 15px;"><strong>Status:</strong> <span style="color: #28a745; font-weight: bold;">✓ Approved</span></p>
+                        </div>
+                        
+                        ${!user ? `
+                        <div style="background-color: #fff3cd; border: 2px solid #ffc107; padding: 20px; margin: 25px 0; border-radius: 5px;">
+                          <p style="margin: 0 0 15px 0; color: #856404; font-size: 16px; font-weight: bold;">📝 Next Step: Create Your Account</p>
+                          <p style="margin: 0 0 15px 0; color: #856404; font-size: 14px; line-height: 1.6;">
+                            To access your vendor dashboard and start selling, you need to create an account. Click the button below to set up your password and complete your vendor profile.
+                          </p>
+                          <div style="text-align: center; margin: 20px 0;">
+                            <a href="${setupLink}" style="background: linear-gradient(135deg, #efb291 0%, #e5a67d 100%); color: #0b2735; padding: 15px 35px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.3s;">
+                              🚀 Create Account & Access Dashboard
+                            </a>
+                          </div>
+                          <p style="margin: 15px 0 0 0; color: #856404; font-size: 12px; text-align: center;">
+                            This link will expire in 7 days for security reasons.
+                          </p>
+                        </div>
+                        ` : `
+                        <div style="background-color: #d4edda; border: 2px solid #28a745; padding: 20px; margin: 25px 0; border-radius: 5px;">
+                          <p style="margin: 0 0 15px 0; color: #155724; font-size: 16px; font-weight: bold;">✅ Account Ready</p>
+                          <p style="margin: 0 0 15px 0; color: #155724; font-size: 14px; line-height: 1.6;">
+                            Since you already have an account, you can access your vendor dashboard immediately!
+                          </p>
+                          <div style="text-align: center; margin: 20px 0;">
+                            <a href="${dashboardLink}" style="background: linear-gradient(135deg, #efb291 0%, #e5a67d 100%); color: #0b2735; padding: 15px 35px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                              🎯 Go to Vendor Dashboard
+                            </a>
+                          </div>
+                        </div>
+                        `}
+                        
+                        <div style="margin: 30px 0;">
+                          <p style="margin: 0 0 15px 0; color: #0b2735; font-size: 18px; font-weight: bold;">What You Can Do Now:</p>
+                          <ul style="margin: 0; padding-left: 20px; color: #555; font-size: 15px; line-height: 2;">
+                            <li>📦 <strong>Upload Products:</strong> Add your products and start selling to millions of customers</li>
+                            <li>💰 <strong>Set Pricing:</strong> Manage your product prices and create special offers</li>
+                            <li>🏷️ <strong>Create Promotions:</strong> Set up discounts and promotional campaigns</li>
+                            <li>📊 <strong>Track Sales:</strong> Monitor your sales, orders, and customer reviews</li>
+                            <li>💵 <strong>Manage Earnings:</strong> View your earnings and request withdrawals</li>
+                            <li>📈 <strong>Analytics:</strong> Access detailed analytics about your shop performance</li>
+                          </ul>
+                        </div>
+                        
+                        <div style="background-color: #e7f3ff; border-left: 4px solid #0b2735; padding: 15px; margin: 25px 0; border-radius: 5px;">
+                          <p style="margin: 0 0 10px 0; color: #0b2735; font-size: 15px; font-weight: bold;">💡 Pro Tips:</p>
+                          <ul style="margin: 0; padding-left: 20px; color: #555; font-size: 14px; line-height: 1.8;">
+                            <li>Complete your shop profile with logo and banner for better visibility</li>
+                            <li>Add detailed product descriptions and high-quality images</li>
+                            <li>Set competitive prices to attract more customers</li>
+                            <li>Respond to customer reviews to build trust</li>
+                            <li>Use promotions to boost sales during special events</li>
+                          </ul>
+                        </div>
+                        
+                        <div style="text-align: center; margin: 30px 0; padding-top: 30px; border-top: 2px solid #e5e2db;">
+                          <p style="margin: 0 0 10px 0; color: #555; font-size: 14px;">Need Help?</p>
+                          <p style="margin: 0; color: #555; font-size: 14px;">
+                            Visit our <a href="${process.env.CLIENT_URL || 'https://www.zubahouse.com'}/help-center" style="color: #efb291; text-decoration: none; font-weight: bold;">Help Center</a> or 
+                            <a href="mailto:support@zubahouse.com" style="color: #efb291; text-decoration: none; font-weight: bold;">contact support</a>
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                      <td style="background-color: #0b2735; padding: 30px; text-align: center; border-radius: 0 0 10px 10px;">
+                        <p style="margin: 0 0 10px 0; color: #e5e2db; font-size: 14px;">Welcome to the Zuba House Vendor Family!</p>
+                        <p style="margin: 0; color: #efb291; font-size: 16px; font-weight: bold;">We're excited to have you on board! 🚀</p>
+                        <p style="margin: 15px 0 0 0; color: #e5e2db; font-size: 12px;">
+                          Best regards,<br>
+                          <strong>The Zuba House Team</strong>
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>
+        `
+      });
     } catch (emailError) {
       console.error('Error sending approval email:', emailError);
     }
@@ -509,24 +827,25 @@ export const rejectVendor = async (req, res) => {
 
     // Send rejection email
     try {
-      const user = await UserModel.findById(vendor.userId);
-      if (user && user.email) {
-        await sendEmailFun({
-          sendTo: user.email,
-          subject: 'Vendor Application Status - Zuba House',
-          text: '',
-          html: `
-            <div style="font-family: Arial, sans-serif; padding: 20px;">
-              <h2>Application Status Update</h2>
-              <p>Dear ${user.name},</p>
-              <p>We regret to inform you that your vendor application has been <strong>rejected</strong>.</p>
-              <p><strong>Reason:</strong> ${vendor.rejectionReason}</p>
-              <p>If you have any questions or would like to reapply, please contact our support team.</p>
-              <p>Best regards,<br>Zuba House Team</p>
-            </div>
-          `
-        });
-      }
+      const user = vendor.userId ? await UserModel.findById(vendor.userId) : null;
+      const recipientEmail = vendor.email;
+      const recipientName = user ? user.name : (vendor.businessName || 'Applicant');
+      
+      await sendEmailFun({
+        sendTo: recipientEmail,
+        subject: 'Vendor Application Status - Zuba House',
+        text: '',
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>Application Status Update</h2>
+            <p>Dear ${recipientName},</p>
+            <p>We regret to inform you that your vendor application has been <strong>rejected</strong>.</p>
+            <p><strong>Reason:</strong> ${vendor.rejectionReason}</p>
+            <p>If you have any questions or would like to reapply, please contact our support team.</p>
+            <p>Best regards,<br>Zuba House Team</p>
+          </div>
+        `
+      });
     } catch (emailError) {
       console.error('Error sending rejection email:', emailError);
     }

@@ -15,6 +15,10 @@ router.get('/dashboard', auth, vendorController.getVendorDashboard);
 router.post('/withdraw', auth, vendorController.requestWithdrawal);
 router.get('/products', auth, vendorController.getVendorProducts);
 
+// Account setup routes (for guest vendors after approval)
+router.get('/verify-setup-token', vendorController.verifySetupToken);
+router.post('/setup-account', vendorController.setupVendorAccount);
+
 // Admin routes
 router.get('/admin/all', auth, vendorController.getAllVendors);
 router.post('/admin/:id/approve', auth, vendorController.approveVendor);

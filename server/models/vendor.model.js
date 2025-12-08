@@ -202,6 +202,22 @@ const VendorSchema = new mongoose.Schema({
   adminNotes: {
     type: String,
     default: ''
+  },
+
+  // ========== ACCOUNT SETUP ==========
+  setupToken: {
+    type: String,
+    default: null,
+    unique: true,
+    sparse: true
+  },
+  setupTokenExpires: {
+    type: Date,
+    default: null
+  },
+  accountCreated: {
+    type: Boolean,
+    default: false
   }
 
 }, {
