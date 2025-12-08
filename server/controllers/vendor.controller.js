@@ -14,24 +14,8 @@ import sendEmailFun from '../config/sendEmail.js';
  */
 export const applyToBecomeVendor = async (req, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.userId; // May be undefined for guest applications
     
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required'
-      });
-    }
-
-    // Check if user already has a vendor application
-    const existingVendor = await VendorModel.findOne({ userId });
-    if (existingVendor) {
-      return res.status(400).json({
-        success: false,
-        error: 'You already have a vendor application. Status: ' + existingVendor.status
-      });
-    }
-
     const {
       shopName,
       shopDescription,
@@ -41,7 +25,8 @@ export const applyToBecomeVendor = async (req, res) => {
       email,
       address,
       taxId,
-      registrationNumber
+      registrationNumber,
+      name // User's name for guest applications
     } = req.body;
 
     // Validate required fields
@@ -52,8 +37,14 @@ export const applyToBecomeVendor = async (req, res) => {
       });
     }
 
+    // Generate shop slug
+    const shopSlug = shopName
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
     // Check if shop name is already taken
-    const shopSlug = shopName.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     const shopNameExists = await VendorModel.findOne({ shopSlug });
     if (shopNameExists) {
       return res.status(400).json({
@@ -62,10 +53,32 @@ export const applyToBecomeVendor = async (req, res) => {
       });
     }
 
+    // For logged-in users, check if they already have an application
+    if (userId) {
+      const existingVendor = await VendorModel.findOne({ userId });
+      if (existingVendor) {
+        return res.status(400).json({
+          success: false,
+          error: 'You already have a vendor application. Status: ' + existingVendor.status
+        });
+      }
+    } else {
+      // For guest applications, check if email is already used
+      const existingVendorByEmail = await VendorModel.findOne({ email: email.toLowerCase().trim() });
+      if (existingVendorByEmail) {
+        return res.status(400).json({
+          success: false,
+          error: 'An application with this email already exists. Please login to check your application status.'
+        });
+      }
+    }
+
     // Create vendor application
+    // Note: userId can be null for guest applications
     const vendor = new VendorModel({
-      userId,
+      userId: userId || null, // Allow null for guest applications
       shopName: shopName.trim(),
+      shopSlug: shopSlug, // Set explicitly to avoid validation error
       shopDescription: shopDescription || '',
       businessName: businessName.trim(),
       businessType,
@@ -79,33 +92,36 @@ export const applyToBecomeVendor = async (req, res) => {
 
     await vendor.save();
 
-    // Update user role (but keep as USER until approved)
-    await UserModel.findByIdAndUpdate(userId, {
-      vendorId: vendor._id
-    });
+    // Update user role if user is logged in (but keep as USER until approved)
+    if (userId) {
+      await UserModel.findByIdAndUpdate(userId, {
+        vendorId: vendor._id
+      });
+    }
 
     // Send confirmation email to vendor
     try {
-      const user = await UserModel.findById(userId);
-      if (user && user.email) {
-        await sendEmailFun({
-          sendTo: user.email,
-          subject: 'Vendor Application Received - Zuba House',
-          text: '',
-          html: `
-            <div style="font-family: Arial, sans-serif; padding: 20px;">
-              <h2>Thank You for Your Application!</h2>
-              <p>Dear ${user.name},</p>
-              <p>We have received your application to become a vendor on Zuba House.</p>
-              <p><strong>Application Status:</strong> Pending Review</p>
-              <p>Our team will review your application and get back to you within 2-3 business days.</p>
-              <p>You will receive an email notification once your application has been reviewed.</p>
-              <p>Thank you for your interest in selling on Zuba House!</p>
-              <p>Best regards,<br>Zuba House Team</p>
-            </div>
-          `
-        });
-      }
+      const recipientName = userId ? (await UserModel.findById(userId))?.name : (name || 'Applicant');
+      const recipientEmail = email.toLowerCase().trim();
+      
+      await sendEmailFun({
+        sendTo: recipientEmail,
+        subject: 'Vendor Application Received - Zuba House',
+        text: '',
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>Thank You for Your Application!</h2>
+            <p>Dear ${recipientName},</p>
+            <p>We have received your application to become a vendor on Zuba House.</p>
+            <p><strong>Application Status:</strong> Pending Review</p>
+            <p>Our team will review your application and get back to you within 2-3 business days.</p>
+            <p>You will receive an email notification once your application has been reviewed.</p>
+            ${!userId ? '<p><strong>Note:</strong> To track your application status, please create an account using the same email address.</p>' : ''}
+            <p>Thank you for your interest in selling on Zuba House!</p>
+            <p>Best regards,<br>Zuba House Team</p>
+          </div>
+        `
+      });
     } catch (emailError) {
       console.error('Error sending vendor application email:', emailError);
       // Don't fail the request if email fails

@@ -5,7 +5,9 @@ const VendorSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'User ID is required'],
+    required: false, // Allow null for guest applications
+    default: null,
+    sparse: true, // Allow multiple null values, but unique for non-null values
     unique: true
   },
 
@@ -29,8 +31,9 @@ const VendorSchema = new mongoose.Schema({
   },
   shopSlug: {
     type: String,
-    required: true,
+    required: false, // Will be generated from shopName if not provided
     unique: true,
+    sparse: true, // Allow null values for uniqueness
     lowercase: true,
     trim: true
   },
@@ -209,7 +212,16 @@ const VendorSchema = new mongoose.Schema({
 
 // Generate shop slug from shop name
 VendorSchema.pre('save', function(next) {
-  if (this.isModified('shopName') && !this.shopSlug) {
+  // Always generate shopSlug from shopName if not already set
+  if (this.shopName && !this.shopSlug) {
+    this.shopSlug = this.shopName
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+  // Ensure shopSlug is set (required for validation)
+  if (!this.shopSlug && this.shopName) {
     this.shopSlug = this.shopName
       .toLowerCase()
       .trim()

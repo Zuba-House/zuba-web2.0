@@ -10,6 +10,7 @@ const BecomeVendor = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
+    name: '', // For guest applications
     shopName: '',
     shopDescription: '',
     businessName: '',
@@ -29,7 +30,11 @@ const BecomeVendor = () => {
   const [applicationStatus, setApplicationStatus] = useState(null);
 
   useEffect(() => {
-    checkExistingApplication();
+    // Only check existing application if user is logged in
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      checkExistingApplication();
+    }
   }, []);
 
   const checkExistingApplication = async () => {
@@ -45,7 +50,7 @@ const BecomeVendor = () => {
         }
       }
     } catch (error) {
-      // No existing application
+      // No existing application - this is fine for guest users
     }
   };
 
@@ -74,25 +79,24 @@ const BecomeVendor = () => {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
-        toast.error('Please login to apply');
-        navigate('/login');
-        return;
-      }
-
+      // Application can be submitted without login (guest application)
+      // If user is logged in, token will be sent automatically
       const response = await postData('/api/vendors/apply', formData);
       
       if (response.success) {
         toast.success('Application submitted successfully! We will review it within 2-3 business days.');
         setApplicationStatus('pending');
-        navigate('/vendor/application-status');
+        // Show success message and option to create account
+        if (!localStorage.getItem('accessToken')) {
+          toast.success('You can create an account with the same email to track your application status.');
+        }
       } else {
         toast.error(response.error || 'Failed to submit application');
       }
     } catch (error) {
       console.error('Application error:', error);
-      toast.error(error.message || 'Failed to submit application');
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to submit application';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -155,8 +159,32 @@ const BecomeVendor = () => {
         <div className="bg-white rounded-lg shadow-lg p-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Become a Vendor</h1>
           <p className="text-gray-600 mb-8">Join thousands of sellers on Zuba House and start selling to millions of customers.</p>
+          
+          {!localStorage.getItem('accessToken') && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> You can apply as a guest. After approval, you'll need to create an account to access your vendor dashboard.
+              </p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Personal Information (for guest applications) */}
+            {!localStorage.getItem('accessToken') && (
+              <div className="border-b pb-6">
+                <h2 className="text-xl font-semibold text-gray-800 mb-4">Your Information</h2>
+                <TextField
+                  required
+                  fullWidth
+                  label="Full Name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  helperText="Your name for correspondence"
+                />
+              </div>
+            )}
+
             {/* Shop Information */}
             <div className="border-b pb-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Shop Information</h2>
