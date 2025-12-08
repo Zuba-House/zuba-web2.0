@@ -188,12 +188,12 @@ const Footer = () => {
               
               {/* Start Selling Button */}
               <div className="mb-5">
-                <a 
-                  href="mailto:sales@zubahouse.com?cc=info@zubahouse.com&subject=Seller Application - Become a Seller on Zuba House&body=Hello Zuba House Sales Team,%0D%0A%0D%0AI am interested in becoming a seller on Zuba House.%0D%0A%0D%0ABusiness/Personal Information:%0D%0A- Full Name: [Your Name]%0D%0A- Email: [Your Email]%0D%0A- Phone: [Your Phone Number]%0D%0A- Business Name (if applicable): [Business Name]%0D%0A%0D%0AProduct Information:%0D%0A- Product Category: [e.g., Clothing, Art, Home Décor, etc.]%0D%0A- Number of Products: [Estimated number]%0D%0A- Product Type: [Handmade/Manufactured/Both]%0D%0A%0D%0AAdditional Information:%0D%0A- Why I want to sell on Zuba House: [Your reason]%0D%0A- Experience with e-commerce: [Your experience level]%0D%0A%0D%0AThank you for considering my application.%0D%0A%0D%0ABest regards"
+                <Link 
+                  to="/become-vendor"
                   className="inline-block bg-[#efb291] text-[#0b2735] px-6 py-3 rounded-lg font-[600] transition-all hover:bg-[#e5a67d] hover:shadow-lg"
                 >
                   Start Selling to Millions
-                </a>
+                </Link>
               </div>
 
               {/* Newsletter Section */}

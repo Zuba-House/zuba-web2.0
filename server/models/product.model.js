@@ -429,8 +429,19 @@ const ProductSchema = new mongoose.Schema({
     trim: true
   }],
   
-  // ========== SELLER INFORMATION ==========
+  // ========== SELLER/VENDOR INFORMATION ==========
   seller: SellerSchema,
+  vendorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vendor',
+    default: null,
+    index: true
+  },
+  vendorShopName: {
+    type: String,
+    default: '',
+    index: true
+  },
   
   // ========== PRICING (Simple Products) ==========
   pricing: PricingSchema,

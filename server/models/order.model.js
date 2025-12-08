@@ -84,9 +84,30 @@ const orderSchema = new mongoose.Schema({
             },
             countInStock: {
                 type: Number
+            },
+            // Vendor information
+            vendorId: {
+                type: mongoose.Schema.ObjectId,
+                ref: 'Vendor',
+                default: null
+            },
+            vendorShopName: {
+                type: String,
+                default: ''
             }
         }
     ],
+    // Vendor information for multi-vendor orders
+    vendors: [{
+        vendorId: {
+            type: mongoose.Schema.ObjectId,
+            ref: 'Vendor'
+        },
+        vendorShopName: String,
+        totalAmount: Number,
+        commission: Number,
+        vendorEarning: Number
+    }],
     paymentId: {
         type: String,
         default: ""

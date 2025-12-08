@@ -63,8 +63,13 @@ const userSchema = mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['ADMIN', "USER"],
+        enum: ['ADMIN', 'USER', 'VENDOR'],
         default: "USER"
+    },
+    vendorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Vendor',
+        default: null
     },
     signUpWithGoogle:{
         type:Boolean,

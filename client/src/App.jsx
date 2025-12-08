@@ -35,6 +35,11 @@ import Sitemap from "./Pages/Sitemap";
 import HowToOrder from "./Pages/HowToOrder";
 import HowToTrack from "./Pages/HowToTrack";
 import PartnerWithUs from "./Pages/PartnerWithUs";
+import BecomeVendor from "./Pages/BecomeVendor";
+import VendorDashboard from "./Pages/VendorDashboard";
+import VendorProducts from "./Pages/VendorDashboard/Products";
+import VendorEarnings from "./Pages/VendorDashboard/Earnings";
+import VendorShopPage from "./Pages/VendorShop";
 import DeleteAccount from "./Pages/DeleteAccount";
 import TermsOfUse from "./Pages/TermsOfUse";
 import PrivacyPolicy from "./Pages/PrivacyPolicy";
@@ -685,6 +690,9 @@ function App() {
             <Route path={"/how-to-order"} exact={true} element={<HowToOrder />} />
             <Route path={"/how-to-track"} exact={true} element={<HowToTrack />} />
             <Route path={"/partner-with-us"} exact={true} element={<PartnerWithUs />} />
+            <Route path={"/become-vendor"} exact={true} element={<BecomeVendor />} />
+            <Route path={"/vendor/dashboard"} exact={true} element={<VendorDashboard />} />
+            <Route path={"/vendor/:shopSlug"} exact={true} element={<VendorShopPage />} />
             <Route path={"/delete-account"} exact={true} element={<DeleteAccount />} />
             <Route path={"/terms"} exact={true} element={<TermsOfUse />} />
             <Route path={"/terms-of-use"} exact={true} element={<TermsOfUse />} />

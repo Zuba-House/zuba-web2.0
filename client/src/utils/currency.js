@@ -1,18 +1,18 @@
-// Simple currency formatter centralized for the client
-export const CURRENCY = import.meta.env.VITE_CURRENCY || 'USD';
+/**
+ * Currency formatting utility
+ */
 
-export function formatCurrency(value) {
-  const amount = Number(value) || 0;
-  try {
-    // Always format as USD to avoid confusion with CAD
-    return amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-  } catch {
-    return `$${amount.toFixed(2)} USD`;
+export const formatCurrency = (amount, currency = 'USD') => {
+  if (amount === null || amount === undefined || isNaN(amount)) {
+    return '$0.00';
   }
-}
 
-// Helper to get currency label for display
-export function getCurrencyLabel() {
-  return 'USD';
-}
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount);
+};
 
+export default formatCurrency;
