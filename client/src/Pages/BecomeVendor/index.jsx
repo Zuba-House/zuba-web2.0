@@ -97,6 +97,36 @@ const BecomeVendor = () => {
     }
   };
 
+  // Auto-send OTP when email is valid and user leaves the field
+  const handleEmailBlur = async () => {
+    if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) {
+      return; // Invalid email, don't send OTP
+    }
+
+    if (emailVerified || otpSent) {
+      return; // Already verified or OTP already sent
+    }
+
+    // Auto-send OTP
+    setSendingOTP(true);
+    try {
+      const response = await postData('/api/vendors/send-otp', { email: formData.email });
+      
+      if (response.success) {
+        toast.success('OTP sent to your email! Please check your inbox.');
+        setOtpSent(true);
+        setOtpCountdown(60); // 60 seconds countdown
+      } else {
+        toast.error(response.error || 'Failed to send OTP');
+      }
+    } catch (error) {
+      console.error('Error sending OTP:', error);
+      toast.error(error.response?.data?.error || 'Failed to send OTP');
+    } finally {
+      setSendingOTP(false);
+    }
+  };
+
   const handleSendOTP = async () => {
     if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) {
       toast.error('Please enter a valid email address');
@@ -247,105 +277,124 @@ const BecomeVendor = () => {
             <div className="border-b pb-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Contact Information</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <TextField
-                  required
-                  fullWidth
-                  label="Your Name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                />
-                <div className="md:col-span-2">
+                {emailVerified && (
                   <TextField
                     required
                     fullWidth
-                    label="Email"
-                    name="email"
-                    type="email"
-                    value={formData.email}
+                    label="Your Name"
+                    name="name"
+                    value={formData.name}
                     onChange={handleChange}
-                    disabled={emailVerified}
-                    helperText={emailVerified ? "Email verified ✓" : "Please verify your email with OTP"}
-                    InputProps={{
-                      endAdornment: emailVerified ? (
-                        <FaCheckCircle className="text-green-500 ml-2" />
-                      ) : null
-                    }}
                   />
+                )}
+                <div className="md:col-span-2">
+                  <div className="relative">
+                    <TextField
+                      required
+                      fullWidth
+                      label="Email"
+                      name="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      onBlur={handleEmailBlur}
+                      disabled={emailVerified}
+                      helperText={
+                        emailVerified 
+                          ? "Email verified ✓" 
+                          : otpSent 
+                            ? "OTP sent! Please check your email and enter the code below."
+                            : "Enter your email and we'll send you a verification code automatically"
+                      }
+                      InputProps={{
+                        endAdornment: emailVerified ? (
+                          <span className="flex items-center gap-2 ml-2">
+                            <FaCheckCircle className="text-green-500 text-xl" />
+                            <span className="text-green-600 text-sm font-medium">Verified</span>
+                          </span>
+                        ) : sendingOTP ? (
+                          <CircularProgress size={20} className="ml-2" />
+                        ) : null
+                      }}
+                    />
+                    
+                    {emailVerified && (
+                      <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <FaCheckCircle className="text-green-500" />
+                          <span className="text-sm text-green-800 font-medium">Email verified successfully!</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   
-                  {!emailVerified && (
+                  {!emailVerified && otpSent && (
                     <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      {!otpSent ? (
-                        <div>
-                          <p className="text-sm text-blue-800 mb-3">
-                            Please verify your email address to continue with the application.
-                          </p>
-                          <Button
-                            type="button"
-                            variant="outlined"
-                            onClick={handleSendOTP}
-                            disabled={sendingOTP || !formData.email}
-                            startIcon={<FaEnvelope />}
-                            sx={{ borderColor: '#efb291', color: '#0b2735', '&:hover': { borderColor: '#e5a67d' } }}
-                          >
-                            {sendingOTP ? 'Sending...' : 'Send OTP'}
-                          </Button>
-                        </div>
-                      ) : (
-                        <div>
-                          <p className="text-sm text-blue-800 mb-3">
-                            OTP has been sent to your email. Please enter the 6-digit code below.
-                          </p>
-                          <div className="flex gap-3 items-start">
-                            <TextField
-                              fullWidth
-                              label="Enter OTP"
-                              value={otp}
-                              onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                              placeholder="000000"
-                              inputProps={{ maxLength: 6, style: { textAlign: 'center', fontSize: '20px', letterSpacing: '8px' } }}
-                            />
-                            <Button
-                              type="button"
-                              variant="contained"
-                              onClick={handleVerifyOTP}
-                              disabled={verifyingOTP || otp.length !== 6}
-                              sx={{ backgroundColor: '#efb291', '&:hover': { backgroundColor: '#e5a67d' }, minWidth: '120px' }}
-                            >
-                              {verifyingOTP ? <CircularProgress size={20} /> : 'Verify'}
-                            </Button>
-                          </div>
-                          <div className="mt-3 flex items-center justify-between">
-                            <p className="text-xs text-gray-600">
-                              Didn't receive OTP? 
-                            </p>
-                            <Button
-                              type="button"
-                              size="small"
-                              onClick={handleSendOTP}
-                              disabled={otpCountdown > 0 || sendingOTP}
-                              sx={{ textTransform: 'none', color: '#efb291' }}
-                            >
-                              {otpCountdown > 0 ? `Resend in ${otpCountdown}s` : 'Resend OTP'}
-                            </Button>
-                          </div>
-                        </div>
-                      )}
+                      <p className="text-sm text-blue-800 mb-3 font-medium">
+                        📧 OTP has been sent to your email. Please enter the 6-digit code below to verify.
+                      </p>
+                      <div className="flex gap-3 items-start">
+                        <TextField
+                          fullWidth
+                          label="Enter OTP"
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          placeholder="000000"
+                          inputProps={{ maxLength: 6, style: { textAlign: 'center', fontSize: '20px', letterSpacing: '8px' } }}
+                          error={otp.length > 0 && otp.length !== 6}
+                          helperText={otp.length > 0 && otp.length !== 6 ? 'OTP must be 6 digits' : ''}
+                        />
+                        <Button
+                          type="button"
+                          variant="contained"
+                          onClick={handleVerifyOTP}
+                          disabled={verifyingOTP || otp.length !== 6}
+                          sx={{ backgroundColor: '#efb291', '&:hover': { backgroundColor: '#e5a67d' }, minWidth: '120px' }}
+                        >
+                          {verifyingOTP ? <CircularProgress size={20} color="inherit" /> : 'Verify'}
+                        </Button>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between">
+                        <p className="text-xs text-gray-600">
+                          Didn't receive OTP? 
+                        </p>
+                        <Button
+                          type="button"
+                          size="small"
+                          onClick={handleSendOTP}
+                          disabled={otpCountdown > 0 || sendingOTP}
+                          sx={{ textTransform: 'none', color: '#efb291', '&:hover': { color: '#e5a67d' } }}
+                        >
+                          {otpCountdown > 0 ? `Resend in ${otpCountdown}s` : 'Resend OTP'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!emailVerified && !otpSent && formData.email && /\S+@\S+\.\S+/.test(formData.email) && (
+                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ Please wait, OTP is being sent automatically...
+                      </p>
                     </div>
                   )}
                 </div>
-                <TextField
-                  required
-                  fullWidth
-                  label="Phone Number"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                />
+                {emailVerified && (
+                  <TextField
+                    required
+                    fullWidth
+                    label="Phone Number"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                  />
+                )}
               </div>
             </div>
 
-            {/* Shop Information */}
+            {/* Shop Information - Only show after email verification */}
+            {emailVerified && (
+              <>
             <div className="border-b pb-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Shop Information</h2>
 
@@ -477,6 +526,19 @@ const BecomeVendor = () => {
             >
               {loading ? 'Submitting...' : emailVerified ? 'Submit Application' : 'Please Verify Email First'}
             </Button>
+              </>
+            )}
+
+            {!emailVerified && (
+              <div className="mt-6 p-6 bg-gray-50 border border-gray-200 rounded-lg text-center">
+                <p className="text-gray-600 mb-2">
+                  <strong>Please verify your email address first</strong>
+                </p>
+                <p className="text-sm text-gray-500">
+                  Complete the email verification above to continue with your application.
+                </p>
+              </div>
+            )}
           </form>
         </div>
       </div>

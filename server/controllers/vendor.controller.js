@@ -166,11 +166,19 @@ export const applyToBecomeVendor = async (req, res) => {
       name // User's name for guest applications
     } = req.body;
 
-    // Validate required fields
-    if (!shopName || !businessName || !businessType || !phone || !email) {
+    // Validate required fields (email verification is already done via OTP)
+    if (!email) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields: shopName, businessName, businessType, phone, email'
+        error: 'Email is required'
+      });
+    }
+
+    // Now validate other required fields (only after email is verified)
+    if (!shopName || !businessName || !businessType || !phone) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: shopName, businessName, businessType, phone'
       });
     }
 
