@@ -220,8 +220,8 @@ VendorSchema.pre('save', function(next) {
 });
 
 // Indexes
-VendorSchema.index({ userId: 1 });
-VendorSchema.index({ shopSlug: 1 });
+// Note: userId and shopSlug already have unique: true, which creates indexes automatically
+// Only add indexes for fields that don't have unique constraint
 VendorSchema.index({ status: 1 });
 VendorSchema.index({ isVerified: 1 });
 VendorSchema.index({ 'earnings.availableBalance': -1 });
