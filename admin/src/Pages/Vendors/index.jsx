@@ -10,9 +10,10 @@ import TableRow from "@mui/material/TableRow";
 import { Link } from "react-router-dom";
 import { AiOutlineEdit, AiOutlineEye } from "react-icons/ai";
 import { GoCheck, GoX } from "react-icons/go";
+import { MdBlock, MdCheckCircle, MdDelete } from "react-icons/md";
 import SearchBox from '../../Components/SearchBox';
 import { MyContext } from '../../App';
-import { fetchDataFromApi, postData } from '../../utils/api';
+import { fetchDataFromApi, postData, deleteData } from '../../utils/api';
 import CircularProgress from '@mui/material/CircularProgress';
 import Chip from '@mui/material/Chip';
 import Badge from '@mui/material/Badge';
@@ -131,6 +132,72 @@ export const Vendors = () => {
         } catch (error) {
             console.error('Error rejecting vendor:', error);
             context?.alertBox("error", "Failed to reject vendor");
+        }
+    };
+
+    const handleSuspend = async (vendorId) => {
+        const reason = window.prompt('Please provide a reason for suspension:');
+        if (!reason) {
+            return;
+        }
+
+        if (!window.confirm('Are you sure you want to suspend this vendor?')) {
+            return;
+        }
+
+        try {
+            const res = await postData(`/api/vendors/admin/${vendorId}/suspend`, { reason });
+            if (res?.success) {
+                context?.alertBox("success", "Vendor suspended successfully");
+                getVendors();
+            } else {
+                context?.alertBox("error", res?.error || "Failed to suspend vendor");
+            }
+        } catch (error) {
+            console.error('Error suspending vendor:', error);
+            context?.alertBox("error", "Failed to suspend vendor");
+        }
+    };
+
+    const handleActivate = async (vendorId) => {
+        if (!window.confirm('Are you sure you want to activate/reactivate this vendor?')) {
+            return;
+        }
+
+        try {
+            const res = await postData(`/api/vendors/admin/${vendorId}/activate`, {});
+            if (res?.success) {
+                context?.alertBox("success", "Vendor activated successfully");
+                getVendors();
+            } else {
+                context?.alertBox("error", res?.error || "Failed to activate vendor");
+            }
+        } catch (error) {
+            console.error('Error activating vendor:', error);
+            context?.alertBox("error", "Failed to activate vendor");
+        }
+    };
+
+    const handleDelete = async (vendorId, shopName) => {
+        if (!window.confirm(`Are you sure you want to DELETE vendor "${shopName}"? This action cannot be undone and will only work if the vendor has no products or earnings.`)) {
+            return;
+        }
+
+        if (!window.confirm('This is a permanent action. Are you absolutely sure?')) {
+            return;
+        }
+
+        try {
+            const res = await deleteData(`/api/vendors/admin/${vendorId}`);
+            if (res?.success) {
+                context?.alertBox("success", "Vendor deleted successfully");
+                getVendors();
+            } else {
+                context?.alertBox("error", res?.error || "Failed to delete vendor");
+            }
+        } catch (error) {
+            console.error('Error deleting vendor:', error);
+            context?.alertBox("error", error.response?.data?.error || "Failed to delete vendor");
         }
     };
 
@@ -255,11 +322,18 @@ export const Vendors = () => {
                                                 />
                                             </TableCell>
                                             <TableCell>
-                                                {vendor.isVerified ? (
-                                                    <Chip label="Verified" color="success" size="small" />
-                                                ) : (
-                                                    <Chip label="Not Verified" color="default" size="small" />
-                                                )}
+                                                <div className="flex flex-col gap-1">
+                                                    {vendor.isVerified ? (
+                                                        <Chip label="Verified" color="success" size="small" />
+                                                    ) : (
+                                                        <Chip label="Not Verified" color="default" size="small" />
+                                                    )}
+                                                    {vendor.emailVerified ? (
+                                                        <Chip label="Email Verified" color="success" size="small" variant="outlined" />
+                                                    ) : (
+                                                        <Chip label="Email Not Verified" color="warning" size="small" variant="outlined" />
+                                                    )}
+                                                </div>
                                             </TableCell>
                                             <TableCell>
                                                 <Badge badgeContent={vendor.stats?.totalProducts || 0} color="primary">
@@ -273,7 +347,7 @@ export const Vendors = () => {
                                                 {formatDate(vendor.applicationDate)}
                                             </TableCell>
                                             <TableCell>
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2 flex-wrap">
                                                     <Link to={`/vendors/${vendor._id}`}>
                                                         <Button
                                                             size="small"
@@ -283,6 +357,7 @@ export const Vendors = () => {
                                                             View
                                                         </Button>
                                                     </Link>
+                                                    
                                                     {vendor.status === 'pending' && (
                                                         <>
                                                             <Button
@@ -304,6 +379,42 @@ export const Vendors = () => {
                                                                 Reject
                                                             </Button>
                                                         </>
+                                                    )}
+
+                                                    {vendor.status === 'approved' && (
+                                                        <Button
+                                                            size="small"
+                                                            variant="contained"
+                                                            color="warning"
+                                                            startIcon={<MdBlock />}
+                                                            onClick={() => handleSuspend(vendor._id)}
+                                                        >
+                                                            Suspend
+                                                        </Button>
+                                                    )}
+
+                                                    {(vendor.status === 'suspended' || vendor.status === 'inactive') && (
+                                                        <Button
+                                                            size="small"
+                                                            variant="contained"
+                                                            color="success"
+                                                            startIcon={<MdCheckCircle />}
+                                                            onClick={() => handleActivate(vendor._id)}
+                                                        >
+                                                            Activate
+                                                        </Button>
+                                                    )}
+
+                                                    {vendor.status !== 'pending' && (
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            color="error"
+                                                            startIcon={<MdDelete />}
+                                                            onClick={() => handleDelete(vendor._id, vendor.shopName)}
+                                                        >
+                                                            Delete
+                                                        </Button>
                                                     )}
                                                 </div>
                                             </TableCell>

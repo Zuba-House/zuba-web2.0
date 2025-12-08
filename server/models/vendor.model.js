@@ -7,8 +7,7 @@ const VendorSchema = new mongoose.Schema({
     ref: 'User',
     required: false, // Allow null for guest applications
     default: null,
-    sparse: true, // Allow multiple null values, but unique for non-null values
-    unique: true
+    sparse: true // Sparse index: only enforces uniqueness for non-null values
   },
 
   // ========== VENDOR STATUS ==========

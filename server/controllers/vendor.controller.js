@@ -76,10 +76,13 @@ export const applyToBecomeVendor = async (req, res) => {
       }
     }
 
+    // Generate email verification token
+    const crypto = await import('crypto');
+    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    
     // Create vendor application
-    // Note: userId can be null for guest applications
-    const vendor = new VendorModel({
-      userId: userId || null, // Allow null for guest applications
+    // Note: userId can be null for guest applications - use undefined to avoid sparse index issues
+    const vendorData = {
       shopName: shopName.trim(),
       shopSlug: shopSlug, // Set explicitly to avoid validation error
       shopDescription: shopDescription || '',
@@ -90,19 +93,72 @@ export const applyToBecomeVendor = async (req, res) => {
       address: address || {},
       taxId: taxId || '',
       registrationNumber: registrationNumber || '',
-      status: 'pending'
-    });
+      status: 'pending',
+      emailVerificationToken: emailVerificationToken,
+      emailVerificationTokenExpires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+    };
 
+    // Only add userId if it exists (to avoid null in sparse index)
+    if (userId) {
+      vendorData.userId = userId;
+    }
+
+    const vendor = new VendorModel(vendorData);
     await vendor.save();
-
+    
     // Update user role if user is logged in (but keep as USER until approved)
     if (userId) {
       await UserModel.findByIdAndUpdate(userId, {
         vendorId: vendor._id
       });
     }
+    
+    // Send email verification
+    try {
+      const verificationLink = `${process.env.CLIENT_URL || 'https://www.zubahouse.com'}/vendor/verify-email?token=${emailVerificationToken}&email=${encodeURIComponent(email.toLowerCase().trim())}`;
+      
+      await sendEmailFun({
+        sendTo: email.toLowerCase().trim(),
+        subject: 'Verify Your Email - Vendor Application - Zuba House',
+        text: '',
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #0b2735 0%, #1a4a5c 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+              <h1 style="margin: 0; color: #efb291; font-size: 24px;">Verify Your Email</h1>
+            </div>
+            <div style="background: #ffffff; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+              <p style="color: #333; font-size: 16px; line-height: 1.6;">
+                Dear ${name || 'Applicant'},
+              </p>
+              <p style="color: #333; font-size: 16px; line-height: 1.6;">
+                Thank you for applying to become a vendor on Zuba House! To complete your application, please verify your email address by clicking the button below:
+              </p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${verificationLink}" style="background: linear-gradient(135deg, #efb291 0%, #e5a67d 100%); color: #0b2735; padding: 15px 35px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                  Verify Email Address
+                </a>
+              </div>
+              <p style="color: #666; font-size: 14px; line-height: 1.6;">
+                If the button doesn't work, copy and paste this link into your browser:<br>
+                <a href="${verificationLink}" style="color: #efb291; word-break: break-all;">${verificationLink}</a>
+              </p>
+              <p style="color: #666; font-size: 12px; margin-top: 30px;">
+                This verification link will expire in 24 hours. If you didn't apply to become a vendor, please ignore this email.
+              </p>
+              <p style="color: #333; font-size: 14px; margin-top: 20px;">
+                Best regards,<br>
+                <strong>The Zuba House Team</strong>
+              </p>
+            </div>
+          </div>
+        `
+      });
+    } catch (emailError) {
+      console.error('Error sending verification email:', emailError);
+      // Don't fail the request if email fails
+    }
 
-    // Send confirmation email to vendor
+    // Send confirmation email to vendor (separate from verification email)
     try {
       const recipientName = userId ? (await UserModel.findById(userId))?.name : (name || 'Applicant');
       const recipientEmail = email.toLowerCase().trim();
@@ -112,16 +168,36 @@ export const applyToBecomeVendor = async (req, res) => {
         subject: 'Vendor Application Received - Zuba House',
         text: '',
         html: `
-          <div style="font-family: Arial, sans-serif; padding: 20px;">
-            <h2>Thank You for Your Application!</h2>
-            <p>Dear ${recipientName},</p>
-            <p>We have received your application to become a vendor on Zuba House.</p>
-            <p><strong>Application Status:</strong> Pending Review</p>
-            <p>Our team will review your application and get back to you within 2-3 business days.</p>
-            <p>You will receive an email notification once your application has been reviewed.</p>
-            ${!userId ? '<p><strong>Note:</strong> To track your application status, please create an account using the same email address.</p>' : ''}
-            <p>Thank you for your interest in selling on Zuba House!</p>
-            <p>Best regards,<br>Zuba House Team</p>
+          <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #0b2735 0%, #1a4a5c 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+              <h1 style="margin: 0; color: #efb291; font-size: 24px;">Application Received!</h1>
+            </div>
+            <div style="background: #ffffff; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+              <p style="color: #333; font-size: 16px; line-height: 1.6;">
+                Dear <strong>${recipientName}</strong>,
+              </p>
+              <p style="color: #333; font-size: 16px; line-height: 1.6;">
+                We have received your application to become a vendor on Zuba House.
+              </p>
+              <div style="background-color: #f8f9fa; border-left: 4px solid #efb291; padding: 15px; margin: 20px 0; border-radius: 5px;">
+                <p style="margin: 0; color: #0b2735; font-size: 15px;"><strong>Application Status:</strong> <span style="color: #ffc107;">Pending Review</span></p>
+                <p style="margin: 5px 0 0 0; color: #555; font-size: 14px;">Shop Name: <strong>${shopName.trim()}</strong></p>
+              </div>
+              <p style="color: #333; font-size: 16px; line-height: 1.6;">
+                <strong>📧 Important:</strong> Please check your email and verify your email address to complete your application. Our team will review your application and get back to you within 2-3 business days.
+              </p>
+              <p style="color: #333; font-size: 16px; line-height: 1.6;">
+                You will receive an email notification once your application has been reviewed.
+              </p>
+              ${!userId ? '<p style="color: #856404; background-color: #fff3cd; padding: 15px; border-radius: 5px; font-size: 14px;"><strong>Note:</strong> To track your application status, please create an account using the same email address after your application is approved.</p>' : ''}
+              <p style="color: #333; font-size: 14px; margin-top: 30px;">
+                Thank you for your interest in selling on Zuba House!
+              </p>
+              <p style="color: #333; font-size: 14px;">
+                Best regards,<br>
+                <strong>The Zuba House Team</strong>
+              </p>
+            </div>
           </div>
         `
       });
@@ -132,7 +208,97 @@ export const applyToBecomeVendor = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Vendor application submitted successfully',
+      message: 'Vendor application submitted successfully. Please check your email to verify your email address.',
+      vendor: {
+        id: vendor._id,
+        shopName: vendor.shopName,
+        status: vendor.status,
+        emailVerified: vendor.emailVerified
+      }
+    });
+
+  } catch (error) {
+    console.error('Apply to become vendor error:', error);
+    
+    // Handle duplicate key error specifically
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      if (field === 'userId') {
+        return res.status(400).json({
+          success: false,
+          error: 'You already have a vendor application with this account.'
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        error: `${field} is already taken.`
+      });
+    }
+    
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to submit vendor application'
+    });
+  }
+};
+
+/**
+ * Verify vendor email
+ * GET /api/vendors/verify-email
+ */
+export const verifyVendorEmail = async (req, res) => {
+  try {
+    const { token, email } = req.query;
+
+    if (!token || !email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Token and email are required'
+      });
+    }
+
+    const vendor = await VendorModel.findOne({
+      emailVerificationToken: token,
+      email: email.toLowerCase().trim()
+    });
+
+    if (!vendor) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid verification token'
+      });
+    }
+
+    // Check if token is expired
+    if (vendor.emailVerificationTokenExpires && new Date() > vendor.emailVerificationTokenExpires) {
+      return res.status(400).json({
+        success: false,
+        error: 'Verification token has expired. Please contact support.'
+      });
+    }
+
+    // Check if already verified
+    if (vendor.emailVerified) {
+      return res.json({
+        success: true,
+        message: 'Email is already verified',
+        vendor: {
+          id: vendor._id,
+          shopName: vendor.shopName,
+          status: vendor.status
+        }
+      });
+    }
+
+    // Verify email
+    vendor.emailVerified = true;
+    vendor.emailVerificationToken = null;
+    vendor.emailVerificationTokenExpires = null;
+    await vendor.save();
+
+    return res.json({
+      success: true,
+      message: 'Email verified successfully',
       vendor: {
         id: vendor._id,
         shopName: vendor.shopName,
@@ -141,10 +307,10 @@ export const applyToBecomeVendor = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Apply to become vendor error:', error);
+    console.error('Verify vendor email error:', error);
     return res.status(500).json({
       success: false,
-      error: error.message || 'Failed to submit vendor application'
+      error: error.message || 'Failed to verify email'
     });
   }
 };
@@ -166,7 +332,7 @@ export const getMyVendorApplication = async (req, res) => {
 
     const vendor = await VendorModel.findOne({ userId })
       .populate('userId', 'name email avatar')
-      .select('-bankAccount -adminNotes');
+      .select('-bankAccount -adminNotes -emailVerificationToken');
 
     if (!vendor) {
       return res.status(404).json({
@@ -472,7 +638,7 @@ export const getVendorProfile = async (req, res) => {
       status: 'approved'
     })
       .populate('userId', 'name avatar')
-      .select('-bankAccount -adminNotes -rejectionReason -setupToken');
+      .select('-bankAccount -adminNotes -rejectionReason -setupToken -emailVerificationToken');
 
     if (!vendor) {
       return res.status(404).json({
@@ -545,7 +711,8 @@ export const getVendorDashboard = async (req, res) => {
           id: vendor._id,
           shopName: vendor.shopName,
           status: vendor.status,
-          isVerified: vendor.isVerified
+          isVerified: vendor.isVerified,
+          emailVerified: vendor.emailVerified
         },
         earnings: vendor.earnings,
         stats: {
@@ -582,7 +749,7 @@ export const getAllVendors = async (req, res) => {
     const vendors = await VendorModel.find(query)
       .populate('userId', 'name email avatar')
       .populate('approvedBy', 'name email')
-      .select('-bankAccount -setupToken')
+      .select('-bankAccount -setupToken -emailVerificationToken')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -631,6 +798,14 @@ export const approveVendor = async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Vendor is already approved'
+      });
+    }
+
+    // Check if email is verified
+    if (!vendor.emailVerified) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot approve vendor. Email verification is required. Please ask the vendor to verify their email first.'
       });
     }
 
@@ -861,6 +1036,297 @@ export const rejectVendor = async (req, res) => {
     return res.status(500).json({
       success: false,
       error: error.message || 'Failed to reject vendor'
+    });
+  }
+};
+
+/**
+ * Admin: Suspend vendor
+ * POST /api/vendors/admin/:id/suspend
+ */
+export const suspendVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const adminId = req.userId;
+
+    const vendor = await VendorModel.findById(id);
+    
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        error: 'Vendor not found'
+      });
+    }
+
+    if (vendor.status === 'suspended') {
+      return res.status(400).json({
+        success: false,
+        error: 'Vendor is already suspended'
+      });
+    }
+
+    const previousStatus = vendor.status;
+    vendor.status = 'suspended';
+    vendor.adminNotes = (vendor.adminNotes || '') + `\n[Suspended by admin on ${new Date().toISOString()}] Reason: ${reason || 'No reason provided'}`;
+    await vendor.save();
+
+    // Send suspension email
+    try {
+      const user = vendor.userId ? await UserModel.findById(vendor.userId) : null;
+      const recipientEmail = vendor.email;
+      const recipientName = user ? user.name : (vendor.businessName || 'Vendor');
+      
+      await sendEmailFun({
+        sendTo: recipientEmail,
+        subject: 'Vendor Account Suspended - Zuba House',
+        text: '',
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+            <div style="background: #dc3545; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px;">Account Suspended</h1>
+            </div>
+            <div style="background: #ffffff; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+              <p style="color: #333; font-size: 16px; line-height: 1.6;">
+                Dear <strong>${recipientName}</strong>,
+              </p>
+              <p style="color: #333; font-size: 16px; line-height: 1.6;">
+                We regret to inform you that your vendor account has been <strong style="color: #dc3545;">suspended</strong>.
+              </p>
+              ${reason ? `<div style="background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 15px; margin: 20px 0; border-radius: 5px;">
+                <p style="margin: 0; color: #721c24; font-size: 14px;"><strong>Reason:</strong> ${reason}</p>
+              </div>` : ''}
+              <p style="color: #333; font-size: 16px; line-height: 1.6;">
+                During this suspension, you will not be able to:
+              </p>
+              <ul style="color: #555; font-size: 14px; line-height: 1.8;">
+                <li>Add or edit products</li>
+                <li>Receive new orders</li>
+                <li>Access your vendor dashboard</li>
+                <li>Request withdrawals</li>
+              </ul>
+              <p style="color: #333; font-size: 16px; line-height: 1.6; margin-top: 20px;">
+                If you have any questions or believe this is an error, please contact our support team immediately.
+              </p>
+              <p style="color: #333; font-size: 14px; margin-top: 30px;">
+                Best regards,<br>
+                <strong>The Zuba House Team</strong>
+              </p>
+            </div>
+          </div>
+        `
+      });
+    } catch (emailError) {
+      console.error('Error sending suspension email:', emailError);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Vendor suspended successfully',
+      vendor: {
+        id: vendor._id,
+        shopName: vendor.shopName,
+        status: vendor.status,
+        previousStatus
+      }
+    });
+
+  } catch (error) {
+    console.error('Suspend vendor error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to suspend vendor'
+    });
+  }
+};
+
+/**
+ * Admin: Activate/Reactivate vendor
+ * POST /api/vendors/admin/:id/activate
+ */
+export const activateVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.userId;
+
+    const vendor = await VendorModel.findById(id);
+    
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        error: 'Vendor not found'
+      });
+    }
+
+    if (vendor.status === 'approved') {
+      return res.status(400).json({
+        success: false,
+        error: 'Vendor is already active'
+      });
+    }
+
+    const previousStatus = vendor.status;
+    vendor.status = 'approved';
+    vendor.adminNotes = (vendor.adminNotes || '') + `\n[Reactivated by admin on ${new Date().toISOString()}]`;
+    await vendor.save();
+
+    // Send activation email
+    try {
+      const user = vendor.userId ? await UserModel.findById(vendor.userId) : null;
+      const recipientEmail = vendor.email;
+      const recipientName = user ? user.name : (vendor.businessName || 'Vendor');
+      
+      await sendEmailFun({
+        sendTo: recipientEmail,
+        subject: 'Vendor Account Reactivated - Zuba House',
+        text: '',
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+            <div style="background: #28a745; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px;">Account Reactivated</h1>
+            </div>
+            <div style="background: #ffffff; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+              <p style="color: #333; font-size: 16px; line-height: 1.6;">
+                Dear <strong>${recipientName}</strong>,
+              </p>
+              <p style="color: #333; font-size: 16px; line-height: 1.6;">
+                Great news! Your vendor account has been <strong style="color: #28a745;">reactivated</strong>.
+              </p>
+              <p style="color: #333; font-size: 16px; line-height: 1.6;">
+                You can now access your vendor dashboard and continue selling on Zuba House.
+              </p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.CLIENT_URL || 'https://www.zubahouse.com'}/vendor/dashboard" style="background: linear-gradient(135deg, #efb291 0%, #e5a67d 100%); color: #0b2735; padding: 15px 35px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                  Access Dashboard
+                </a>
+              </div>
+              <p style="color: #333; font-size: 14px; margin-top: 30px;">
+                Best regards,<br>
+                <strong>The Zuba House Team</strong>
+              </p>
+            </div>
+          </div>
+        `
+      });
+    } catch (emailError) {
+      console.error('Error sending activation email:', emailError);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Vendor activated successfully',
+      vendor: {
+        id: vendor._id,
+        shopName: vendor.shopName,
+        status: vendor.status,
+        previousStatus
+      }
+    });
+
+  } catch (error) {
+    console.error('Activate vendor error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to activate vendor'
+    });
+  }
+};
+
+/**
+ * Admin: Delete vendor
+ * DELETE /api/vendors/admin/:id
+ */
+export const deleteVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.userId;
+
+    const vendor = await VendorModel.findById(id);
+    
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        error: 'Vendor not found'
+      });
+    }
+
+    // Check if vendor has products
+    const productsCount = await ProductModel.countDocuments({ vendorId: vendor._id });
+    if (productsCount > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot delete vendor. They have ${productsCount} product(s). Please remove or reassign products first.`
+      });
+    }
+
+    // Check if vendor has earnings
+    if (vendor.earnings.totalEarnings > 0 || vendor.earnings.availableBalance > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot delete vendor with earnings. Please process withdrawals first.'
+      });
+    }
+
+    const vendorData = {
+      shopName: vendor.shopName,
+      email: vendor.email
+    };
+
+    // Remove vendorId from user if exists
+    if (vendor.userId) {
+      await UserModel.findByIdAndUpdate(vendor.userId, {
+        $unset: { vendorId: 1 },
+        role: 'USER' // Revert role to USER
+      });
+    }
+
+    // Delete vendor
+    await VendorModel.findByIdAndDelete(id);
+
+    // Send deletion notification email
+    try {
+      await sendEmailFun({
+        sendTo: vendor.email,
+        subject: 'Vendor Account Deleted - Zuba House',
+        text: '',
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+            <div style="background: #6c757d; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 24px;">Account Deleted</h1>
+            </div>
+            <div style="background: #ffffff; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+              <p style="color: #333; font-size: 16px; line-height: 1.6;">
+                Dear Vendor,
+              </p>
+              <p style="color: #333; font-size: 16px; line-height: 1.6;">
+                This is to inform you that your vendor account for "<strong>${vendorData.shopName}</strong>" has been deleted from our system.
+              </p>
+              <p style="color: #333; font-size: 16px; line-height: 1.6;">
+                If you have any questions or believe this is an error, please contact our support team immediately.
+              </p>
+              <p style="color: #333; font-size: 14px; margin-top: 30px;">
+                Best regards,<br>
+                <strong>The Zuba House Team</strong>
+              </p>
+            </div>
+          </div>
+        `
+      });
+    } catch (emailError) {
+      console.error('Error sending deletion email:', emailError);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Vendor deleted successfully',
+      deletedVendor: vendorData
+    });
+
+  } catch (error) {
+    console.error('Delete vendor error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to delete vendor'
     });
   }
 };
