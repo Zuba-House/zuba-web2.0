@@ -124,6 +124,18 @@ const VendorSchema = new mongoose.Schema({
     url: String,
     uploadedAt: { type: Date, default: Date.now }
   }],
+  emailVerified: {
+    type: Boolean,
+    default: false
+  },
+  otp: {
+    type: String,
+    default: null
+  },
+  otpExpires: {
+    type: Date,
+    default: null
+  },
 
   // ========== COMMISSION SETTINGS ==========
   commissionRate: {

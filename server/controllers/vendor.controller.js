@@ -39,8 +39,14 @@ export const sendVendorOTP = async (req, res) => {
       // Update existing vendor's OTP
       vendor.otp = otp;
       vendor.otpExpires = otpExpires;
+      // Don't reset emailVerified if it's already true
+      // vendor.emailVerified = false; // Reset verification if new OTP is sent
       await vendor.save();
-      console.log(`[OTP Send] Updated OTP for existing vendor: ${vendor._id}, Email: ${normalizedEmail}, OTP: ${otp}`);
+      console.log(`[OTP Send] Updated OTP for existing vendor: ${vendor._id}, Email: ${normalizedEmail}, OTP: ${otp}, Saved OTP: ${vendor.otp}`);
+      
+      // Verify the OTP was saved
+      const verifyVendor = await VendorModel.findById(vendor._id);
+      console.log(`[OTP Send] Verification - Vendor ID: ${verifyVendor._id}, OTP in DB: ${verifyVendor.otp}`);
     } else {
       // Create temporary vendor record for OTP (will be updated on application submission)
       // Use unique temporary values to avoid conflicts
@@ -61,6 +67,10 @@ export const sendVendorOTP = async (req, res) => {
       });
       await vendor.save();
       console.log(`[OTP Send] Created new vendor record: ${vendor._id}, Email: ${normalizedEmail}, OTP: ${otp}`);
+      
+      // Verify the OTP was saved
+      const verifyVendor = await VendorModel.findById(vendor._id);
+      console.log(`[OTP Send] Verification - New Vendor ID: ${verifyVendor._id}, OTP in DB: ${verifyVendor.otp}`);
     }
 
     // Send OTP email
