@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BrowserRouter, Route, Routes, Link } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Link, useLocation } from "react-router-dom";
 import Button from "@mui/material/Button";
 import emailjs from '@emailjs/browser';
 import "./App.css";
@@ -54,6 +54,7 @@ import { OrderSuccess } from "./Pages/Orders/success";
 import { OrderFailed } from "./Pages/Orders/failed";
 import SearchPage from "./Pages/Search";
 import BlogDetail from "./Pages/BlogDetail";
+import ScrollToTop from "./components/ScrollToTop";
 
 
 const MyContext = createContext();
@@ -643,6 +644,7 @@ function App() {
     <>
       <BrowserRouter>
         <MyContext.Provider value={values}>
+          <ScrollToTop />
           <Header />
           <Routes>
             <Route path={"/"} exact={true} element={<Home />} />

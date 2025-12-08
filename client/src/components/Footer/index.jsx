@@ -190,6 +190,7 @@ const Footer = () => {
               <div className="mb-5">
                 <Link 
                   to="/become-vendor"
+                  onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                   className="inline-block bg-[#efb291] text-[#0b2735] px-6 py-3 rounded-lg font-[600] transition-all hover:bg-[#e5a67d] hover:shadow-lg"
                 >
                   Start Selling to Millions

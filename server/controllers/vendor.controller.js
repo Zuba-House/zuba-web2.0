@@ -6,7 +6,7 @@
 import VendorModel from '../models/vendor.model.js';
 import UserModel from '../models/user.model.js';
 import ProductModel from '../models/product.model.js';
-import { sendEmail } from '../config/sendEmail.js';
+import sendEmailFun from '../config/sendEmail.js';
 
 /**
  * Apply to become a vendor
@@ -88,9 +88,10 @@ export const applyToBecomeVendor = async (req, res) => {
     try {
       const user = await UserModel.findById(userId);
       if (user && user.email) {
-        await sendEmail({
-          to: user.email,
+        await sendEmailFun({
+          sendTo: user.email,
           subject: 'Vendor Application Received - Zuba House',
+          text: '',
           html: `
             <div style="font-family: Arial, sans-serif; padding: 20px;">
               <h2>Thank You for Your Application!</h2>
@@ -421,9 +422,10 @@ export const approveVendor = async (req, res) => {
       if (user && user.email) {
         const approvalLink = `${process.env.CLIENT_URL || 'https://www.zubahouse.com'}/vendor/complete-registration?token=${vendor._id}`;
         
-        await sendEmail({
-          to: user.email,
+        await sendEmailFun({
+          sendTo: user.email,
           subject: 'Congratulations! Your Vendor Application Has Been Approved - Zuba House',
+          text: '',
           html: `
             <div style="font-family: Arial, sans-serif; padding: 20px;">
               <h2>Congratulations!</h2>
@@ -493,9 +495,10 @@ export const rejectVendor = async (req, res) => {
     try {
       const user = await UserModel.findById(vendor.userId);
       if (user && user.email) {
-        await sendEmail({
-          to: user.email,
+        await sendEmailFun({
+          sendTo: user.email,
           subject: 'Vendor Application Status - Zuba House',
+          text: '',
           html: `
             <div style="font-family: Arial, sans-serif; padding: 20px;">
               <h2>Application Status Update</h2>
@@ -587,9 +590,10 @@ export const requestWithdrawal = async (req, res) => {
     try {
       const user = await UserModel.findById(userId);
       if (user && user.email) {
-        await sendEmail({
-          to: user.email,
+        await sendEmailFun({
+          sendTo: user.email,
           subject: 'Withdrawal Request Received - Zuba House',
+          text: '',
           html: `
             <div style="font-family: Arial, sans-serif; padding: 20px;">
               <h2>Withdrawal Request Received</h2>
