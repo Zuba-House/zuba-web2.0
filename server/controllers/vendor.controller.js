@@ -686,21 +686,42 @@ export const verifySetupToken = async (req, res) => {
       });
     }
 
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // First, find vendor by email and status
     const vendor = await VendorModel.findOne({
-      setupToken: token,
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
       status: 'approved'
-    }).select('shopName setupTokenExpires accountCreated userId');
+    }).select('shopName setupToken setupTokenExpires accountCreated userId');
 
     if (!vendor) {
+      console.log(`[Verify Setup Token] No approved vendor found for email: ${normalizedEmail}`);
+      return res.status(404).json({
+        success: false,
+        error: 'Vendor not found or not approved'
+      });
+    }
+
+    // Check if vendor already has an account
+    if (vendor.userId || vendor.accountCreated) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid setup token'
+        error: 'Account has already been created. Please login to access your dashboard.',
+        alreadyCreated: true
+      });
+    }
+
+    // Check if setup token matches
+    if (!vendor.setupToken || vendor.setupToken !== token) {
+      console.log(`[Verify Setup Token] Token mismatch. Stored: ${vendor.setupToken?.substring(0, 10)}..., Received: ${token.substring(0, 10)}...`);
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid setup token. Please use the link from your approval email.'
       });
     }
 
     // Check if token is expired
-    if (vendor.setupTokenExpires && new Date() > vendor.setupTokenExpires) {
+    if (!vendor.setupTokenExpires) {
       return res.status(400).json({
         success: false,
         error: 'Setup token has expired',
@@ -708,12 +729,11 @@ export const verifySetupToken = async (req, res) => {
       });
     }
 
-    // Check if account already created
-    if (vendor.accountCreated || vendor.userId) {
+    if (new Date() > vendor.setupTokenExpires) {
       return res.status(400).json({
         success: false,
-        error: 'Account has already been created',
-        alreadyCreated: true
+        error: 'Setup token has expired. Please contact support for a new link.',
+        expired: true
       });
     }
 
@@ -721,7 +741,7 @@ export const verifySetupToken = async (req, res) => {
       success: true,
       vendor: {
         shopName: vendor.shopName,
-        email: email
+        email: normalizedEmail
       }
     });
 

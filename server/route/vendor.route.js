@@ -4,8 +4,13 @@ import * as vendorController from '../controllers/vendor.controller.js';
 
 const router = express.Router();
 
-// Public routes
-router.get('/:shopSlug', vendorController.getVendorProfile);
+// OTP routes (public) - Must be before dynamic routes
+router.post('/send-otp', vendorController.sendVendorOTP);
+router.post('/verify-otp', vendorController.verifyVendorOTP);
+
+// Account setup routes (for guest vendors after approval) - Must be before dynamic routes
+router.get('/verify-setup-token', vendorController.verifySetupToken);
+router.post('/setup-account', vendorController.setupVendorAccount);
 
 // Vendor routes (allow guest applications)
 router.post('/apply', optionalAuth, vendorController.applyToBecomeVendor);
@@ -15,13 +20,8 @@ router.get('/dashboard', auth, vendorController.getVendorDashboard);
 router.post('/withdraw', auth, vendorController.requestWithdrawal);
 router.get('/products', auth, vendorController.getVendorProducts);
 
-// Account setup routes (for guest vendors after approval)
-router.get('/verify-setup-token', vendorController.verifySetupToken);
-router.post('/setup-account', vendorController.setupVendorAccount);
-
-// OTP routes (public)
-router.post('/send-otp', vendorController.sendVendorOTP);
-router.post('/verify-otp', vendorController.verifyVendorOTP);
+// Public routes - Must be last to avoid catching other routes
+router.get('/:shopSlug', vendorController.getVendorProfile);
 
 // Admin routes
 router.get('/admin/all', auth, vendorController.getAllVendors);

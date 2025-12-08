@@ -71,6 +71,7 @@ export const fetchDataFromApi = async (url) => {
             error?.response?.data?.message === "You have not login") {
             
             return { 
+                success: false,
                 error: true, 
                 isAuthError: true,
                 message: error?.response?.data?.message || 'Authentication failed',
@@ -78,10 +79,11 @@ export const fetchDataFromApi = async (url) => {
             };
         }
         
-        return { 
+        // Return error data for other errors (including 404)
+        return error?.response?.data || { 
+            success: false,
             error: true, 
-            message: error?.response?.data?.message || error.message,
-            response: error.response 
+            message: error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Request failed' 
         };
     }
 }

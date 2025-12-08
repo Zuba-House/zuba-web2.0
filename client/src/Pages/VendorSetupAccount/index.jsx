@@ -38,25 +38,37 @@ const VendorSetupAccount = () => {
 
       const response = await fetchDataFromApi(`/api/vendors/verify-setup-token?token=${token}&email=${encodeURIComponent(email)}`);
       
-      if (response.success) {
+      if (response && response.success) {
         setVendorInfo(response.vendor);
         setFormData(prev => ({
           ...prev,
           email: email
         }));
       } else {
-        if (response.expired) {
+        const errorMessage = response?.error || 'Invalid setup link';
+        
+        if (response?.expired) {
           toast.error('This setup link has expired. Please contact support for a new link.');
-        } else if (response.alreadyCreated) {
+        } else if (response?.alreadyCreated) {
           toast.error('Account has already been created. Please login to access your dashboard.');
-          navigate('/login');
+          setTimeout(() => navigate('/login'), 2000);
         } else {
-          toast.error(response.error || 'Invalid setup link');
+          toast.error(errorMessage);
+          // If it's a 404 or invalid token, redirect after a delay
+          if (errorMessage.includes('not found') || errorMessage.includes('Invalid')) {
+            setTimeout(() => navigate('/become-vendor'), 3000);
+          }
         }
       }
     } catch (error) {
       console.error('Error verifying token:', error);
-      toast.error('Failed to verify setup link');
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to verify setup link';
+      toast.error(errorMessage);
+      
+      // If it's a 404, redirect to application page
+      if (error?.response?.status === 404) {
+        setTimeout(() => navigate('/become-vendor'), 3000);
+      }
     } finally {
       setLoading(false);
     }
