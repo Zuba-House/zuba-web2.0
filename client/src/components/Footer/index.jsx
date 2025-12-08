@@ -195,6 +195,15 @@ const Footer = () => {
                 >
                   Start Selling to Millions
                 </Link>
+                <div className="mt-3">
+                  <Link
+                    to="/login"
+                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    className="text-[#e5e2db] hover:text-[#efb291] text-sm font-medium transition-colors"
+                  >
+                    Seller Login →
+                  </Link>
+                </div>
               </div>
 
               {/* Newsletter Section */}

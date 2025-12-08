@@ -3,7 +3,7 @@ import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import { IoMdEye } from "react-icons/io";
 import { IoMdEyeOff } from "react-icons/io";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import { FcGoogle } from "react-icons/fc";
 import { MyContext } from "../../App";
 import CircularProgress from '@mui/material/CircularProgress';
@@ -17,8 +17,9 @@ const googleProvider = new GoogleAuthProvider();
 const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isPasswordShow, setIsPasswordShow] = useState(false);
+  const location = useLocation();
   const [formFields, setFormsFields] = useState({
-    email:'',
+    email: location.state?.email || '',
     password:''
   });
 
@@ -28,6 +29,11 @@ const Login = () => {
  
   useEffect(()=>{
     window.scrollTo(0,0);
+    
+    // Show success message if coming from account creation
+    if (location.state?.message) {
+      context?.alertBox("success", location.state.message);
+    }
     
     // Check if user is already logged in with a valid session
     const token = localStorage.getItem('accessToken');
@@ -129,8 +135,16 @@ const Login = () => {
           if (context?.mergeGuestCartWithServer) {
             context.mergeGuestCartWithServer();
           }
-  
-          history("/")
+          
+          // Check if coming from vendor setup - redirect to vendor dashboard
+          if (location.state?.fromVendorSetup) {
+            setTimeout(() => {
+              history("/vendor/dashboard");
+            }, 1000);
+          } else {
+            // Regular login - redirect to home
+            history("/");
+          }
         } else {
           context.alertBox("error", res?.message);
           setIsLoading(false);

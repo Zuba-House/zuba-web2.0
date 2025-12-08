@@ -136,20 +136,18 @@ const VendorSetupAccount = () => {
       });
 
       if (response.success) {
-        // Store tokens
-        if (response.data?.accesstoken) {
-          localStorage.setItem('accessToken', response.data.accesstoken);
-          if (response.data.refreshToken) {
-            localStorage.setItem('refreshToken', response.data.refreshToken);
-          }
-        }
-
-        toast.success('Account created successfully! Welcome to Zuba House!');
+        toast.success('Account created successfully! Please login to access your vendor dashboard.');
         
-        // Redirect to vendor dashboard
+        // Redirect to login page instead of auto-login
         setTimeout(() => {
-          navigate('/vendor/dashboard');
-        }, 1500);
+          navigate('/login', { 
+            state: { 
+              message: 'Account created successfully! Please login to continue.',
+              email: formData.email,
+              fromVendorSetup: true // Flag to redirect to vendor dashboard after login
+            } 
+          });
+        }, 2000);
       } else {
         toast.error(response.error || 'Failed to create account');
       }
