@@ -12,6 +12,140 @@ import generatedAccessToken from '../utils/generatedAccessToken.js';
 import genertedRefreshToken from '../utils/generatedRefreshToken.js';
 
 /**
+ * Send OTP for vendor email verification
+ * POST /api/vendors/send-otp
+ */
+export const sendVendorOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email is required'
+      });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Check if vendor application already exists with this email
+    let vendor = await VendorModel.findOne({ email: email.toLowerCase().trim() });
+    
+    if (vendor) {
+      // Update existing vendor's OTP
+      vendor.otp = otp;
+      vendor.otpExpires = otpExpires;
+      await vendor.save();
+    } else {
+      // Create temporary vendor record for OTP (will be updated on application submission)
+      vendor = new VendorModel({
+        email: email.toLowerCase().trim(),
+        otp: otp,
+        otpExpires: otpExpires,
+        status: 'pending'
+      });
+      await vendor.save();
+    }
+
+    // Send OTP email
+    try {
+      const VerificationEmail = (await import('../utils/verifyEmailTemplate.js')).default;
+      
+      await sendEmailFun({
+        sendTo: email.toLowerCase().trim(),
+        subject: 'Verify Your Email - Vendor Application - Zuba House',
+        text: '',
+        html: VerificationEmail('Vendor Applicant', otp)
+      });
+
+      return res.json({
+        success: true,
+        message: 'OTP sent successfully to your email',
+        expiresIn: 10 // minutes
+      });
+    } catch (emailError) {
+      console.error('Error sending OTP email:', emailError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to send OTP email. Please try again.'
+      });
+    }
+
+  } catch (error) {
+    console.error('Send vendor OTP error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to send OTP'
+    });
+  }
+};
+
+/**
+ * Verify OTP for vendor email
+ * POST /api/vendors/verify-otp
+ */
+export const verifyVendorOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email and OTP are required'
+      });
+    }
+
+    const vendor = await VendorModel.findOne({ 
+      email: email.toLowerCase().trim() 
+    });
+
+    if (!vendor) {
+      return res.status(400).json({
+        success: false,
+        error: 'No OTP found for this email. Please request a new OTP.'
+      });
+    }
+
+    // Check if OTP matches
+    if (vendor.otp !== otp) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid OTP. Please check and try again.'
+      });
+    }
+
+    // Check if OTP is expired
+    if (!vendor.otpExpires || new Date() > vendor.otpExpires) {
+      return res.status(400).json({
+        success: false,
+        error: 'OTP has expired. Please request a new OTP.'
+      });
+    }
+
+    // Mark email as verified
+    vendor.emailVerified = true;
+    vendor.otp = null; // Clear OTP after verification
+    vendor.otpExpires = null;
+    await vendor.save();
+
+    return res.json({
+      success: true,
+      message: 'Email verified successfully',
+      emailVerified: true
+    });
+
+  } catch (error) {
+    console.error('Verify vendor OTP error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to verify OTP'
+    });
+  }
+};
+
+/**
  * Apply to become a vendor
  * POST /api/vendors/apply
  */
@@ -37,6 +171,18 @@ export const applyToBecomeVendor = async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields: shopName, businessName, businessType, phone, email'
+      });
+    }
+
+    // Check if email is verified
+    const existingVendor = await VendorModel.findOne({ 
+      email: email.toLowerCase().trim() 
+    });
+
+    if (!existingVendor || !existingVendor.emailVerified) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email verification is required. Please verify your email with OTP first.'
       });
     }
 
@@ -76,86 +222,31 @@ export const applyToBecomeVendor = async (req, res) => {
       }
     }
 
-    // Generate email verification token
-    const crypto = await import('crypto');
-    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
-    
-    // Create vendor application
+    // Update existing vendor record (created during OTP verification) with full application data
     // Note: userId can be null for guest applications - use undefined to avoid sparse index issues
-    const vendorData = {
-      shopName: shopName.trim(),
-      shopSlug: shopSlug, // Set explicitly to avoid validation error
-      shopDescription: shopDescription || '',
-      businessName: businessName.trim(),
-      businessType,
-      phone: phone.trim(),
-      email: email.toLowerCase().trim(),
-      address: address || {},
-      taxId: taxId || '',
-      registrationNumber: registrationNumber || '',
-      status: 'pending',
-      emailVerificationToken: emailVerificationToken,
-      emailVerificationTokenExpires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-    };
-
+    existingVendor.shopName = shopName.trim();
+    existingVendor.shopSlug = shopSlug;
+    existingVendor.shopDescription = shopDescription || '';
+    existingVendor.businessName = businessName.trim();
+    existingVendor.businessType = businessType;
+    existingVendor.phone = phone.trim();
+    existingVendor.address = address || {};
+    existingVendor.taxId = taxId || '';
+    existingVendor.registrationNumber = registrationNumber || '';
+    existingVendor.status = 'pending';
+    
     // Only add userId if it exists (to avoid null in sparse index)
     if (userId) {
-      vendorData.userId = userId;
+      existingVendor.userId = userId;
     }
 
-    const vendor = new VendorModel(vendorData);
-    await vendor.save();
+    await existingVendor.save();
     
     // Update user role if user is logged in (but keep as USER until approved)
     if (userId) {
       await UserModel.findByIdAndUpdate(userId, {
-        vendorId: vendor._id
+        vendorId: existingVendor._id
       });
-    }
-    
-    // Send email verification
-    try {
-      const verificationLink = `${process.env.CLIENT_URL || 'https://www.zubahouse.com'}/vendor/verify-email?token=${emailVerificationToken}&email=${encodeURIComponent(email.toLowerCase().trim())}`;
-      
-      await sendEmailFun({
-        sendTo: email.toLowerCase().trim(),
-        subject: 'Verify Your Email - Vendor Application - Zuba House',
-        text: '',
-        html: `
-          <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
-            <div style="background: linear-gradient(135deg, #0b2735 0%, #1a4a5c 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-              <h1 style="margin: 0; color: #efb291; font-size: 24px;">Verify Your Email</h1>
-            </div>
-            <div style="background: #ffffff; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-              <p style="color: #333; font-size: 16px; line-height: 1.6;">
-                Dear ${name || 'Applicant'},
-              </p>
-              <p style="color: #333; font-size: 16px; line-height: 1.6;">
-                Thank you for applying to become a vendor on Zuba House! To complete your application, please verify your email address by clicking the button below:
-              </p>
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="${verificationLink}" style="background: linear-gradient(135deg, #efb291 0%, #e5a67d 100%); color: #0b2735; padding: 15px 35px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                  Verify Email Address
-                </a>
-              </div>
-              <p style="color: #666; font-size: 14px; line-height: 1.6;">
-                If the button doesn't work, copy and paste this link into your browser:<br>
-                <a href="${verificationLink}" style="color: #efb291; word-break: break-all;">${verificationLink}</a>
-              </p>
-              <p style="color: #666; font-size: 12px; margin-top: 30px;">
-                This verification link will expire in 24 hours. If you didn't apply to become a vendor, please ignore this email.
-              </p>
-              <p style="color: #333; font-size: 14px; margin-top: 20px;">
-                Best regards,<br>
-                <strong>The Zuba House Team</strong>
-              </p>
-            </div>
-          </div>
-        `
-      });
-    } catch (emailError) {
-      console.error('Error sending verification email:', emailError);
-      // Don't fail the request if email fails
     }
 
     // Send confirmation email to vendor (separate from verification email)
@@ -242,78 +333,6 @@ export const applyToBecomeVendor = async (req, res) => {
   }
 };
 
-/**
- * Verify vendor email
- * GET /api/vendors/verify-email
- */
-export const verifyVendorEmail = async (req, res) => {
-  try {
-    const { token, email } = req.query;
-
-    if (!token || !email) {
-      return res.status(400).json({
-        success: false,
-        error: 'Token and email are required'
-      });
-    }
-
-    const vendor = await VendorModel.findOne({
-      emailVerificationToken: token,
-      email: email.toLowerCase().trim()
-    });
-
-    if (!vendor) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid verification token'
-      });
-    }
-
-    // Check if token is expired
-    if (vendor.emailVerificationTokenExpires && new Date() > vendor.emailVerificationTokenExpires) {
-      return res.status(400).json({
-        success: false,
-        error: 'Verification token has expired. Please contact support.'
-      });
-    }
-
-    // Check if already verified
-    if (vendor.emailVerified) {
-      return res.json({
-        success: true,
-        message: 'Email is already verified',
-        vendor: {
-          id: vendor._id,
-          shopName: vendor.shopName,
-          status: vendor.status
-        }
-      });
-    }
-
-    // Verify email
-    vendor.emailVerified = true;
-    vendor.emailVerificationToken = null;
-    vendor.emailVerificationTokenExpires = null;
-    await vendor.save();
-
-    return res.json({
-      success: true,
-      message: 'Email verified successfully',
-      vendor: {
-        id: vendor._id,
-        shopName: vendor.shopName,
-        status: vendor.status
-      }
-    });
-
-  } catch (error) {
-    console.error('Verify vendor email error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to verify email'
-    });
-  }
-};
 
 /**
  * Get vendor application status
@@ -802,12 +821,8 @@ export const approveVendor = async (req, res) => {
     }
 
     // Check if email is verified
-    if (!vendor.emailVerified) {
-      return res.status(400).json({
-        success: false,
-        error: 'Cannot approve vendor. Email verification is required. Please ask the vendor to verify their email first.'
-      });
-    }
+    // Email verification is already done during application submission (OTP verification)
+    // No need to check again - emailVerified is set to true when OTP is verified
 
     vendor.status = 'approved';
     vendor.approvalDate = new Date();

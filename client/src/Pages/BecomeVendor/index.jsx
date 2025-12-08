@@ -5,10 +5,18 @@ import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import { fetchDataFromApi, postData } from '../../utils/api';
+import CircularProgress from '@mui/material/CircularProgress';
+import { FaCheckCircle, FaEnvelope } from 'react-icons/fa';
 
 const BecomeVendor = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [sendingOTP, setSendingOTP] = useState(false);
+  const [verifyingOTP, setVerifyingOTP] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [otpCountdown, setOtpCountdown] = useState(0);
   const [formData, setFormData] = useState({
     name: '', // For guest applications
     shopName: '',
@@ -36,6 +44,14 @@ const BecomeVendor = () => {
       checkExistingApplication();
     }
   }, []);
+
+  // Countdown timer for OTP resend
+  useEffect(() => {
+    if (otpCountdown > 0) {
+      const timer = setTimeout(() => setOtpCountdown(otpCountdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpCountdown]);
 
   const checkExistingApplication = async () => {
     try {
@@ -72,10 +88,77 @@ const BecomeVendor = () => {
         [name]: value
       }));
     }
+
+    // Reset email verification when email changes
+    if (name === 'email') {
+      setEmailVerified(false);
+      setOtpSent(false);
+      setOtp('');
+    }
+  };
+
+  const handleSendOTP = async () => {
+    if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    setSendingOTP(true);
+    try {
+      const response = await postData('/api/vendors/send-otp', { email: formData.email });
+      
+      if (response.success) {
+        toast.success('OTP sent to your email! Please check your inbox.');
+        setOtpSent(true);
+        setOtpCountdown(60); // 60 seconds countdown
+      } else {
+        toast.error(response.error || 'Failed to send OTP');
+      }
+    } catch (error) {
+      console.error('Error sending OTP:', error);
+      toast.error(error.response?.data?.error || 'Failed to send OTP');
+    } finally {
+      setSendingOTP(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (!otp || otp.length !== 6) {
+      toast.error('Please enter a valid 6-digit OTP');
+      return;
+    }
+
+    setVerifyingOTP(true);
+    try {
+      const response = await postData('/api/vendors/verify-otp', { 
+        email: formData.email, 
+        otp: otp 
+      });
+      
+      if (response.success) {
+        toast.success('Email verified successfully!');
+        setEmailVerified(true);
+        setOtp('');
+      } else {
+        toast.error(response.error || 'Invalid OTP');
+      }
+    } catch (error) {
+      console.error('Error verifying OTP:', error);
+      toast.error(error.response?.data?.error || 'Failed to verify OTP');
+    } finally {
+      setVerifyingOTP(false);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Check if email is verified
+    if (!emailVerified) {
+      toast.error('Please verify your email with OTP before submitting the application');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -108,20 +191,19 @@ const BecomeVendor = () => {
         <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8 text-center">
           <div className="mb-6">
             <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              <span className="text-3xl">⏳</span>
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Application Under Review</h2>
-            <p className="text-gray-600">Your vendor application is currently being reviewed by our team.</p>
-            <p className="text-gray-600 mt-2">You will receive an email notification once your application has been reviewed.</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Application Pending</h1>
+            <p className="text-gray-600">
+              Your vendor application is currently under review. We will notify you via email once a decision has been made.
+            </p>
           </div>
           <Button
             variant="contained"
             onClick={() => navigate('/')}
             sx={{ backgroundColor: '#efb291', '&:hover': { backgroundColor: '#e5a67d' } }}
           >
-            Back to Home
+            Return to Home
           </Button>
         </div>
       </div>
@@ -134,12 +216,12 @@ const BecomeVendor = () => {
         <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8 text-center">
           <div className="mb-6">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+              <span className="text-3xl">✅</span>
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Application Approved!</h2>
-            <p className="text-gray-600">Your vendor application has been approved. Please complete your registration.</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Application Approved!</h1>
+            <p className="text-gray-600">
+              Congratulations! Your vendor application has been approved. Please complete your registration.
+            </p>
           </div>
           <Button
             variant="contained"
@@ -159,36 +241,114 @@ const BecomeVendor = () => {
         <div className="bg-white rounded-lg shadow-lg p-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Become a Vendor</h1>
           <p className="text-gray-600 mb-8">Join thousands of sellers on Zuba House and start selling to millions of customers.</p>
-          
-          {!localStorage.getItem('accessToken') && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>Note:</strong> You can apply as a guest. After approval, you'll need to create an account to access your vendor dashboard.
-              </p>
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Personal Information (for guest applications) */}
-            {!localStorage.getItem('accessToken') && (
-              <div className="border-b pb-6">
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">Your Information</h2>
+            {/* Contact Information */}
+            <div className="border-b pb-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Contact Information</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <TextField
                   required
                   fullWidth
-                  label="Full Name"
+                  label="Your Name"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
-                  helperText="Your name for correspondence"
+                />
+                <div className="md:col-span-2">
+                  <TextField
+                    required
+                    fullWidth
+                    label="Email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    disabled={emailVerified}
+                    helperText={emailVerified ? "Email verified ✓" : "Please verify your email with OTP"}
+                    InputProps={{
+                      endAdornment: emailVerified ? (
+                        <FaCheckCircle className="text-green-500 ml-2" />
+                      ) : null
+                    }}
+                  />
+                  
+                  {!emailVerified && (
+                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      {!otpSent ? (
+                        <div>
+                          <p className="text-sm text-blue-800 mb-3">
+                            Please verify your email address to continue with the application.
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outlined"
+                            onClick={handleSendOTP}
+                            disabled={sendingOTP || !formData.email}
+                            startIcon={<FaEnvelope />}
+                            sx={{ borderColor: '#efb291', color: '#0b2735', '&:hover': { borderColor: '#e5a67d' } }}
+                          >
+                            {sendingOTP ? 'Sending...' : 'Send OTP'}
+                          </Button>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-sm text-blue-800 mb-3">
+                            OTP has been sent to your email. Please enter the 6-digit code below.
+                          </p>
+                          <div className="flex gap-3 items-start">
+                            <TextField
+                              fullWidth
+                              label="Enter OTP"
+                              value={otp}
+                              onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                              placeholder="000000"
+                              inputProps={{ maxLength: 6, style: { textAlign: 'center', fontSize: '20px', letterSpacing: '8px' } }}
+                            />
+                            <Button
+                              type="button"
+                              variant="contained"
+                              onClick={handleVerifyOTP}
+                              disabled={verifyingOTP || otp.length !== 6}
+                              sx={{ backgroundColor: '#efb291', '&:hover': { backgroundColor: '#e5a67d' }, minWidth: '120px' }}
+                            >
+                              {verifyingOTP ? <CircularProgress size={20} /> : 'Verify'}
+                            </Button>
+                          </div>
+                          <div className="mt-3 flex items-center justify-between">
+                            <p className="text-xs text-gray-600">
+                              Didn't receive OTP? 
+                            </p>
+                            <Button
+                              type="button"
+                              size="small"
+                              onClick={handleSendOTP}
+                              disabled={otpCountdown > 0 || sendingOTP}
+                              sx={{ textTransform: 'none', color: '#efb291' }}
+                            >
+                              {otpCountdown > 0 ? `Resend in ${otpCountdown}s` : 'Resend OTP'}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <TextField
+                  required
+                  fullWidth
+                  label="Phone Number"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
                 />
               </div>
-            )}
+            </div>
 
             {/* Shop Information */}
             <div className="border-b pb-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Shop Information</h2>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <TextField
                   required
@@ -199,7 +359,7 @@ const BecomeVendor = () => {
                   onChange={handleChange}
                   helperText="This will be your shop URL: zubahouse.com/vendor/your-shop-name"
                 />
-                
+
                 <TextField
                   fullWidth
                   label="Business Name"
@@ -226,7 +386,7 @@ const BecomeVendor = () => {
             {/* Business Information */}
             <div className="border-b pb-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Business Information</h2>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <TextField
                   required
@@ -241,7 +401,6 @@ const BecomeVendor = () => {
                   <MenuItem value="business">Business</MenuItem>
                   <MenuItem value="company">Company</MenuItem>
                 </TextField>
-
                 <TextField
                   fullWidth
                   label="Tax ID / EIN"
@@ -249,58 +408,27 @@ const BecomeVendor = () => {
                   value={formData.taxId}
                   onChange={handleChange}
                 />
-              </div>
-
-              <TextField
-                fullWidth
-                label="Registration Number"
-                name="registrationNumber"
-                value={formData.registrationNumber}
-                onChange={handleChange}
-                className="mt-4"
-              />
-            </div>
-
-            {/* Contact Information */}
-            <div className="border-b pb-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Contact Information</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <TextField
-                  required
                   fullWidth
-                  type="email"
-                  label="Email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                />
-
-                <TextField
-                  required
-                  fullWidth
-                  label="Phone Number"
-                  name="phone"
-                  value={formData.phone}
+                  label="Registration Number"
+                  name="registrationNumber"
+                  value={formData.registrationNumber}
                   onChange={handleChange}
                 />
               </div>
             </div>
 
-            {/* Address */}
-            <div className="border-b pb-6">
+            {/* Business Address */}
+            <div className="pb-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Business Address</h2>
-              
-              <TextField
-                fullWidth
-                label="Street Address"
-                name="address.street"
-                value={formData.address.street}
-                onChange={handleChange}
-                className="mb-4"
-              />
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <TextField
+                  fullWidth
+                  label="Street Address"
+                  name="address.street"
+                  value={formData.address.street}
+                  onChange={handleChange}
+                />
                 <TextField
                   fullWidth
                   label="City"
@@ -308,7 +436,6 @@ const BecomeVendor = () => {
                   value={formData.address.city}
                   onChange={handleChange}
                 />
-
                 <TextField
                   fullWidth
                   label="State/Province"
@@ -316,9 +443,6 @@ const BecomeVendor = () => {
                   value={formData.address.state}
                   onChange={handleChange}
                 />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <TextField
                   fullWidth
                   label="ZIP/Postal Code"
@@ -326,7 +450,6 @@ const BecomeVendor = () => {
                   value={formData.address.zipCode}
                   onChange={handleChange}
                 />
-
                 <TextField
                   fullWidth
                   label="Country"
@@ -337,24 +460,23 @@ const BecomeVendor = () => {
               </div>
             </div>
 
-            {/* Submit */}
-            <div className="flex justify-end gap-4">
-              <Button
-                variant="outlined"
-                onClick={() => navigate('/')}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={loading}
-                sx={{ backgroundColor: '#efb291', '&:hover': { backgroundColor: '#e5a67d' } }}
-              >
-                {loading ? 'Submitting...' : 'Submit Application'}
-              </Button>
-            </div>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={loading || !emailVerified}
+              fullWidth
+              size="large"
+              sx={{ 
+                backgroundColor: '#efb291', 
+                '&:hover': { backgroundColor: '#e5a67d' }, 
+                color: '#0b2735',
+                py: 1.5,
+                fontSize: '16px',
+                fontWeight: 'bold'
+              }}
+            >
+              {loading ? 'Submitting...' : emailVerified ? 'Submit Application' : 'Please Verify Email First'}
+            </Button>
           </form>
         </div>
       </div>
@@ -363,4 +485,3 @@ const BecomeVendor = () => {
 };
 
 export default BecomeVendor;
-

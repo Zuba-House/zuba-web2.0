@@ -19,8 +19,9 @@ router.get('/products', auth, vendorController.getVendorProducts);
 router.get('/verify-setup-token', vendorController.verifySetupToken);
 router.post('/setup-account', vendorController.setupVendorAccount);
 
-// Email verification route (public)
-router.get('/verify-email', vendorController.verifyVendorEmail);
+// OTP routes (public)
+router.post('/send-otp', vendorController.sendVendorOTP);
+router.post('/verify-otp', vendorController.verifyVendorOTP);
 
 // Admin routes
 router.get('/admin/all', auth, vendorController.getAllVendors);
