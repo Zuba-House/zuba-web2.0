@@ -40,11 +40,21 @@ export const sendVendorOTP = async (req, res) => {
       await vendor.save();
     } else {
       // Create temporary vendor record for OTP (will be updated on application submission)
+      // Use unique temporary values to avoid conflicts
+      const timestamp = Date.now();
+      const emailHash = email.toLowerCase().trim().replace(/[^a-z0-9]/g, '').substring(0, 10);
+      
       vendor = new VendorModel({
         email: email.toLowerCase().trim(),
         otp: otp,
         otpExpires: otpExpires,
-        status: 'pending'
+        status: 'pending',
+        // Set unique temporary values that will be replaced on application submission
+        shopName: `temp-${emailHash}-${timestamp}`, // Unique temporary value
+        shopSlug: `temp-${emailHash}-${timestamp}`, // Unique temporary value
+        businessName: `Temp-${timestamp}`, // Temporary, will be updated
+        businessType: 'individual', // Default, will be updated
+        phone: `temp${timestamp}` // Temporary, will be updated
       });
       await vendor.save();
     }
@@ -182,6 +192,21 @@ export const applyToBecomeVendor = async (req, res) => {
       });
     }
 
+    // Validate shopName format
+    if (shopName.trim().length < 3) {
+      return res.status(400).json({
+        success: false,
+        error: 'Shop name must be at least 3 characters'
+      });
+    }
+
+    if (shopName.trim().length > 50) {
+      return res.status(400).json({
+        success: false,
+        error: 'Shop name cannot exceed 50 characters'
+      });
+    }
+
     // Check if email is verified
     const existingVendor = await VendorModel.findOne({ 
       email: email.toLowerCase().trim() 
@@ -232,7 +257,7 @@ export const applyToBecomeVendor = async (req, res) => {
 
     // Update existing vendor record (created during OTP verification) with full application data
     // Note: userId can be null for guest applications - use undefined to avoid sparse index issues
-    existingVendor.shopName = shopName.trim();
+    existingVendor.shopName = shopName.trim().toLowerCase();
     existingVendor.shopSlug = shopSlug;
     existingVendor.shopDescription = shopDescription || '';
     existingVendor.businessName = businessName.trim();
@@ -242,6 +267,14 @@ export const applyToBecomeVendor = async (req, res) => {
     existingVendor.taxId = taxId || '';
     existingVendor.registrationNumber = registrationNumber || '';
     existingVendor.status = 'pending';
+    
+    // Validate that all required fields are now present
+    if (!existingVendor.shopName || !existingVendor.businessName || !existingVendor.businessType || !existingVendor.phone) {
+      return res.status(400).json({
+        success: false,
+        error: 'All required fields must be filled: shopName, businessName, businessType, phone'
+      });
+    }
     
     // Only add userId if it exists (to avoid null in sparse index)
     if (userId) {

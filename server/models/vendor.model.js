@@ -21,9 +21,10 @@ const VendorSchema = new mongoose.Schema({
   // ========== SHOP INFORMATION ==========
   shopName: {
     type: String,
-    required: [true, 'Shop name is required'],
+    required: false, // Will be required on final application submission
     trim: true,
     unique: true,
+    sparse: true, // Allow multiple null values
     lowercase: true,
     minlength: [3, 'Shop name must be at least 3 characters'],
     maxlength: [50, 'Shop name cannot exceed 50 characters']
@@ -53,13 +54,13 @@ const VendorSchema = new mongoose.Schema({
   // ========== BUSINESS INFORMATION ==========
   businessName: {
     type: String,
-    required: [true, 'Business name is required'],
+    required: false, // Will be required on final application submission
     trim: true
   },
   businessType: {
     type: String,
     enum: ['individual', 'business', 'company'],
-    required: [true, 'Business type is required']
+    required: false // Will be required on final application submission
   },
   taxId: {
     type: String,
@@ -75,7 +76,7 @@ const VendorSchema = new mongoose.Schema({
   // ========== CONTACT INFORMATION ==========
   phone: {
     type: String,
-    required: [true, 'Phone number is required'],
+    required: false, // Will be required on final application submission
     trim: true
   },
   email: {
