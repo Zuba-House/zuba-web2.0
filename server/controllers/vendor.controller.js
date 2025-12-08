@@ -29,23 +29,26 @@ export const sendVendorOTP = async (req, res) => {
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const normalizedEmail = email.toLowerCase().trim();
 
     // Check if vendor application already exists with this email
-    let vendor = await VendorModel.findOne({ email: email.toLowerCase().trim() });
+    // Get the most recent one if multiple exist
+    let vendor = await VendorModel.findOne({ email: normalizedEmail }).sort({ createdAt: -1 });
     
     if (vendor) {
       // Update existing vendor's OTP
       vendor.otp = otp;
       vendor.otpExpires = otpExpires;
       await vendor.save();
+      console.log(`[OTP Send] Updated OTP for existing vendor: ${vendor._id}, Email: ${normalizedEmail}, OTP: ${otp}`);
     } else {
       // Create temporary vendor record for OTP (will be updated on application submission)
       // Use unique temporary values to avoid conflicts
       const timestamp = Date.now();
-      const emailHash = email.toLowerCase().trim().replace(/[^a-z0-9]/g, '').substring(0, 10);
+      const emailHash = normalizedEmail.replace(/[^a-z0-9]/g, '').substring(0, 10);
       
       vendor = new VendorModel({
-        email: email.toLowerCase().trim(),
+        email: normalizedEmail,
         otp: otp,
         otpExpires: otpExpires,
         status: 'pending',
@@ -57,6 +60,7 @@ export const sendVendorOTP = async (req, res) => {
         phone: `temp${timestamp}` // Temporary, will be updated
       });
       await vendor.save();
+      console.log(`[OTP Send] Created new vendor record: ${vendor._id}, Email: ${normalizedEmail}, OTP: ${otp}`);
     }
 
     // Send OTP email
@@ -107,19 +111,40 @@ export const verifyVendorOTP = async (req, res) => {
       });
     }
 
+    // Normalize inputs
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedOtp = otp.toString().trim();
+
+    // Find vendor by email - get the most recent one if multiple exist
     const vendor = await VendorModel.findOne({ 
-      email: email.toLowerCase().trim() 
-    });
+      email: normalizedEmail 
+    }).sort({ createdAt: -1 }); // Get most recent
 
     if (!vendor) {
+      console.log(`[OTP Verify] No vendor found for email: ${normalizedEmail}`);
       return res.status(400).json({
         success: false,
         error: 'No OTP found for this email. Please request a new OTP.'
       });
     }
 
-    // Check if OTP matches
-    if (vendor.otp !== otp) {
+    // Check if OTP exists
+    if (!vendor.otp) {
+      console.log(`[OTP Verify] No OTP stored for vendor: ${vendor._id}`);
+      return res.status(400).json({
+        success: false,
+        error: 'No OTP found. Please request a new OTP.'
+      });
+    }
+
+    // Normalize stored OTP for comparison
+    const storedOtp = vendor.otp.toString().trim();
+
+    // Debug logging (remove in production if needed)
+    console.log(`[OTP Verify] Email: ${normalizedEmail}, Received OTP: ${normalizedOtp}, Stored OTP: ${storedOtp}, Match: ${storedOtp === normalizedOtp}`);
+
+    // Check if OTP matches (string comparison)
+    if (storedOtp !== normalizedOtp) {
       return res.status(400).json({
         success: false,
         error: 'Invalid OTP. Please check and try again.'
@@ -127,7 +152,19 @@ export const verifyVendorOTP = async (req, res) => {
     }
 
     // Check if OTP is expired
-    if (!vendor.otpExpires || new Date() > vendor.otpExpires) {
+    if (!vendor.otpExpires) {
+      console.log(`[OTP Verify] No expiration date for vendor: ${vendor._id}`);
+      return res.status(400).json({
+        success: false,
+        error: 'OTP has expired. Please request a new OTP.'
+      });
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(vendor.otpExpires);
+    
+    if (now > expiresAt) {
+      console.log(`[OTP Verify] OTP expired. Now: ${now}, Expires: ${expiresAt}`);
       return res.status(400).json({
         success: false,
         error: 'OTP has expired. Please request a new OTP.'
@@ -139,6 +176,8 @@ export const verifyVendorOTP = async (req, res) => {
     vendor.otp = null; // Clear OTP after verification
     vendor.otpExpires = null;
     await vendor.save();
+
+    console.log(`[OTP Verify] Successfully verified email: ${normalizedEmail}`);
 
     return res.json({
       success: true,

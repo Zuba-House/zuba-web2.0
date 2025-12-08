@@ -160,21 +160,29 @@ const BecomeVendor = () => {
 
     setVerifyingOTP(true);
     try {
+      // Ensure OTP is a string and trimmed
+      const otpToSend = otp.toString().trim();
+      const emailToSend = formData.email.toLowerCase().trim();
+      
+      console.log('Verifying OTP:', { email: emailToSend, otp: otpToSend, otpLength: otpToSend.length });
+      
       const response = await postData('/api/vendors/verify-otp', { 
-        email: formData.email, 
-        otp: otp 
+        email: emailToSend, 
+        otp: otpToSend 
       });
       
       if (response.success) {
         toast.success('Email verified successfully!');
         setEmailVerified(true);
         setOtp('');
+        setOtpSent(false);
       } else {
         toast.error(response.error || 'Invalid OTP');
       }
     } catch (error) {
       console.error('Error verifying OTP:', error);
-      toast.error(error.response?.data?.error || 'Failed to verify OTP');
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to verify OTP';
+      toast.error(errorMessage);
     } finally {
       setVerifyingOTP(false);
     }
