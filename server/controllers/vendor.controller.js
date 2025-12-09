@@ -13,6 +13,63 @@ import generatedAccessToken from '../utils/generatedAccessToken.js';
 import genertedRefreshToken from '../utils/generatedRefreshToken.js';
 
 /**
+ * Helper function to find vendor by multiple methods
+ * Tries: userId -> user.vendorId -> user.email
+ * Also ensures vendor and user are properly linked
+ */
+const findVendorByUser = async (userId, requireApproved = true) => {
+  if (!userId) {
+    return { vendor: null, user: null, error: 'User ID is required' };
+  }
+
+  // Get user to check vendorId and email
+  const user = await UserModel.findById(userId).select('email vendorId role');
+  
+  if (!user) {
+    return { vendor: null, user: null, error: 'User not found' };
+  }
+
+  // Try multiple ways to find vendor:
+  // 1. By userId (direct link)
+  // 2. By user's vendorId (reverse link)
+  // 3. By email (for guest applications)
+  let vendor = await VendorModel.findOne({ userId });
+  
+  if (!vendor && user.vendorId) {
+    vendor = await VendorModel.findById(user.vendorId);
+  }
+  
+  if (!vendor && user.email) {
+    const query = { email: user.email.toLowerCase().trim() };
+    if (requireApproved) {
+      query.status = 'approved';
+    }
+    vendor = await VendorModel.findOne(query);
+  }
+
+  if (!vendor) {
+    return { vendor: null, user, error: 'Vendor not found' };
+  }
+
+  // Ensure vendor is linked to user if not already
+  if (!vendor.userId && userId) {
+    vendor.userId = userId;
+    await vendor.save();
+  }
+  
+  // Ensure user is linked to vendor if not already
+  if (!user.vendorId && vendor._id) {
+    user.vendorId = vendor._id;
+    if (user.role !== 'VENDOR' && vendor.status === 'approved') {
+      user.role = 'VENDOR';
+    }
+    await user.save();
+  }
+
+  return { vendor, user, error: null };
+};
+
+/**
  * Send OTP for vendor email verification
  * POST /api/vendors/send-otp
  */
@@ -501,16 +558,17 @@ export const getMyVendorApplication = async (req, res) => {
       });
     }
 
-    const vendor = await VendorModel.findOne({ userId })
-      .populate('userId', 'name email avatar')
-      .select('-bankAccount -adminNotes -emailVerificationToken');
-
-    if (!vendor) {
+    const { vendor, user, error } = await findVendorByUser(userId, false);
+    
+    if (error || !vendor) {
       return res.status(404).json({
         success: false,
-        error: 'No vendor application found'
+        error: error || 'No vendor application found'
       });
     }
+
+    // Populate userId for response
+    await vendor.populate('userId', 'name email avatar');
 
     return res.json({
       success: true,
@@ -541,13 +599,45 @@ export const completeVendorRegistration = async (req, res) => {
       });
     }
 
-    const vendor = await VendorModel.findOne({ userId });
+    // Get user to check vendorId and email
+    const user = await UserModel.findById(userId).select('email vendorId role');
+    
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Try multiple ways to find vendor
+    let vendor = await VendorModel.findOne({ userId });
+    
+    if (!vendor && user.vendorId) {
+      vendor = await VendorModel.findById(user.vendorId);
+    }
+    
+    if (!vendor && user.email) {
+      vendor = await VendorModel.findOne({ 
+        email: user.email.toLowerCase().trim(),
+        status: 'approved'
+      });
+    }
     
     if (!vendor) {
       return res.status(404).json({
         success: false,
         error: 'Vendor application not found'
       });
+    }
+
+    // Ensure vendor is linked to user if not already
+    if (!vendor.userId && userId) {
+      vendor.userId = userId;
+    }
+    
+    // Ensure user is linked to vendor if not already
+    if (!user.vendorId && vendor._id) {
+      user.vendorId = vendor._id;
     }
 
     if (vendor.status !== 'approved') {
@@ -867,12 +957,19 @@ export const getVendorDashboard = async (req, res) => {
       });
     }
 
-    const vendor = await VendorModel.findOne({ userId });
+    const { vendor, user, error } = await findVendorByUser(userId, true);
     
-    if (!vendor || vendor.status !== 'approved') {
+    if (error || !vendor) {
       return res.status(403).json({
         success: false,
-        error: 'Vendor access denied'
+        error: error || 'Vendor access denied. Please ensure your vendor account is approved and linked to your user account.'
+      });
+    }
+
+    if (vendor.status !== 'approved') {
+      return res.status(403).json({
+        success: false,
+        error: 'Vendor access denied. Your vendor account is not approved yet.'
       });
     }
 
@@ -1675,12 +1772,12 @@ export const requestWithdrawal = async (req, res) => {
       });
     }
 
-    const vendor = await VendorModel.findOne({ userId, status: 'approved' });
+    const { vendor, error } = await findVendorByUser(userId, true);
     
-    if (!vendor) {
+    if (error || !vendor) {
       return res.status(403).json({
         success: false,
-        error: 'Vendor access denied'
+        error: error || 'Vendor access denied'
       });
     }
 
@@ -1780,12 +1877,12 @@ export const getVendorProducts = async (req, res) => {
       });
     }
 
-    const vendor = await VendorModel.findOne({ userId, status: 'approved' });
+    const { vendor, error } = await findVendorByUser(userId, true);
     
-    if (!vendor) {
+    if (error || !vendor) {
       return res.status(403).json({
         success: false,
-        error: 'Vendor access denied'
+        error: error || 'Vendor access denied'
       });
     }
 
@@ -1838,12 +1935,12 @@ export const getVendorOrders = async (req, res) => {
       });
     }
 
-    const vendor = await VendorModel.findOne({ userId, status: 'approved' });
+    const { vendor, error } = await findVendorByUser(userId, true);
     
-    if (!vendor) {
+    if (error || !vendor) {
       return res.status(403).json({
         success: false,
-        error: 'Vendor access denied'
+        error: error || 'Vendor access denied'
       });
     }
 
@@ -1952,12 +2049,12 @@ export const updateProductStatus = async (req, res) => {
       });
     }
 
-    const vendor = await VendorModel.findOne({ userId, status: 'approved' });
+    const { vendor, error } = await findVendorByUser(userId, true);
     
-    if (!vendor) {
+    if (error || !vendor) {
       return res.status(403).json({
         success: false,
-        error: 'Vendor access denied'
+        error: error || 'Vendor access denied'
       });
     }
 
@@ -2029,12 +2126,12 @@ export const addTrackingNumber = async (req, res) => {
       });
     }
 
-    const vendor = await VendorModel.findOne({ userId, status: 'approved' });
+    const { vendor, error } = await findVendorByUser(userId, true);
     
-    if (!vendor) {
+    if (error || !vendor) {
       return res.status(403).json({
         success: false,
-        error: 'Vendor access denied'
+        error: error || 'Vendor access denied'
       });
     }
 
