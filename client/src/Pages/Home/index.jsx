@@ -78,13 +78,15 @@ const Home = () => {
 
 
   useEffect(() => {
-    if (context?.catData?.length !== 0) {
+    if (context?.catData?.length !== 0 && context?.catData[0]?._id) {
 
       fetchDataFromApi(`/api/product/getAllProductsByCatId/${context?.catData[0]?._id}`).then((res) => {
         if (res?.error === false) {
           setPopularProductsData(res?.products)
         }
 
+      }).catch((error) => {
+        console.error('Error fetching products by category:', error);
       })
     }
 
@@ -111,15 +113,21 @@ const Home = () => {
     for (let i = 0; i < arr.length; i++) {
       let catId = catArr[arr[i]]?._id;
 
-      fetchDataFromApi(`/api/product/getAllProductsByCatId/${catId}`).then((res) => {
-        filterData.push({
-          catName: catArr[arr[i]]?.name,
-          data: res?.products
-        })
+      // Only fetch if catId is valid
+      if (catId && catId !== 'undefined' && catId !== 'null') {
+        fetchDataFromApi(`/api/product/getAllProductsByCatId/${catId}`).then((res) => {
+          if (res?.error === false && res?.products) {
+            filterData.push({
+              catName: catArr[arr[i]]?.name,
+              data: res?.products
+            });
 
-        setRandomCatProducts(filterData)
-      })
-
+            setRandomCatProducts([...filterData]);
+          }
+        }).catch((error) => {
+          console.error(`Error fetching products for category ${catId}:`, error);
+        });
+      }
     }
 
 
@@ -131,12 +139,18 @@ const Home = () => {
   };
 
   const filterByCatId = (id) => {
+    if (!id || id === 'undefined' || id === 'null') {
+      console.error('Invalid category ID:', id);
+      return;
+    }
     setPopularProductsData([])
     fetchDataFromApi(`/api/product/getAllProductsByCatId/${id}`).then((res) => {
       if (res?.error === false) {
-        setPopularProductsData(res?.products)
+        setPopularProductsData(res?.products || [])
       }
 
+    }).catch((error) => {
+      console.error('Error fetching products by category ID:', error);
     })
   }
 

@@ -8,6 +8,7 @@ import UserModel from '../models/user.model.js';
 import ProductModel from '../models/product.model.js';
 import sendEmailFun from '../config/sendEmail.js';
 import bcryptjs from 'bcryptjs';
+import crypto from 'crypto';
 import generatedAccessToken from '../utils/generatedAccessToken.js';
 import genertedRefreshToken from '../utils/generatedRefreshToken.js';
 
@@ -57,10 +58,18 @@ export const sendVendorOTP = async (req, res) => {
       // Create a unique temporary shop name (must be at least 3 chars, lowercase, max 50)
       // Combine email hash, random suffix, and timestamp for uniqueness
       const baseName = `temp${emailHash}${randomSuffix}${timestamp}`;
-      const tempShopName = baseName.toLowerCase().substring(0, 50);
+      let tempShopName = baseName.toLowerCase().substring(0, 50);
       // Ensure it's at least 3 characters
-      const finalShopName = tempShopName.length >= 3 ? tempShopName : `${tempShopName}xx`.substring(0, 50);
-      const tempShopSlug = finalShopName; // Same as shopName for consistency
+      if (tempShopName.length < 3) {
+        tempShopName = `${tempShopName}xx`.substring(0, 50);
+      }
+      // Remove any invalid characters that might cause issues
+      tempShopName = tempShopName.replace(/[^a-z0-9]/g, '').substring(0, 50);
+      // Final check - ensure minimum length
+      if (tempShopName.length < 3) {
+        tempShopName = `temp${Date.now()}`.substring(0, 50);
+      }
+      const tempShopSlug = tempShopName; // Same as shopName for consistency
       
       try {
         vendor = new VendorModel({
@@ -69,7 +78,7 @@ export const sendVendorOTP = async (req, res) => {
           otpExpires: otpExpires,
           status: 'pending',
           // Set unique temporary values that will be replaced on application submission
-          shopName: tempShopName, // Unique temporary value (already lowercase)
+          shopName: tempShopName, // Unique temporary value (already lowercase, validated)
           shopSlug: tempShopSlug, // Unique temporary value
           businessName: `Temp-${timestamp}`, // Temporary, will be updated
           businessType: 'individual', // Default, will be updated
@@ -992,12 +1001,44 @@ export const approveVendor = async (req, res) => {
     vendor.approvedBy = adminId;
     
     // Generate secure setup token for account creation (valid for 7 days)
-    const crypto = await import('crypto');
-    const setupToken = crypto.randomBytes(32).toString('hex');
+    // Retry logic to handle potential duplicate token collisions
+    let setupToken;
+    let tokenExists = true;
+    let retries = 0;
+    const maxRetries = 5;
+    
+    while (tokenExists && retries < maxRetries) {
+      setupToken = crypto.randomBytes(32).toString('hex');
+      const existingVendor = await VendorModel.findOne({ setupToken });
+      if (!existingVendor) {
+        tokenExists = false;
+      } else {
+        retries++;
+        console.log(`[Approve Vendor] Setup token collision detected, retrying... (${retries}/${maxRetries})`);
+      }
+    }
+    
+    if (tokenExists) {
+      // Fallback: use timestamp + random to ensure uniqueness
+      setupToken = `${Date.now()}-${crypto.randomBytes(16).toString('hex')}`;
+    }
+    
     vendor.setupToken = setupToken;
     vendor.setupTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
     
-    await vendor.save();
+    try {
+      await vendor.save();
+    } catch (saveError) {
+      // If still duplicate, clear old token and retry once more
+      if (saveError.code === 11000 && saveError.keyPattern?.setupToken) {
+        console.log('[Approve Vendor] Setup token duplicate error, generating new token...');
+        vendor.setupToken = `${Date.now()}-${crypto.randomBytes(16).toString('hex')}-${vendor._id}`;
+        vendor.setupTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        await vendor.save();
+      } else {
+        throw saveError;
+      }
+    }
 
     // Send comprehensive approval email
     try {

@@ -729,57 +729,73 @@ export async function getAllProducts(request, response) {
 //get all products by category id
 export async function getAllProductsByCatId(request, response) {
     try {
+        const categoryId = request.params.id;
+
+        // Validate category ID
+        if (!categoryId || categoryId === 'undefined' || categoryId === 'null') {
+            return response.status(400).json({
+                message: "Category ID is required",
+                success: false,
+                error: true
+            });
+        }
+
+        // Validate ObjectId format if using MongoDB ObjectId
+        const mongoose = (await import('mongoose')).default;
+        if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+            return response.status(400).json({
+                message: "Invalid category ID format",
+                success: false,
+                error: true
+            });
+        }
 
         const page = parseInt(request.query.page) || 1;
         const perPage = parseInt(request.query.perPage) || 10000;
 
+        // Build query - support both single category and multiple categories
+        const query = {
+            $or: [
+                { catId: categoryId },
+                { category: categoryId },
+                { categories: { $in: [categoryId] } } // Use $in for array field
+            ]
+        };
 
-        const totalPosts = await ProductModel.countDocuments();
+        const totalPosts = await ProductModel.countDocuments(query);
         const totalPages = Math.ceil(totalPosts / perPage);
 
-        if (page > totalPages) {
-            return response.status(404).json(
-                {
-                    message: "Page not found",
-                    success: false,
-                    error: true
-                }
-            );
+        if (page > totalPages && totalPages > 0) {
+            return response.status(404).json({
+                message: "Page not found",
+                success: false,
+                error: true
+            });
         }
 
         // Support both single category and multiple categories
-        const products = await ProductModel.find({
-            $or: [
-                { catId: request.params.id },
-                { category: request.params.id },
-                { categories: request.params.id }
-            ]
-        }).populate("category").populate("categories")
+        const products = await ProductModel.find(query)
+            .populate("category")
+            .populate("categories")
             .skip((page - 1) * perPage)
             .limit(perPage)
             .exec();
 
-        if (!products) {
-            response.status(500).json({
-                error: true,
-                success: false
-            })
-        }
-
         return response.status(200).json({
             error: false,
             success: true,
-            products: products,
+            products: products || [],
             totalPages: totalPages,
             page: page,
-        })
+        });
 
     } catch (error) {
+        console.error('getAllProductsByCatId error:', error);
         return response.status(500).json({
             message: error.message || error,
             error: true,
             success: false
-        })
+        });
     }
 }
 
