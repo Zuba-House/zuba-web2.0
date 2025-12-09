@@ -1001,42 +1001,88 @@ export const approveVendor = async (req, res) => {
     vendor.approvedBy = adminId;
     
     // Generate secure setup token for account creation (valid for 7 days)
-    // Retry logic to handle potential duplicate token collisions
-    let setupToken;
-    let tokenExists = true;
-    let retries = 0;
-    const maxRetries = 5;
+    // Use vendor ID + timestamp + random bytes to ensure absolute uniqueness
+    const vendorIdStr = vendor._id.toString().replace(/[^a-zA-Z0-9]/g, '');
     
-    while (tokenExists && retries < maxRetries) {
-      setupToken = crypto.randomBytes(32).toString('hex');
+    // Clear any existing setupToken first to avoid conflicts
+    // Use updateOne to avoid validation issues
+    await VendorModel.updateOne(
+      { _id: vendor._id },
+      { $unset: { setupToken: "", setupTokenExpires: "" } }
+    );
+    
+    // Generate a unique token that includes vendor ID, timestamp, and random bytes
+    // This format ensures absolute uniqueness
+    let setupToken;
+    let tokenUnique = false;
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    while (!tokenUnique && attempts < maxAttempts) {
+      attempts++;
+      const timestamp = Date.now();
+      const randomBytes = crypto.randomBytes(32).toString('hex');
+      // Use high-resolution time for additional uniqueness
+      const hrTime = process.hrtime();
+      const nanoTime = hrTime[0] * 1000000000 + hrTime[1];
+      
+      // Create a unique token: vendorId-timestamp-nanotime-random
+      setupToken = `${vendorIdStr}-${timestamp}-${nanoTime}-${randomBytes}`;
+      
+      // Check if token already exists
       const existingVendor = await VendorModel.findOne({ setupToken });
       if (!existingVendor) {
-        tokenExists = false;
+        tokenUnique = true;
       } else {
-        retries++;
-        console.log(`[Approve Vendor] Setup token collision detected, retrying... (${retries}/${maxRetries})`);
+        console.log(`[Approve Vendor] Token collision detected (attempt ${attempts}/${maxAttempts}), generating new token...`);
+        // Small delay to ensure different timestamp
+        await new Promise(resolve => setTimeout(resolve, 10));
       }
     }
     
-    if (tokenExists) {
-      // Fallback: use timestamp + random to ensure uniqueness
-      setupToken = `${Date.now()}-${crypto.randomBytes(16).toString('hex')}`;
+    if (!tokenUnique) {
+      // Fallback: use vendor ID + UUID-like format
+      const uuid = crypto.randomBytes(16).toString('hex');
+      setupToken = `${vendorIdStr}-${Date.now()}-${uuid}`;
     }
     
+    // Set the new token
     vendor.setupToken = setupToken;
     vendor.setupTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
     
-    try {
-      await vendor.save();
-    } catch (saveError) {
-      // If still duplicate, clear old token and retry once more
-      if (saveError.code === 11000 && saveError.keyPattern?.setupToken) {
-        console.log('[Approve Vendor] Setup token duplicate error, generating new token...');
-        vendor.setupToken = `${Date.now()}-${crypto.randomBytes(16).toString('hex')}-${vendor._id}`;
-        vendor.setupTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    // Save with retry logic
+    let saved = false;
+    let saveAttempts = 0;
+    const maxSaveAttempts = 5;
+    
+    while (!saved && saveAttempts < maxSaveAttempts) {
+      try {
         await vendor.save();
-      } else {
-        throw saveError;
+        saved = true;
+        console.log(`[Approve Vendor] Successfully saved vendor ${vendor._id} with setup token`);
+      } catch (saveError) {
+        saveAttempts++;
+        
+        // If duplicate token error
+        if (saveError.code === 11000 && saveError.keyPattern?.setupToken) {
+          console.log(`[Approve Vendor] Setup token duplicate error (save attempt ${saveAttempts}/${maxSaveAttempts}), generating new token...`);
+          
+          // Generate completely new token
+          const newTimestamp = Date.now();
+          const newHrTime = process.hrtime();
+          const newNanoTime = newHrTime[0] * 1000000000 + newHrTime[1];
+          const newRandomBytes = crypto.randomBytes(32).toString('hex');
+          setupToken = `${vendorIdStr}-${newTimestamp}-${newNanoTime}-${newRandomBytes}`;
+          vendor.setupToken = setupToken;
+          
+          if (saveAttempts >= maxSaveAttempts) {
+            // Last attempt - throw error with helpful message
+            throw new Error('Failed to generate unique setup token after multiple attempts. Please try again.');
+          }
+        } else {
+          // Other errors - throw immediately
+          throw saveError;
+        }
       }
     }
 
