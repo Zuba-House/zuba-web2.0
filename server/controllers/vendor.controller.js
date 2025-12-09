@@ -1154,89 +1154,154 @@ export const approveVendor = async (req, res) => {
     vendor.approvedBy = adminId;
     
     // Generate secure setup token for account creation (valid for 7 days)
-    // Use vendor ID + timestamp + random bytes to ensure absolute uniqueness
+    // Use atomic findOneAndUpdate to avoid race conditions with unique index
     const vendorIdStr = vendor._id.toString().replace(/[^a-zA-Z0-9]/g, '');
+    const tokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
     
-    // Clear any existing setupToken first to avoid conflicts
-    // Use updateOne to avoid validation issues
+    // First, clear any existing setupToken to avoid conflicts
     await VendorModel.updateOne(
       { _id: vendor._id },
       { $unset: { setupToken: "", setupTokenExpires: "" } }
     );
     
-    // Generate a unique token that includes vendor ID, timestamp, and random bytes
-    // This format ensures absolute uniqueness
+    // Generate a unique token using atomic findOneAndUpdate
     let setupToken;
     let tokenUnique = false;
     let attempts = 0;
-    const maxAttempts = 10;
+    const maxAttempts = 20;
     
     while (!tokenUnique && attempts < maxAttempts) {
       attempts++;
+      
+      // Generate unique token with multiple entropy sources
       const timestamp = Date.now();
-      const randomBytes = crypto.randomBytes(32).toString('hex');
-      // Use high-resolution time for additional uniqueness
+      const randomBytes1 = crypto.randomBytes(32).toString('hex');
+      const randomBytes2 = crypto.randomBytes(16).toString('hex');
       const hrTime = process.hrtime();
       const nanoTime = hrTime[0] * 1000000000 + hrTime[1];
       
-      // Create a unique token: vendorId-timestamp-nanotime-random
-      setupToken = `${vendorIdStr}-${timestamp}-${nanoTime}-${randomBytes}`;
+      // Create a unique token: vendorId-timestamp-nanotime-random1-random2
+      setupToken = `${vendorIdStr}-${timestamp}-${nanoTime}-${randomBytes1}-${randomBytes2}`;
       
-      // Check if token already exists
-      const existingVendor = await VendorModel.findOne({ setupToken });
-      if (!existingVendor) {
-        tokenUnique = true;
-      } else {
-        console.log(`[Approve Vendor] Token collision detected (attempt ${attempts}/${maxAttempts}), generating new token...`);
-        // Small delay to ensure different timestamp
-        await new Promise(resolve => setTimeout(resolve, 10));
-      }
-    }
-    
-    if (!tokenUnique) {
-      // Fallback: use vendor ID + UUID-like format
-      const uuid = crypto.randomBytes(16).toString('hex');
-      setupToken = `${vendorIdStr}-${Date.now()}-${uuid}`;
-    }
-    
-    // Set the new token
-    vendor.setupToken = setupToken;
-    vendor.setupTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-    
-    // Save with retry logic
-    let saved = false;
-    let saveAttempts = 0;
-    const maxSaveAttempts = 5;
-    
-    while (!saved && saveAttempts < maxSaveAttempts) {
       try {
-        await vendor.save();
-        saved = true;
-        console.log(`[Approve Vendor] Successfully saved vendor ${vendor._id} with setup token`);
-      } catch (saveError) {
-        saveAttempts++;
-        
-        // If duplicate token error
-        if (saveError.code === 11000 && saveError.keyPattern?.setupToken) {
-          console.log(`[Approve Vendor] Setup token duplicate error (save attempt ${saveAttempts}/${maxSaveAttempts}), generating new token...`);
-          
-          // Generate completely new token
-          const newTimestamp = Date.now();
-          const newHrTime = process.hrtime();
-          const newNanoTime = newHrTime[0] * 1000000000 + newHrTime[1];
-          const newRandomBytes = crypto.randomBytes(32).toString('hex');
-          setupToken = `${vendorIdStr}-${newTimestamp}-${newNanoTime}-${newRandomBytes}`;
-          vendor.setupToken = setupToken;
-          
-          if (saveAttempts >= maxSaveAttempts) {
-            // Last attempt - throw error with helpful message
-            throw new Error('Failed to generate unique setup token after multiple attempts. Please try again.');
+        // Use findOneAndUpdate to atomically check and set the token
+        // This ensures no race condition with the unique index
+        const updatedVendor = await VendorModel.findOneAndUpdate(
+          { 
+            _id: vendor._id,
+            // Ensure we're not overwriting if token was already set
+            $or: [
+              { setupToken: { $exists: false } },
+              { setupToken: null },
+              { setupToken: "" }
+            ]
+          },
+          {
+            $set: {
+              status: 'approved',
+              approvalDate: new Date(),
+              approvedBy: adminId,
+              setupToken: setupToken,
+              setupTokenExpires: tokenExpires
+            }
+          },
+          {
+            new: true,
+            runValidators: false // Skip validation to avoid issues
           }
+        );
+        
+        if (updatedVendor && updatedVendor.setupToken === setupToken) {
+          // Successfully updated - token is unique
+          tokenUnique = true;
+          // Update the vendor object we're working with
+          Object.assign(vendor, {
+            setupToken: setupToken,
+            setupTokenExpires: tokenExpires,
+            status: 'approved',
+            approvalDate: new Date(),
+            approvedBy: adminId
+          });
+          console.log(`[Approve Vendor] Successfully generated and saved unique setup token for vendor ${vendor._id} (attempt ${attempts})`);
         } else {
-          // Other errors - throw immediately
-          throw saveError;
+          // Token might be duplicate - check if another vendor has it
+          const existingVendor = await VendorModel.findOne({ setupToken, _id: { $ne: vendor._id } });
+          if (existingVendor) {
+            console.log(`[Approve Vendor] Token collision detected (attempt ${attempts}/${maxAttempts}), generating new token...`);
+            await new Promise(resolve => setTimeout(resolve, 25)); // Small delay
+          } else {
+            // No collision, but update didn't work - try again
+            await new Promise(resolve => setTimeout(resolve, 25));
+          }
+        }
+      } catch (updateError) {
+        // If duplicate key error, try again with new token
+        if (updateError.code === 11000 && updateError.keyPattern?.setupToken) {
+          console.log(`[Approve Vendor] Duplicate token detected (attempt ${attempts}/${maxAttempts}), generating new token...`);
+          await new Promise(resolve => setTimeout(resolve, 25));
+        } else {
+          // Other error - log and try again
+          console.error(`[Approve Vendor] Error updating vendor (attempt ${attempts}):`, updateError.message);
+          await new Promise(resolve => setTimeout(resolve, 25));
         }
       }
+    }
+    
+    // If still not unique after all attempts, use a simpler but guaranteed unique format
+    if (!tokenUnique) {
+      console.log(`[Approve Vendor] Using fallback token generation after ${maxAttempts} attempts`);
+      const fallbackToken = `${vendorIdStr}-${Date.now()}-${crypto.randomBytes(48).toString('hex')}-${Math.random().toString(36).substring(2, 15)}`;
+      
+      try {
+        // Clear token again before fallback
+        await VendorModel.updateOne(
+          { _id: vendor._id },
+          { $unset: { setupToken: "", setupTokenExpires: "" } }
+        );
+        
+        const updatedVendor = await VendorModel.findOneAndUpdate(
+          { _id: vendor._id },
+          {
+            $set: {
+              status: 'approved',
+              approvalDate: new Date(),
+              approvedBy: adminId,
+              setupToken: fallbackToken,
+              setupTokenExpires: tokenExpires
+            }
+          },
+          { new: true, runValidators: false }
+        );
+        
+        if (updatedVendor && updatedVendor.setupToken) {
+          setupToken = fallbackToken;
+          Object.assign(vendor, {
+            setupToken: setupToken,
+            setupTokenExpires: tokenExpires,
+            status: 'approved',
+            approvalDate: new Date(),
+            approvedBy: adminId
+          });
+          tokenUnique = true;
+          console.log(`[Approve Vendor] Fallback token generated successfully`);
+        } else {
+          throw new Error('Failed to update vendor with fallback setup token');
+        }
+      } catch (finalError) {
+        console.error(`[Approve Vendor] Final token generation error:`, finalError);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to generate unique setup token. Please try approving the vendor again.'
+        });
+      }
+    }
+    
+    // Verify token was saved
+    if (!setupToken || !tokenUnique) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to generate setup token. Please try again.'
+      });
     }
 
     // Send comprehensive approval email
