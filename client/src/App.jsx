@@ -44,6 +44,7 @@ import VendorShopPage from "./Pages/VendorShop";
 import VendorSetupAccount from "./Pages/VendorSetupAccount";
 import VendorVerifyEmail from "./Pages/VendorVerifyEmail";
 import CompleteRegistration from "./Pages/VendorDashboard/CompleteRegistration";
+import AddProduct from "./Pages/VendorDashboard/AddProduct";
 import DeleteAccount from "./Pages/DeleteAccount";
 import TermsOfUse from "./Pages/TermsOfUse";
 import PrivacyPolicy from "./Pages/PrivacyPolicy";
@@ -702,6 +703,7 @@ function App() {
             <Route path={"/vendor/complete-registration"} exact={true} element={<CompleteRegistration />} />
             <Route path={"/vendor/dashboard"} exact={true} element={<VendorDashboard />} />
             <Route path={"/vendor/products"} exact={true} element={<VendorProducts />} />
+            <Route path={"/vendor/products/add"} exact={true} element={<AddProduct />} />
             <Route path={"/vendor/earnings"} exact={true} element={<VendorEarnings />} />
             <Route path={"/vendor/orders"} exact={true} element={<VendorOrders />} />
             <Route path={"/vendor/:shopSlug"} exact={true} element={<VendorShopPage />} />
