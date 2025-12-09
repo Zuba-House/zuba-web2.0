@@ -237,6 +237,13 @@ const VendorDashboard = () => {
               <span className="font-medium">Promotions</span>
             </button>
             <button
+              onClick={() => navigate('/vendor/orders')}
+              className="flex items-center gap-3 p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-[#efb291] hover:bg-[#efb291]/5 transition-colors"
+            >
+              <FaShoppingCart className="text-2xl text-[#efb291]" />
+              <span className="font-medium">Manage Orders</span>
+            </button>
+            <button
               onClick={() => navigate('/vendor/earnings')}
               className="flex items-center gap-3 p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-[#efb291] hover:bg-[#efb291]/5 transition-colors"
             >

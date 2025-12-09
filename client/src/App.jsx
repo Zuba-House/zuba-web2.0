@@ -39,6 +39,7 @@ import BecomeVendor from "./Pages/BecomeVendor";
 import VendorDashboard from "./Pages/VendorDashboard";
 import VendorProducts from "./Pages/VendorDashboard/Products";
 import VendorEarnings from "./Pages/VendorDashboard/Earnings";
+import VendorOrders from "./Pages/VendorDashboard/Orders";
 import VendorShopPage from "./Pages/VendorShop";
 import VendorSetupAccount from "./Pages/VendorSetupAccount";
 import VendorVerifyEmail from "./Pages/VendorVerifyEmail";
@@ -700,6 +701,7 @@ function App() {
             <Route path={"/vendor/dashboard"} exact={true} element={<VendorDashboard />} />
             <Route path={"/vendor/products"} exact={true} element={<VendorProducts />} />
             <Route path={"/vendor/earnings"} exact={true} element={<VendorEarnings />} />
+            <Route path={"/vendor/orders"} exact={true} element={<VendorOrders />} />
             <Route path={"/vendor/:shopSlug"} exact={true} element={<VendorShopPage />} />
             <Route path={"/delete-account"} exact={true} element={<DeleteAccount />} />
             <Route path={"/terms"} exact={true} element={<TermsOfUse />} />

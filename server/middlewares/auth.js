@@ -22,7 +22,13 @@ const auth = async(request, response, next) => {
             })
         }
 
-        request.userId = decode.id
+        // Get user details to include role and vendorId
+        const UserModel = (await import('../models/user.model.js')).default;
+        const user = await UserModel.findById(decode.id).select('role vendorId');
+        
+        request.userId = decode.id;
+        request.userRole = user?.role || 'USER';
+        request.vendorId = user?.vendorId || null;
         next()
 
     } catch (error) {

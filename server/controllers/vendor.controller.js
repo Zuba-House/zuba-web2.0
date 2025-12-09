@@ -884,15 +884,60 @@ export const getVendorDashboard = async (req, res) => {
       vendorId: vendor._id,
       status: 'published'
     });
-
+    
     // Get pending products count
     const pendingProductsCount = await ProductModel.countDocuments({ 
       vendorId: vendor._id,
       status: 'pending'
     });
 
+    // Get order statistics
+    const OrderModel = (await import('../models/order.model.js')).default;
+    
+    const orders = await OrderModel.find({
+      'products.vendorId': vendor._id
+    });
+
+    let totalSales = 0;
+    let totalOrders = orders.length;
+    let pendingOrders = 0;
+    let processingOrders = 0;
+    let shippedOrders = 0;
+    let completedOrders = 0;
+
+    orders.forEach(order => {
+      // Calculate sales for this vendor only
+      order.products.forEach(product => {
+        if (product.vendorId && product.vendorId.toString() === vendor._id.toString()) {
+          totalSales += (product.price * product.quantity);
+        }
+      });
+
+      // Count order statuses
+      if (order.status === 'Received' || order.order_status === 'confirm') {
+        pendingOrders++;
+      } else if (order.status === 'Processing') {
+        processingOrders++;
+      } else if (order.status === 'Shipped' || order.status === 'Out for Delivery') {
+        shippedOrders++;
+      } else if (order.status === 'Delivered') {
+        completedOrders++;
+      }
+    });
+
+    // Get recent orders (last 10)
+    const recentOrders = await OrderModel.find({
+      'products.vendorId': vendor._id
+    })
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .select('orderNumber status order_status totalAmount createdAt')
+    .lean();
+    
     // Update vendor stats
     vendor.stats.totalProducts = productsCount;
+    vendor.stats.totalSales = totalSales;
+    vendor.stats.totalOrders = totalOrders;
     await vendor.save();
 
     return res.json({
@@ -903,15 +948,26 @@ export const getVendorDashboard = async (req, res) => {
           shopName: vendor.shopName,
           status: vendor.status,
           isVerified: vendor.isVerified,
-          emailVerified: vendor.emailVerified
+          emailVerified: vendor.emailVerified,
+          logo: vendor.shopLogo,
+          banner: vendor.shopBanner
         },
         earnings: vendor.earnings,
         stats: {
           ...vendor.stats,
           totalProducts: productsCount,
           publishedProducts: publishedProductsCount,
-          pendingProducts: pendingProductsCount
-        }
+          pendingProducts: pendingProductsCount,
+          totalSales: totalSales,
+          totalOrders: totalOrders,
+          pendingOrders: pendingOrders,
+          processingOrders: processingOrders,
+          shippedOrders: shippedOrders,
+          completedOrders: completedOrders,
+          averageRating: vendor.stats?.averageRating || 0,
+          reviewCount: vendor.stats?.reviewCount || 0
+        },
+        recentOrders: recentOrders
       }
     });
 
@@ -1628,16 +1684,18 @@ export const requestWithdrawal = async (req, res) => {
       });
     }
 
-    if (!vendor.canWithdraw(amount)) {
+    // Check if vendor has sufficient balance
+    if (vendor.earnings.availableBalance < amount) {
       return res.status(400).json({
         success: false,
-        error: 'Insufficient balance or invalid amount'
+        error: 'Insufficient balance'
       });
     }
 
     // Update bank account if provided
     if (bankAccount) {
       vendor.bankAccount = { ...vendor.bankAccount, ...bankAccount };
+      await vendor.save();
     }
 
     // Check if bank account is set up
@@ -1648,9 +1706,20 @@ export const requestWithdrawal = async (req, res) => {
       });
     }
 
-    // Create withdrawal request (you may want to create a separate Withdrawal model)
-    // For now, we'll just deduct the amount and mark it as withdrawn
-    await vendor.withdraw(amount);
+    // Create withdrawal request using Withdrawal model
+    const WithdrawalModel = (await import('../models/withdrawal.model.js')).default;
+    
+    const withdrawal = await WithdrawalModel.create({
+      vendor: vendor._id,
+      amount: amount,
+      bankAccount: vendor.bankAccount,
+      status: 'pending'
+    });
+
+    // Move amount from available to pending (don't deduct yet - wait for approval)
+    vendor.earnings.availableBalance -= amount;
+    vendor.earnings.pendingBalance = (vendor.earnings.pendingBalance || 0) + amount;
+    await vendor.save();
 
     // Send notification email
     try {
@@ -1679,7 +1748,9 @@ export const requestWithdrawal = async (req, res) => {
       success: true,
       message: 'Withdrawal request submitted successfully',
       withdrawal: {
+        id: withdrawal._id,
         amount,
+        status: withdrawal.status,
         remainingBalance: vendor.earnings.availableBalance
       }
     });
@@ -1747,6 +1818,473 @@ export const getVendorProducts = async (req, res) => {
     return res.status(500).json({
       success: false,
       error: error.message || 'Failed to get vendor products'
+    });
+  }
+};
+
+/**
+ * Get vendor orders
+ * GET /api/vendors/orders
+ */
+export const getVendorOrders = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { status, page = 1, limit = 50 } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
+
+    const vendor = await VendorModel.findOne({ userId, status: 'approved' });
+    
+    if (!vendor) {
+      return res.status(403).json({
+        success: false,
+        error: 'Vendor access denied'
+      });
+    }
+
+    const OrderModel = (await import('../models/order.model.js')).default;
+    const UserModel = (await import('../models/user.model.js')).default;
+
+    // Build query
+    let query = {
+      'products.vendorId': vendor._id
+    };
+
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    // Get orders
+    const orders = await OrderModel.find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .lean();
+
+    // Process orders to show only vendor's products
+    const processedOrders = await Promise.all(orders.map(async (order) => {
+      const vendorProducts = order.products.filter(
+        p => p.vendorId && p.vendorId.toString() === vendor._id.toString()
+      );
+
+      // Calculate vendor earnings for this order
+      const vendorEarnings = vendorProducts.reduce((total, product) => {
+        return total + (product.price * product.quantity);
+      }, 0);
+
+      // Get customer info
+      let customer = null;
+      if (order.userId) {
+        const user = await UserModel.findById(order.userId).select('name email mobile').lean();
+        customer = user ? {
+          name: user.name,
+          email: user.email,
+          phone: user.mobile || 'N/A'
+        } : null;
+      } else if (order.guestCustomer) {
+        customer = {
+          name: order.guestCustomer.name,
+          email: order.guestCustomer.email,
+          phone: order.guestCustomer.phone || 'N/A'
+        };
+      }
+
+      return {
+        ...order,
+        vendorProducts: vendorProducts.map(p => ({
+          productId: p.productId,
+          name: p.productTitle,
+          quantity: p.quantity,
+          price: p.price,
+          image: p.image,
+          vendorStatus: p.vendorStatus || 'pending',
+          trackingNumber: p.trackingNumber || '',
+          shippedAt: p.shippedAt,
+          deliveredAt: p.deliveredAt
+        })),
+        vendorEarnings,
+        customer
+      };
+    }));
+
+    const total = await OrderModel.countDocuments(query);
+
+    return res.json({
+      success: true,
+      count: processedOrders.length,
+      data: processedOrders,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Get vendor orders error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get vendor orders'
+    });
+  }
+};
+
+/**
+ * Update product status in order
+ * PUT /api/vendors/orders/:orderId/products/:productId/status
+ */
+export const updateProductStatus = async (req, res) => {
+  try {
+    const { orderId, productId } = req.params;
+    const { status } = req.body;
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
+
+    const vendor = await VendorModel.findOne({ userId, status: 'approved' });
+    
+    if (!vendor) {
+      return res.status(403).json({
+        success: false,
+        error: 'Vendor access denied'
+      });
+    }
+
+    const OrderModel = (await import('../models/order.model.js')).default;
+    const order = await OrderModel.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found'
+      });
+    }
+
+    // Find the product in the order
+    const productIndex = order.products.findIndex(
+      p => p.productId.toString() === productId && 
+           p.vendorId && p.vendorId.toString() === vendor._id.toString()
+    );
+
+    if (productIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product not found in order or not owned by vendor'
+      });
+    }
+
+    // Update product status
+    order.products[productIndex].vendorStatus = status;
+    
+    if (status === 'shipped' && !order.products[productIndex].shippedAt) {
+      order.products[productIndex].shippedAt = new Date();
+    }
+    
+    if (status === 'delivered' && !order.products[productIndex].deliveredAt) {
+      order.products[productIndex].deliveredAt = new Date();
+    }
+
+    await order.save();
+
+    return res.json({
+      success: true,
+      message: 'Product status updated successfully',
+      data: order
+    });
+
+  } catch (error) {
+    console.error('Update product status error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to update product status'
+    });
+  }
+};
+
+/**
+ * Add tracking number to product
+ * PUT /api/vendors/orders/:orderId/products/:productId/tracking
+ */
+export const addTrackingNumber = async (req, res) => {
+  try {
+    const { orderId, productId } = req.params;
+    const { trackingNumber } = req.body;
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
+
+    const vendor = await VendorModel.findOne({ userId, status: 'approved' });
+    
+    if (!vendor) {
+      return res.status(403).json({
+        success: false,
+        error: 'Vendor access denied'
+      });
+    }
+
+    if (!trackingNumber) {
+      return res.status(400).json({
+        success: false,
+        error: 'Tracking number is required'
+      });
+    }
+
+    const OrderModel = (await import('../models/order.model.js')).default;
+    const order = await OrderModel.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found'
+      });
+    }
+
+    const productIndex = order.products.findIndex(
+      p => p.productId.toString() === productId && 
+           p.vendorId && p.vendorId.toString() === vendor._id.toString()
+    );
+
+    if (productIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product not found in order'
+      });
+    }
+
+    order.products[productIndex].trackingNumber = trackingNumber;
+    order.products[productIndex].vendorStatus = 'shipped';
+    order.products[productIndex].shippedAt = new Date();
+
+    await order.save();
+
+    return res.json({
+      success: true,
+      message: 'Tracking number added successfully',
+      data: order
+    });
+
+  } catch (error) {
+    console.error('Add tracking number error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to add tracking number'
+    });
+  }
+};
+
+/**
+ * Admin: Get all withdrawal requests
+ * GET /api/vendors/admin/withdrawals
+ */
+export const getAllWithdrawals = async (req, res) => {
+  try {
+    const { status, page = 1, limit = 20 } = req.query;
+    
+    const WithdrawalModel = (await import('../models/withdrawal.model.js')).default;
+    
+    let query = {};
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    const withdrawals = await WithdrawalModel.find(query)
+      .populate('vendor', 'shopName email contactPerson')
+      .populate('approvedBy', 'name email')
+      .populate('rejectedBy', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await WithdrawalModel.countDocuments(query);
+
+    return res.json({
+      success: true,
+      count: withdrawals.length,
+      data: withdrawals,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Get all withdrawals error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get withdrawals'
+    });
+  }
+};
+
+/**
+ * Admin: Approve withdrawal
+ * PUT /api/vendors/admin/withdrawals/:id/approve
+ */
+export const approveWithdrawal = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.userId;
+
+    const WithdrawalModel = (await import('../models/withdrawal.model.js')).default;
+    const withdrawal = await WithdrawalModel.findById(id).populate('vendor');
+
+    if (!withdrawal) {
+      return res.status(404).json({
+        success: false,
+        error: 'Withdrawal request not found'
+      });
+    }
+
+    if (withdrawal.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        error: 'Withdrawal request is not pending'
+      });
+    }
+
+    // Update withdrawal status
+    withdrawal.status = 'approved';
+    withdrawal.approvedAt = new Date();
+    withdrawal.approvedBy = userId;
+    await withdrawal.save();
+
+    // Update vendor earnings - move from pending to withdrawn
+    const vendor = await VendorModel.findById(withdrawal.vendor._id);
+    vendor.earnings.pendingBalance = (vendor.earnings.pendingBalance || 0) - withdrawal.amount;
+    vendor.earnings.withdrawnAmount = (vendor.earnings.withdrawnAmount || 0) + withdrawal.amount;
+    await vendor.save();
+
+    // Send email notification
+    try {
+      const user = await UserModel.findById(vendor.userId);
+      if (user && user.email) {
+        await sendEmailFun({
+          sendTo: user.email,
+          subject: 'Withdrawal Approved - Zuba House',
+          text: '',
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px;">
+              <h2>Withdrawal Approved</h2>
+              <p>Dear ${user.name},</p>
+              <p>Your withdrawal request of <strong>${withdrawal.amount.toFixed(2)} USD</strong> has been approved.</p>
+              <p>The funds will be transferred to your bank account within 3-5 business days.</p>
+              <p>Best regards,<br>Zuba House Team</p>
+            </div>
+          `
+        });
+      }
+    } catch (emailError) {
+      console.error('Error sending approval email:', emailError);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Withdrawal approved successfully',
+      data: withdrawal
+    });
+
+  } catch (error) {
+    console.error('Approve withdrawal error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to approve withdrawal'
+    });
+  }
+};
+
+/**
+ * Admin: Reject withdrawal
+ * PUT /api/vendors/admin/withdrawals/:id/reject
+ */
+export const rejectWithdrawal = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const userId = req.userId;
+
+    const WithdrawalModel = (await import('../models/withdrawal.model.js')).default;
+    const withdrawal = await WithdrawalModel.findById(id).populate('vendor');
+
+    if (!withdrawal) {
+      return res.status(404).json({
+        success: false,
+        error: 'Withdrawal request not found'
+      });
+    }
+
+    if (withdrawal.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        error: 'Withdrawal request is not pending'
+      });
+    }
+
+    // Update withdrawal status
+    withdrawal.status = 'rejected';
+    withdrawal.rejectionReason = reason || 'No reason provided';
+    withdrawal.rejectedAt = new Date();
+    withdrawal.rejectedBy = userId;
+    await withdrawal.save();
+
+    // Return amount to vendor's available balance
+    const vendor = await VendorModel.findById(withdrawal.vendor._id);
+    vendor.earnings.pendingBalance = (vendor.earnings.pendingBalance || 0) - withdrawal.amount;
+    vendor.earnings.availableBalance = (vendor.earnings.availableBalance || 0) + withdrawal.amount;
+    await vendor.save();
+
+    // Send email notification
+    try {
+      const user = await UserModel.findById(vendor.userId);
+      if (user && user.email) {
+        await sendEmailFun({
+          sendTo: user.email,
+          subject: 'Withdrawal Request Rejected - Zuba House',
+          text: '',
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px;">
+              <h2>Withdrawal Request Rejected</h2>
+              <p>Dear ${user.name},</p>
+              <p>Your withdrawal request of <strong>${withdrawal.amount.toFixed(2)} USD</strong> has been rejected.</p>
+              <p><strong>Reason:</strong> ${withdrawal.rejectionReason}</p>
+              <p>The amount has been returned to your available balance.</p>
+              <p>Best regards,<br>Zuba House Team</p>
+            </div>
+          `
+        });
+      }
+    } catch (emailError) {
+      console.error('Error sending rejection email:', emailError);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Withdrawal rejected',
+      data: withdrawal
+    });
+
+  } catch (error) {
+    console.error('Reject withdrawal error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to reject withdrawal'
     });
   }
 };

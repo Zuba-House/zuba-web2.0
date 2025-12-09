@@ -94,6 +94,24 @@ const orderSchema = new mongoose.Schema({
             vendorShopName: {
                 type: String,
                 default: ''
+            },
+            // Vendor-specific order tracking
+            vendorStatus: {
+                type: String,
+                enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+                default: 'pending'
+            },
+            trackingNumber: {
+                type: String,
+                default: ''
+            },
+            shippedAt: {
+                type: Date,
+                default: null
+            },
+            deliveredAt: {
+                type: Date,
+                default: null
             }
         }
     ],
