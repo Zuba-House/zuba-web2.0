@@ -110,7 +110,7 @@ const Login = () => {
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
   
-      postData("/api/user/login", formFields, { withCredentials: true }).then((res) => {
+      postData("/api/user/login", formFields, { withCredentials: true }).then(async (res) => {
         console.log(res)
   
         if (res?.error !== true) {
@@ -126,9 +126,10 @@ const Login = () => {
 
           context.setIsLogin(true);
           
-          // Trigger user data fetch
+          // Trigger user data fetch and wait for it to complete
+          let userData = null;
           if (context?.getUserDetails) {
-            context.getUserDetails();
+            userData = await context.getUserDetails();
           }
           
           // Merge guest cart with server cart
@@ -136,13 +137,14 @@ const Login = () => {
             context.mergeGuestCartWithServer();
           }
           
-          // Check if coming from vendor setup - redirect to vendor dashboard
-          if (location.state?.fromVendorSetup) {
+          // Check user role and redirect accordingly
+          if (userData?.role === 'VENDOR' || location.state?.fromVendorSetup) {
+            // Vendor login - redirect to vendor dashboard
             setTimeout(() => {
               history("/vendor/dashboard");
             }, 1000);
           } else {
-            // Regular login - redirect to home
+            // Regular user login - redirect to home
             history("/");
           }
         } else {
