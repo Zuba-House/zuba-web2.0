@@ -40,15 +40,23 @@ const findVendorByUser = async (userId, requireApproved = true) => {
   }
   
   if (!vendor && user.email) {
-    const query = { email: user.email.toLowerCase().trim() };
-    if (requireApproved) {
-      query.status = 'approved';
-    }
+    // Try to find vendor by email - first without status requirement
+    let query = { email: user.email.toLowerCase().trim() };
     vendor = await VendorModel.findOne(query);
+    
+    // If not found and requireApproved, try with approved status
+    if (!vendor && requireApproved) {
+      query.status = 'approved';
+      vendor = await VendorModel.findOne(query);
+    }
   }
 
   if (!vendor) {
-    return { vendor: null, user, error: 'Vendor not found' };
+    // Provide more helpful error message
+    const errorMsg = requireApproved 
+      ? 'Vendor not found or not approved. Please ensure your vendor application has been approved.'
+      : 'Vendor not found. Please submit a vendor application first.';
+    return { vendor: null, user, error: errorMsg };
   }
 
   // Ensure vendor is linked to user if not already
@@ -777,6 +785,12 @@ export const setupVendorAccount = async (req, res) => {
       // Update user
       user.vendorId = vendor._id;
       user.role = 'VENDOR';
+      if (!user.status || user.status !== 'Active') {
+        user.status = 'Active'; // Ensure user can login
+      }
+      if (!user.verify_email) {
+        user.verify_email = true; // Auto-verify vendor accounts
+      }
       await user.save();
 
       // Generate tokens
@@ -812,6 +826,7 @@ export const setupVendorAccount = async (req, res) => {
         password: hashPassword,
         name: name.trim(),
         verify_email: true, // Auto-verify since they came from approved vendor application
+        status: 'Active', // Set status to Active so vendor can login
         role: 'VENDOR',
         vendorId: vendor._id
       });

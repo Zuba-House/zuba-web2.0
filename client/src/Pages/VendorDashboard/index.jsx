@@ -47,10 +47,12 @@ const VendorDashboard = () => {
             navigate('/vendor/application-status');
             return;
           }
-          if (appResponse.vendor.status === 'approved' && !appResponse.vendor.shopLogo) {
-            navigate('/vendor/complete-registration');
-            return;
-          }
+          // Allow vendors to access dashboard even without shopLogo
+          // They can complete registration later if needed
+          // if (appResponse.vendor.status === 'approved' && !appResponse.vendor.shopLogo) {
+          //   navigate('/vendor/complete-registration');
+          //   return;
+          // }
         }
       } catch (appError) {
         // No application found, redirect to apply
