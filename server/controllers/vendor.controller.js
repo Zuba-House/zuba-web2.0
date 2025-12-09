@@ -394,8 +394,11 @@ export const applyToBecomeVendor = async (req, res) => {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
 
-    // Check if shop name is already taken
-    const shopNameExists = await VendorModel.findOne({ shopSlug });
+    // Check if shop slug is already taken by a different vendor (not the temp one we're updating)
+    const shopNameExists = await VendorModel.findOne({ 
+      shopSlug,
+      _id: { $ne: existingVendor._id } // Different from the temp vendor we found
+    });
     if (shopNameExists) {
       return res.status(400).json({
         success: false,
@@ -403,22 +406,31 @@ export const applyToBecomeVendor = async (req, res) => {
       });
     }
 
-    // For logged-in users, check if they already have an application
+    // Check if this is a completed application (not just a temp OTP record)
+    // A completed application has proper shopName (not starting with 'temp') and proper businessName
+    const isTempRecord = existingVendor.shopName && existingVendor.shopName.startsWith('temp');
+    const hasCompletedApplication = !isTempRecord && 
+                                    existingVendor.businessName && 
+                                    !existingVendor.businessName.startsWith('Temp-') &&
+                                    existingVendor.status !== 'pending';
+    
+    if (hasCompletedApplication) {
+      return res.status(400).json({
+        success: false,
+        error: `An application with this email already exists. Status: ${existingVendor.status}. Please login to check your application status.`
+      });
+    }
+
+    // For logged-in users, check if they already have a different vendor application
     if (userId) {
-      const existingVendor = await VendorModel.findOne({ userId });
-      if (existingVendor) {
+      const existingVendorByUserId = await VendorModel.findOne({ 
+        userId,
+        _id: { $ne: existingVendor._id } // Different from the one we found by email
+      });
+      if (existingVendorByUserId) {
         return res.status(400).json({
           success: false,
-          error: 'You already have a vendor application. Status: ' + existingVendor.status
-        });
-      }
-    } else {
-      // For guest applications, check if email is already used
-      const existingVendorByEmail = await VendorModel.findOne({ email: email.toLowerCase().trim() });
-      if (existingVendorByEmail) {
-        return res.status(400).json({
-          success: false,
-          error: 'An application with this email already exists. Please login to check your application status.'
+          error: 'You already have a vendor application. Status: ' + existingVendorByUserId.status
         });
       }
     }
@@ -445,11 +457,35 @@ export const applyToBecomeVendor = async (req, res) => {
     }
     
     // Only add userId if it exists (to avoid null in sparse index)
-    if (userId) {
+    // Only set userId if it's not already set or if it's different
+    if (userId && (!existingVendor.userId || existingVendor.userId.toString() !== userId.toString())) {
       existingVendor.userId = userId;
     }
 
-    await existingVendor.save();
+    // Save the updated vendor application
+    try {
+      await existingVendor.save();
+    } catch (saveError) {
+      // Handle duplicate key errors
+      if (saveError.code === 11000) {
+        const field = Object.keys(saveError.keyPattern)[0];
+        if (field === 'userId') {
+          // User already has a vendor application - find it
+          const otherVendor = await VendorModel.findOne({ userId });
+          if (otherVendor && otherVendor._id.toString() !== existingVendor._id.toString()) {
+            return res.status(400).json({
+              success: false,
+              error: 'You already have a vendor application. Status: ' + otherVendor.status
+            });
+          }
+        }
+        return res.status(400).json({
+          success: false,
+          error: `${field} is already taken.`
+        });
+      }
+      throw saveError;
+    }
     
     // Update user role if user is logged in (but keep as USER until approved)
     if (userId) {
@@ -508,12 +544,12 @@ export const applyToBecomeVendor = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Vendor application submitted successfully. Please check your email to verify your email address.',
+      message: 'Vendor application submitted successfully. Our team will review your application and get back to you soon.',
       vendor: {
-        id: vendor._id,
-        shopName: vendor.shopName,
-        status: vendor.status,
-        emailVerified: vendor.emailVerified
+        id: existingVendor._id,
+        shopName: existingVendor.shopName,
+        status: existingVendor.status,
+        emailVerified: existingVendor.emailVerified
       }
     });
 
