@@ -50,6 +50,12 @@ import { OrderFailed } from "./Pages/Orders/failed";
 import SearchPage from "./Pages/Search";
 import BlogDetail from "./Pages/BlogDetail";
 
+// Vendor Pages
+import BecomeVendor from "./Pages/BecomeVendor";
+import VendorDashboard from "./Pages/VendorDashboard";
+import VendorSetupAccount from "./Pages/VendorSetupAccount";
+import VendorShop from "./Pages/VendorShop";
+import VendorVerifyEmail from "./Pages/VendorVerifyEmail";
 
 const MyContext = createContext();
 
@@ -699,6 +705,17 @@ function App() {
             <Route path={"/address"} exact={true} element={<Address />} />
             <Route path={"/search"} exact={true} element={<SearchPage />} />
             <Route path={"/blog/:id"} exact={true} element={<BlogDetail />} />
+            
+            {/* Vendor Routes */}
+            <Route path={"/become-vendor"} exact={true} element={<BecomeVendor />} />
+            <Route path={"/sell-on-zuba"} exact={true} element={<BecomeVendor />} />
+            <Route path={"/vendor/dashboard"} exact={true} element={<VendorDashboard />} />
+            <Route path={"/vendor/dashboard/*"} element={<VendorDashboard />} />
+            <Route path={"/vendor/setup-account"} exact={true} element={<VendorSetupAccount />} />
+            <Route path={"/vendor/setup-account/:token"} exact={true} element={<VendorSetupAccount />} />
+            <Route path={"/vendor/verify-email"} exact={true} element={<VendorVerifyEmail />} />
+            <Route path={"/shop/:slug"} exact={true} element={<VendorShop />} />
+            
             {/* Catch-all route for 404 - must be last */}
             <Route path="*" element={
               <section className='w-full p-10 py-8 lg:py-20 flex items-center justify-center flex-col gap-2'>
