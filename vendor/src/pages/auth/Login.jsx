@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
-import jwt_decode from 'jwt-decode';
+import { jwtDecode } from 'jwt-decode';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -26,7 +26,7 @@ const Login = () => {
         
         // Decode token to get user role and vendorId
         try {
-          const decoded = jwt_decode(token);
+          const decoded = jwtDecode(token);
           const userRole = decoded.role || 'USER';
           const vendorId = decoded.vendorId || null;
           
