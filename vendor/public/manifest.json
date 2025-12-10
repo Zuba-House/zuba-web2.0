@@ -1,0 +1,28 @@
+{
+  "short_name": "Vendor",
+  "name": "Zuba House Vendor Panel",
+  "description": "Manage your store, products, orders, and earnings",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "type": "image/png",
+      "sizes": "32x32"
+    },
+    {
+      "src": "/logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#efb291",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary"
+}
+
