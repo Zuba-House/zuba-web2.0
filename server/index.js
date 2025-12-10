@@ -321,6 +321,7 @@ app.use("/api/banners", bannerRouter);
 
 // Vendor System Routes
 app.use("/api/vendor", vendorRouter);
+app.use("/api/vendors", vendorRouter); // Alias for plural
 app.use("/api/vendor-subscriptions", vendorSubscriptionRouter);
 app.use("/api/vendor-reviews", vendorReviewRouter);
 
