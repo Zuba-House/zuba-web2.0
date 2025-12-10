@@ -33,9 +33,6 @@ import bannerRouter from './route/banner.route.js';
 import { transporter } from './config/emailService.js';
 import analyticsRouter from './route/analytics.route.js';
 import { analyticsMiddleware } from './middlewares/analytics.js';
-import vendorRouter from './route/vendor.route.js';
-import vendorSubscriptionRouter from './route/vendorSubscription.route.js';
-import vendorReviewRouter from './route/vendorReview.route.js';
 
 // Validate environment variables at startup
 try {
@@ -318,12 +315,6 @@ app.use("/api", notificationRouter);
 app.use("/api/shipping", shippingRouter);
 app.use("/api", testRouter);
 app.use("/api/banners", bannerRouter);
-
-// Vendor System Routes
-app.use("/api/vendor", vendorRouter);
-app.use("/api/vendors", vendorRouter); // Alias for plural
-app.use("/api/vendor-subscriptions", vendorSubscriptionRouter);
-app.use("/api/vendor-reviews", vendorReviewRouter);
 
 // 404 handler (must be after all routes)
 app.use(notFoundHandler);

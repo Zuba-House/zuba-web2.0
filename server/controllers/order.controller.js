@@ -61,74 +61,6 @@ export const createOrderController = async (request, response) => {
             finalTotal
         });
 
-        // Prepare products with vendor information and calculate vendor totals
-        const productsWithVendor = await Promise.all(
-            request.body.products.map(async (product) => {
-                try {
-                    const productDoc = await ProductModel.findById(product.productId);
-                    if (productDoc && productDoc.vendorId) {
-                        return {
-                            ...product,
-                            vendorId: productDoc.vendorId,
-                            vendorShopName: productDoc.vendorShopName || ''
-                        };
-                    }
-                    return product;
-                } catch (error) {
-                    console.error('Error fetching product vendor info:', error);
-                    return product;
-                }
-            })
-        );
-
-        // Calculate vendor totals for order
-        const vendorTotals = new Map();
-        productsWithVendor.forEach((product) => {
-            if (product.vendorId) {
-                const vendorId = product.vendorId.toString();
-                const productTotal = product.subTotal || (product.price * product.quantity);
-                
-                if (!vendorTotals.has(vendorId)) {
-                    vendorTotals.set(vendorId, {
-                        vendorId: product.vendorId,
-                        vendorShopName: product.vendorShopName || '',
-                        totalAmount: 0,
-                        commission: 0,
-                        vendorEarning: 0
-                    });
-                }
-                
-                const vendorTotal = vendorTotals.get(vendorId);
-                vendorTotal.totalAmount += productTotal;
-            }
-        });
-
-        // Calculate commission and earnings for each vendor
-        const VendorModel = (await import('../models/vendor.model.js')).default;
-        for (const [vendorId, vendorTotal] of vendorTotals.entries()) {
-            try {
-                const vendor = await VendorModel.findById(vendorId);
-                if (vendor && vendor.status === 'approved') {
-                    // Commission rate is stored as 0-100 (percentage) OR 0-1 (legacy)
-                    // Convert to decimal: if > 1, assume it's a percentage (12 = 12%)
-                    let rawRate = vendor.commissionRate ?? 12;
-                    const commissionRate = rawRate > 1 ? rawRate / 100 : rawRate;
-                    const commissionType = vendor.commissionType || 'percentage';
-                    
-                    if (commissionType === 'percentage') {
-                        vendorTotal.commission = vendorTotal.totalAmount * commissionRate;
-                        vendorTotal.vendorEarning = vendorTotal.totalAmount * (1 - commissionRate);
-                    } else {
-                        // Fixed commission (simplified)
-                        vendorTotal.commission = rawRate;
-                        vendorTotal.vendorEarning = Math.max(0, vendorTotal.totalAmount - rawRate);
-                    }
-                }
-            } catch (error) {
-                console.error('Error calculating vendor commission:', error);
-            }
-        }
-
         // Update address with phone number if provided
         if (request.body.phone && request.body.delivery_address) {
             try {
@@ -168,7 +100,7 @@ export const createOrderController = async (request, response) => {
 
         let order = new OrderModel({
             userId: request.body.userId || null,
-            products: productsWithVendor,
+            products: request.body.products,
             paymentId: request.body.paymentId,
             payment_status: request.body.payment_status,
             delivery_address: request.body.delivery_address,
@@ -187,8 +119,6 @@ export const createOrderController = async (request, response) => {
             guestCustomer: request.body.guestCustomer || null,
             // Discount information
             discounts: request.body.discounts || null,
-            // Vendor information
-            vendors: Array.from(vendorTotals.values()),
             // Status tracking
             status: 'Received',
             statusHistory: [{
@@ -289,47 +219,6 @@ export const createOrderController = async (request, response) => {
                 
                 // Save product with updated stock
                 await product.save();
-                
-                // ========================================
-                // UPDATE VENDOR EARNINGS
-                // ========================================
-                if (product.vendorId && shouldAffectInventory) {
-                    try {
-                        const VendorModel = (await import('../models/vendor.model.js')).default;
-                        const vendor = await VendorModel.findById(product.vendorId);
-                        
-                        if (vendor && vendor.status === 'approved') {
-                            // Calculate vendor earnings (product price - commission)
-                            const productTotal = orderProduct.subTotal || (orderProduct.price * orderProduct.quantity);
-                            // Commission rate is stored as 0-100 (percentage) OR 0-1 (legacy)
-                            // Convert to decimal: if > 1, assume it's a percentage (12 = 12%)
-                            let rawRate = vendor.commissionRate ?? 12;
-                            const commissionRate = rawRate > 1 ? rawRate / 100 : rawRate;
-                            const commissionType = vendor.commissionType || 'percentage';
-                            
-                            let vendorEarning = 0;
-                            if (commissionType === 'percentage') {
-                                vendorEarning = productTotal * (1 - commissionRate);
-                            } else {
-                                // Fixed commission
-                                vendorEarning = Math.max(0, productTotal - rawRate);
-                            }
-                            
-                            // Add to vendor earnings (pending until order is completed)
-                            await vendor.addEarnings(vendorEarning);
-                            
-                            // Update vendor stats
-                            vendor.stats.totalSales = (vendor.stats.totalSales || 0) + orderProduct.quantity;
-                            vendor.stats.totalOrders = (vendor.stats.totalOrders || 0) + 1;
-                            await vendor.save();
-                            
-                            console.log(`✅ Vendor earnings updated: ${vendor.shopName}, Amount: ${vendorEarning.toFixed(2)}`);
-                        }
-                    } catch (vendorError) {
-                        console.error('Error updating vendor earnings:', vendorError);
-                        // Don't fail order creation if vendor earnings update fails
-                    }
-                }
             }
         }
 

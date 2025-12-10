@@ -549,56 +549,8 @@ export async function createProduct(request, response) {
             });
         }
 
-        // Assign vendor if user is a vendor
-        if (request.userId) {
-            try {
-                const UserModel = (await import('../models/user.model.js')).default;
-                const VendorModel = (await import('../models/vendor.model.js')).default;
-                
-                const user = await UserModel.findById(request.userId);
-                if (user && (user.role === 'VENDOR' || user.vendorId)) {
-                    const vendor = await VendorModel.findOne({ 
-                        userId: request.userId,
-                        status: 'approved'
-                    });
-                    
-                    if (vendor) {
-                        productData.vendorId = vendor._id;
-                        productData.vendorShopName = vendor.shopName;
-                        
-                        // Also update seller schema for backward compatibility
-                        if (!productData.seller || !productData.seller.sellerId) {
-                            productData.seller = {
-                                sellerId: vendor.userId,
-                                sellerName: vendor.shopName,
-                                sellerRating: vendor.stats?.averageRating || 0,
-                                commissionRate: vendor.commissionRate || 0.12,
-                                commissionType: vendor.commissionType || 'percentage'
-                            };
-                        }
-                    }
-                }
-            } catch (vendorError) {
-                console.error('Error assigning vendor to product:', vendorError);
-                // Don't fail product creation if vendor assignment fails
-            }
-        }
-
         let product = new ProductModel(productData);
         product = await product.save();
-        
-        // Update vendor stats after product creation
-        if (product.vendorId) {
-            try {
-                const VendorModel = (await import('../models/vendor.model.js')).default;
-                await VendorModel.findByIdAndUpdate(product.vendorId, {
-                    $inc: { 'stats.totalProducts': 1 }
-                });
-            } catch (statsError) {
-                console.error('Error updating vendor stats:', statsError);
-                // Don't fail if stats update fails
-            }
-        }
 
         console.log('Product created with images:', product.images?.length || 0, 'images');
 
@@ -635,57 +587,10 @@ export async function createProduct(request, response) {
 //get all products
 export async function getAllProducts(request, response) {
     try {
-        const { page = 1, limit = 50, vendor, vendorSlug, status } = request.query;
+        const { page = 1, limit = 50, status } = request.query;
         
         // Build query filters
         const query = {};
-        
-        // Filter by vendor (by vendorId or shopSlug)
-        if (vendor) {
-            // If vendor is an ObjectId, use vendorId
-            if (vendor.match(/^[0-9a-fA-F]{24}$/)) {
-                query.vendorId = vendor;
-            } else {
-                // Otherwise treat as shopSlug
-                const VendorModel = (await import('../models/vendor.model.js')).default;
-                const vendorDoc = await VendorModel.findOne({ shopSlug: vendor, status: 'approved' });
-                if (vendorDoc) {
-                    query.vendorId = vendorDoc._id;
-                } else {
-                    // Vendor not found, return empty
-                    return response.status(200).json({
-                        error: false,
-                        success: true,
-                        products: [],
-                        total: 0,
-                        page: parseInt(page),
-                        totalPages: 0,
-                        totalCount: 0,
-                        totalProducts: []
-                    });
-                }
-            }
-        }
-        
-        // Filter by vendor shop slug
-        if (vendorSlug) {
-            const VendorModel = (await import('../models/vendor.model.js')).default;
-            const vendorDoc = await VendorModel.findOne({ shopSlug: vendorSlug, status: 'approved' });
-            if (vendorDoc) {
-                query.vendorId = vendorDoc._id;
-            } else {
-                return response.status(200).json({
-                    error: false,
-                    success: true,
-                    products: [],
-                    total: 0,
-                    page: parseInt(page),
-                    totalPages: 0,
-                    totalCount: 0,
-                    totalProducts: []
-                });
-            }
-        }
         
         // Filter by status (default to published for public, allow all for admin)
         if (status) {
@@ -697,7 +602,6 @@ export async function getAllProducts(request, response) {
 
         const totalProducts = await ProductModel.find(query);
         const products = await ProductModel.find(query)
-            .populate('vendorId', 'shopName shopSlug shopLogo isVerified')
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
             .limit(parseInt(limit));
