@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BrowserRouter, Route, Routes, Link, useLocation } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Link } from "react-router-dom";
 import Button from "@mui/material/Button";
 import emailjs from '@emailjs/browser';
 import "./App.css";
@@ -35,16 +35,6 @@ import Sitemap from "./Pages/Sitemap";
 import HowToOrder from "./Pages/HowToOrder";
 import HowToTrack from "./Pages/HowToTrack";
 import PartnerWithUs from "./Pages/PartnerWithUs";
-import BecomeVendor from "./Pages/BecomeVendor";
-import VendorDashboard from "./Pages/VendorDashboard";
-import VendorProducts from "./Pages/VendorDashboard/Products";
-import VendorEarnings from "./Pages/VendorDashboard/Earnings";
-import VendorOrders from "./Pages/VendorDashboard/Orders";
-import VendorShopPage from "./Pages/VendorShop";
-import VendorSetupAccount from "./Pages/VendorSetupAccount";
-import VendorVerifyEmail from "./Pages/VendorVerifyEmail";
-import CompleteRegistration from "./Pages/VendorDashboard/CompleteRegistration";
-import AddProduct from "./Pages/VendorDashboard/AddProduct";
 import DeleteAccount from "./Pages/DeleteAccount";
 import TermsOfUse from "./Pages/TermsOfUse";
 import PrivacyPolicy from "./Pages/PrivacyPolicy";
@@ -59,7 +49,6 @@ import { OrderSuccess } from "./Pages/Orders/success";
 import { OrderFailed } from "./Pages/Orders/failed";
 import SearchPage from "./Pages/Search";
 import BlogDetail from "./Pages/BlogDetail";
-import ScrollToTop from "./components/ScrollToTop";
 
 
 const MyContext = createContext();
@@ -520,35 +509,37 @@ function App() {
     }
 
     const data = {
-      productTitle: product?.name || product?.productTitle,
+      productTitle: product?.name,
       image: product?.image,
       rating: product?.rating,
       price: product?.price,
       oldPrice: product?.oldPrice,
       discount: product?.discount,
       quantity: quantity,
-      subTotal: parseFloat(product?.price || 0) * quantity,
-      productId: product?.productId || product?._id,
+      subTotal: parseInt(product?.price * quantity),
+      productId: product?._id,
       countInStock: product?.countInStock,
       brand: product?.brand,
-      // Old fields (backward compatibility)
       size: product?.size,
       weight: product?.weight,
-      ram: product?.ram,
-      // NEW: Variation fields for variable products
-      productType: product?.productType || 'simple',
-      variationId: product?.variationId || null,
-      variation: product?.variation || null
+      ram: product?.ram
     }
+
 
     postData("/api/cart/add", data).then((res) => {
       if (res?.error === false) {
         alertBox("success", res?.message);
+
         getCartItems();
+
+
       } else {
         alertBox("error", res?.message);
       }
+
     })
+
+
   }
 
 
@@ -649,7 +640,6 @@ function App() {
     <>
       <BrowserRouter>
         <MyContext.Provider value={values}>
-          <ScrollToTop />
           <Header />
           <Routes>
             <Route path={"/"} exact={true} element={<Home />} />
@@ -697,16 +687,6 @@ function App() {
             <Route path={"/how-to-order"} exact={true} element={<HowToOrder />} />
             <Route path={"/how-to-track"} exact={true} element={<HowToTrack />} />
             <Route path={"/partner-with-us"} exact={true} element={<PartnerWithUs />} />
-            <Route path={"/become-vendor"} exact={true} element={<BecomeVendor />} />
-            <Route path={"/vendor/verify-email"} exact={true} element={<VendorVerifyEmail />} />
-            <Route path={"/vendor/setup-account"} exact={true} element={<VendorSetupAccount />} />
-            <Route path={"/vendor/complete-registration"} exact={true} element={<CompleteRegistration />} />
-            <Route path={"/vendor/dashboard"} exact={true} element={<VendorDashboard />} />
-            <Route path={"/vendor/products"} exact={true} element={<VendorProducts />} />
-            <Route path={"/vendor/products/add"} exact={true} element={<AddProduct />} />
-            <Route path={"/vendor/earnings"} exact={true} element={<VendorEarnings />} />
-            <Route path={"/vendor/orders"} exact={true} element={<VendorOrders />} />
-            <Route path={"/vendor/:shopSlug"} exact={true} element={<VendorShopPage />} />
             <Route path={"/delete-account"} exact={true} element={<DeleteAccount />} />
             <Route path={"/terms"} exact={true} element={<TermsOfUse />} />
             <Route path={"/terms-of-use"} exact={true} element={<TermsOfUse />} />

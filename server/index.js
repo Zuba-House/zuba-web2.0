@@ -30,13 +30,12 @@ import notificationRouter from './route/notification.route.js';
 import shippingRouter from './route/shipping.route.js';
 import testRouter from './route/test.route.js';
 import bannerRouter from './route/banner.route.js';
-import couponRouter from './route/coupon.route.js';
-import giftCardRouter from './route/giftCard.route.js';
-import discountRouter from './route/discount.route.js';
-import vendorRouter from './route/vendor.route.js';
 import { transporter } from './config/emailService.js';
 import analyticsRouter from './route/analytics.route.js';
 import { analyticsMiddleware } from './middlewares/analytics.js';
+import vendorRouter from './route/vendor.route.js';
+import vendorSubscriptionRouter from './route/vendorSubscription.route.js';
+import vendorReviewRouter from './route/vendorReview.route.js';
 
 // Validate environment variables at startup
 try {
@@ -319,10 +318,11 @@ app.use("/api", notificationRouter);
 app.use("/api/shipping", shippingRouter);
 app.use("/api", testRouter);
 app.use("/api/banners", bannerRouter);
-app.use("/api/coupons", couponRouter);
-app.use("/api/gift-cards", giftCardRouter);
-app.use("/api/discounts", discountRouter);
-app.use("/api/vendors", vendorRouter);
+
+// Vendor System Routes
+app.use("/api/vendor", vendorRouter);
+app.use("/api/vendor-subscriptions", vendorSubscriptionRouter);
+app.use("/api/vendor-reviews", vendorReviewRouter);
 
 // 404 handler (must be after all routes)
 app.use(notFoundHandler);
