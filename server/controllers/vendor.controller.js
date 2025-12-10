@@ -73,6 +73,29 @@ export const applyToBecomeVendor = async (req, res) => {
       }
       // Update user role to VENDOR (will be linked after vendor creation)
       user.role = 'VENDOR';
+      
+      // Send OTP if email not verified
+      if (!user.verify_email) {
+        const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+        user.otp = verifyCode;
+        user.otpExpires = Date.now() + 600000;
+        await user.save();
+
+        // Send OTP email
+        console.log('📧 Sending vendor registration OTP email to:', email);
+        const emailSent = await sendEmailFun({
+          sendTo: email,
+          subject: "Verify Your Email - Zuba House Vendor Registration",
+          text: "",
+          html: VerificationEmail(user.name, verifyCode)
+        });
+
+        if (emailSent) {
+          console.log('✅ Vendor OTP email sent successfully to:', email);
+        } else {
+          console.error('❌ Failed to send vendor OTP email to:', email);
+        }
+      }
     } else {
       // Create new user account
       if (!password || password.length < 6) {
@@ -121,23 +144,6 @@ export const applyToBecomeVendor = async (req, res) => {
         console.log('✅ Vendor OTP email sent successfully to:', email);
       } else {
         console.error('❌ Failed to send vendor OTP email to:', email);
-      }
-    } else {
-      // User exists but no vendor account - send OTP if email not verified
-      if (!user.verify_email) {
-        const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
-        user.otp = verifyCode;
-        user.otpExpires = Date.now() + 600000;
-        await user.save();
-
-        // Send OTP email
-        console.log('📧 Sending vendor registration OTP email to:', email);
-        await sendEmailFun({
-          sendTo: email,
-          subject: "Verify Your Email - Zuba House Vendor Registration",
-          text: "",
-          html: VerificationEmail(user.name, verifyCode)
-        });
       }
     }
 
