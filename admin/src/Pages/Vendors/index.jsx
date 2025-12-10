@@ -84,15 +84,35 @@ export const Vendors = () => {
         if (searchQuery) queryParams.append('search', searchQuery);
 
         fetchDataFromApi(`/api/admin/vendors?${queryParams}`).then((res) => {
-            if (res?.error === false) {
-                setVendorData(res.data);
-                setVendorTotalData(res.data);
+            if (res?.error === false && res?.data) {
+                // Ensure vendors array exists and has safe defaults
+                const safeData = {
+                    ...res.data,
+                    vendors: (res.data.vendors || []).map(vendor => ({
+                        ...vendor,
+                        storeName: vendor?.storeName || 'N/A',
+                        storeSlug: vendor?.storeSlug || '',
+                        email: vendor?.email || '',
+                        status: vendor?.status || 'PENDING',
+                        availableBalance: vendor?.availableBalance || 0,
+                        createdAt: vendor?.createdAt || new Date(),
+                        ownerUser: vendor?.ownerUser || { name: 'N/A' }
+                    }))
+                };
+                setVendorData(safeData);
+                setVendorTotalData(safeData);
             } else {
+                // Set empty data structure to prevent crashes
+                setVendorData({ vendors: [], total: 0, page: 1, pages: 0 });
+                setVendorTotalData({ vendors: [], total: 0, page: 1, pages: 0 });
                 toast.error(res?.message || 'Failed to fetch vendors');
             }
             setIsLoading(false);
         }).catch((error) => {
             console.error('Error fetching vendors:', error);
+            // Set empty data structure to prevent crashes
+            setVendorData({ vendors: [], total: 0, page: 1, pages: 0 });
+            setVendorTotalData({ vendors: [], total: 0, page: 1, pages: 0 });
             toast.error('Failed to fetch vendors');
             setIsLoading(false);
         });
@@ -150,8 +170,9 @@ export const Vendors = () => {
     };
 
     const openStatusModal = (vendor) => {
+        if (!vendor) return;
         setSelectedVendor(vendor);
-        setNewStatus(vendor.status);
+        setNewStatus(vendor?.status || 'PENDING');
         setShowStatusModal(true);
     };
 
@@ -214,36 +235,36 @@ export const Vendors = () => {
                                                 <div className="flex items-center gap-2">
                                                     <MdStore className="text-[#efb291]" />
                                                     <div>
-                                                        <div className="font-medium">{vendor.storeName}</div>
-                                                        <div className="text-xs text-gray-500">/{vendor.storeSlug}</div>
+                                                        <div className="font-medium">{vendor?.storeName || 'N/A'}</div>
+                                                        <div className="text-xs text-gray-500">/{vendor?.storeSlug || 'N/A'}</div>
                                                     </div>
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                {vendor.ownerUser?.name || 'N/A'}
+                                                {vendor?.ownerUser?.name || 'N/A'}
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-1">
                                                     <MdEmail className="text-gray-400" />
-                                                    <span className="text-sm">{vendor.email}</span>
+                                                    <span className="text-sm">{vendor?.email || 'N/A'}</span>
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(vendor.status)}`}>
-                                                    {getStatusIcon(vendor.status)}
-                                                    {vendor.status}
+                                                <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(vendor?.status || 'PENDING')}`}>
+                                                    {getStatusIcon(vendor?.status || 'PENDING')}
+                                                    {vendor?.status || 'PENDING'}
                                                 </div>
                                             </TableCell>
                                             <TableCell>
                                                 <div className="text-sm">
-                                                    <div className="font-medium">${(vendor.availableBalance || 0).toFixed(2)}</div>
+                                                    <div className="font-medium">${((vendor?.availableBalance || 0)).toFixed(2)}</div>
                                                     <div className="text-xs text-gray-500">Available</div>
                                                 </div>
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-1 text-sm text-gray-600">
                                                     <MdCalendarToday className="text-gray-400" />
-                                                    {new Date(vendor.createdAt).toLocaleDateString()}
+                                                    {vendor?.createdAt ? new Date(vendor.createdAt).toLocaleDateString() : 'N/A'}
                                                 </div>
                                             </TableCell>
                                             <TableCell>
@@ -251,17 +272,17 @@ export const Vendors = () => {
                                                     <Button
                                                         size="small"
                                                         variant="outlined"
-                                                        color={vendor.status === 'APPROVED' ? 'success' : 'primary'}
+                                                        color={(vendor?.status || 'PENDING') === 'APPROVED' ? 'success' : 'primary'}
                                                         onClick={() => openStatusModal(vendor)}
                                                         className="!text-xs"
                                                     >
-                                                        {vendor.status === 'APPROVED' ? 'Change Status' : 'Approve'}
+                                                        {(vendor?.status || 'PENDING') === 'APPROVED' ? 'Change Status' : 'Approve'}
                                                     </Button>
                                                     <Button
                                                         size="small"
                                                         variant="outlined"
                                                         color="error"
-                                                        onClick={() => handleDelete(vendor._id)}
+                                                        onClick={() => handleDelete(vendor?._id)}
                                                         className="!text-xs"
                                                     >
                                                         Delete
@@ -301,7 +322,7 @@ export const Vendors = () => {
                     <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
                         <h2 className="text-xl font-bold mb-4">Change Vendor Status</h2>
                         <p className="text-gray-600 mb-4">
-                            Store: <strong>{selectedVendor.storeName}</strong>
+                            Store: <strong>{selectedVendor?.storeName || 'N/A'}</strong>
                         </p>
                         <div className="mb-4">
                             <label className="block mb-2 font-medium">New Status</label>
@@ -329,7 +350,7 @@ export const Vendors = () => {
                             <Button
                                 variant="contained"
                                 style={{ backgroundColor: '#efb291' }}
-                                onClick={() => handleStatusChange(selectedVendor._id, newStatus)}
+                                onClick={() => handleStatusChange(selectedVendor?._id, newStatus)}
                             >
                                 Update Status
                             </Button>
