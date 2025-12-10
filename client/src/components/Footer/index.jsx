@@ -188,21 +188,25 @@ const Footer = () => {
               
               {/* Start Selling Button */}
               <div className="mb-5">
-                <Link 
-                  to="/become-vendor"
+                <a 
+                  href={process.env.REACT_APP_VENDOR_URL || "https://vendor.zubahouse.com/register"}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                   className="inline-block bg-[#efb291] text-[#0b2735] px-6 py-3 rounded-lg font-[600] transition-all hover:bg-[#e5a67d] hover:shadow-lg"
                 >
                   Start Selling to Millions
-                </Link>
+                </a>
                 <div className="mt-3">
-                  <Link
-                    to="/login"
+                  <a
+                    href={process.env.REACT_APP_VENDOR_URL || "https://vendor.zubahouse.com/login"}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                     className="text-[#e5e2db] hover:text-[#efb291] text-sm font-medium transition-colors"
                   >
                     Seller Login →
-                  </Link>
+                  </a>
                 </div>
               </div>
 
