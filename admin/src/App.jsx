@@ -34,7 +34,7 @@ import ManageLogo from "./Pages/ManageLogo";
 import LoadingBar from "react-top-loading-bar";
 import NotFound from "./Pages/NotFound";
 import Analytics from "./Pages/Analytics";
-import Vendors from "./Pages/Vendors";
+import { Vendors } from "./Pages/Vendors";
 import { VendorDetails } from "./Pages/Vendors/vendorDetails";
 
 import { useParams } from 'react-router-dom';
