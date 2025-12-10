@@ -320,6 +320,10 @@ app.use("/api/banners", bannerRouter);
 import vendorRouter from './route/vendor.route.js';
 app.use("/api/vendor", vendorRouter);
 
+// Admin Vendor routes
+import adminVendorRouter from './route/adminVendor.route.js';
+app.use("/api/admin/vendors", adminVendorRouter);
+
 // 404 handler (must be after all routes)
 app.use(notFoundHandler);
 

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { RxDashboard } from "react-icons/rx";
 import { FaRegImage } from "react-icons/fa";
 import { FiUsers } from "react-icons/fi";
+import { MdStore } from "react-icons/md";
 import { RiProductHuntLine } from "react-icons/ri";
 import { TbCategory } from "react-icons/tb";
 import { IoBagCheckOutline } from "react-icons/io5";
@@ -246,6 +247,19 @@ const Sidebar = () => {
             >
               <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]">
                 <FiUsers className="text-[18px] text-[#efb291]" /> <span>Users</span>
+              </Button>
+            </Link>
+          </li>
+
+          <li>
+            <Link to="/vendors"
+              onClick={() => {
+                context?.windowWidth < 992 && context?.setisSidebarOpen(false)
+                setSubmenuIndex(null)
+              }}
+            >
+              <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]">
+                <MdStore className="text-[18px] text-[#efb291]" /> <span>Vendors</span>
               </Button>
             </Link>
           </li>

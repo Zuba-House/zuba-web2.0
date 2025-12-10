@@ -14,6 +14,8 @@ const router = Router();
 // ========== PUBLIC ROUTES (No auth required) ==========
 // Vendor application endpoint - anyone can apply
 router.post('/apply', vendorController.applyToBecomeVendor);
+router.post('/verify-email', vendorController.verifyVendorEmail); // Verify email with OTP
+router.post('/resend-otp', vendorController.resendVendorOTP); // Resend OTP
 router.get('/application-status/:email', vendorController.getApplicationStatus);
 
 // ========== PROTECTED ROUTES (Require auth + vendor role) ==========

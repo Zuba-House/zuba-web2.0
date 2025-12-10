@@ -14,6 +14,7 @@ import HomeSliderBanners from "./Pages/HomeSliderBanners";
 import CategoryList from "./Pages/Categegory";
 import SubCategoryList from "./Pages/Categegory/subCatList";
 import Users from "./Pages/Users";
+import Vendors from "./Pages/Vendors";
 import Orders from "./Pages/Orders";
 import ForgotPassword from "./Pages/ForgotPassword";
 import VerifyAccount from "./Pages/VerifyAccount";
@@ -301,6 +302,31 @@ function App() {
                 style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
               >
                 <Users />
+              </div>
+            </div>
+          </section>
+        </>
+      ),
+    },
+    {
+      path: "/vendors",
+      exact: true,
+      element: (
+        <>
+          <section className="main">
+            <Header />
+            <div className="contentMain flex">
+              <div
+                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
+                  } transition-all`}
+              >
+                <Sidebar />
+              </div>
+              <div
+                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
+                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
+              >
+                <Vendors />
               </div>
             </div>
           </section>

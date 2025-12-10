@@ -1,6 +1,8 @@
 import VendorModel from '../models/vendor.model.js';
 import UserModel from '../models/user.model.js';
 import bcryptjs from 'bcryptjs';
+import sendEmailFun from '../config/sendEmail.js';
+import VerificationEmail from '../utils/verifyEmailTemplate.js';
 
 /**
  * POST /api/vendor/apply
@@ -92,14 +94,51 @@ export const applyToBecomeVendor = async (req, res) => {
       const salt = await bcryptjs.genSalt(10);
       const hashedPassword = await bcryptjs.hash(password, salt);
 
+      // Generate OTP for email verification
+      const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+
       user = await UserModel.create({
         name,
         email: email.toLowerCase().trim(),
         password: hashedPassword,
         role: 'VENDOR',
         status: 'Active',
-        verify_email: false
+        verify_email: false,
+        otp: verifyCode,
+        otpExpires: Date.now() + 600000 // 10 minutes
       });
+
+      // Send OTP email
+      console.log('📧 Sending vendor registration OTP email to:', email);
+      const emailSent = await sendEmailFun({
+        sendTo: email,
+        subject: "Verify Your Email - Zuba House Vendor Registration",
+        text: "",
+        html: VerificationEmail(name, verifyCode)
+      });
+
+      if (emailSent) {
+        console.log('✅ Vendor OTP email sent successfully to:', email);
+      } else {
+        console.error('❌ Failed to send vendor OTP email to:', email);
+      }
+    } else {
+      // User exists but no vendor account - send OTP if email not verified
+      if (!user.verify_email) {
+        const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+        user.otp = verifyCode;
+        user.otpExpires = Date.now() + 600000;
+        await user.save();
+
+        // Send OTP email
+        console.log('📧 Sending vendor registration OTP email to:', email);
+        await sendEmailFun({
+          sendTo: email,
+          subject: "Verify Your Email - Zuba House Vendor Registration",
+          text: "",
+          html: VerificationEmail(user.name, verifyCode)
+        });
+      }
     }
 
     // Create vendor profile
@@ -126,17 +165,20 @@ export const applyToBecomeVendor = async (req, res) => {
     await user.save();
 
     // TODO: Send email notification to admin for approval
-    // TODO: Send confirmation email to vendor
 
     return res.status(201).json({
       error: false,
       success: true,
-      message: 'Vendor application submitted successfully! Your application is under review.',
+      message: user.verify_email 
+        ? 'Vendor application submitted successfully! Your application is under review.'
+        : 'Please verify your email to complete registration. Check your inbox for the OTP code.',
       data: {
         vendorId: vendor._id,
         storeName: vendor.storeName,
         storeSlug: vendor.storeSlug,
-        status: vendor.status
+        status: vendor.status,
+        emailVerified: user.verify_email,
+        requiresEmailVerification: !user.verify_email
       }
     });
   } catch (error) {
@@ -145,6 +187,150 @@ export const applyToBecomeVendor = async (req, res) => {
       error: true,
       success: false,
       message: error.message || 'Failed to submit vendor application'
+    });
+  }
+};
+
+/**
+ * POST /api/vendor/verify-email
+ * Public endpoint - Verify vendor email with OTP
+ */
+export const verifyVendorEmail = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Email and OTP are required'
+      });
+    }
+
+    const user = await UserModel.findOne({ email: email.toLowerCase().trim() });
+
+    if (!user) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (!user.vendor && !user.vendorId) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'No vendor application found for this email'
+      });
+    }
+
+    const isCodeValid = user.otp === otp;
+    const isNotExpired = user.otpExpires && user.otpExpires > Date.now();
+
+    if (isCodeValid && isNotExpired) {
+      user.verify_email = true;
+      user.otp = null;
+      user.otpExpires = null;
+      await user.save();
+
+      return res.status(200).json({
+        error: false,
+        success: true,
+        message: 'Email verified successfully! Your vendor application is under review.'
+      });
+    } else if (!isCodeValid) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Invalid OTP code'
+      });
+    } else {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'OTP expired. Please request a new code.'
+      });
+    }
+  } catch (error) {
+    console.error('Verify vendor email error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Failed to verify email'
+    });
+  }
+};
+
+/**
+ * POST /api/vendor/resend-otp
+ * Public endpoint - Resend OTP for vendor email verification
+ */
+export const resendVendorOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    const user = await UserModel.findOne({ email: email.toLowerCase().trim() });
+
+    if (!user) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (user.verify_email) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Email is already verified'
+      });
+    }
+
+    // Generate new OTP
+    const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.otp = verifyCode;
+    user.otpExpires = Date.now() + 600000; // 10 minutes
+    await user.save();
+
+    // Send OTP email
+    console.log('📧 Resending vendor OTP email to:', email);
+    const emailSent = await sendEmailFun({
+      sendTo: email,
+      subject: "Verify Your Email - Zuba House Vendor Registration",
+      text: "",
+      html: VerificationEmail(user.name, verifyCode)
+    });
+
+    if (emailSent) {
+      console.log('✅ Vendor OTP email resent successfully to:', email);
+      return res.status(200).json({
+        error: false,
+        success: true,
+        message: 'OTP code sent to your email'
+      });
+    } else {
+      return res.status(500).json({
+        error: true,
+        success: false,
+        message: 'Failed to send OTP email. Please try again.'
+      });
+    }
+  } catch (error) {
+    console.error('Resend vendor OTP error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Failed to resend OTP'
     });
   }
 };
