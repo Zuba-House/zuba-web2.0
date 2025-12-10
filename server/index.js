@@ -316,6 +316,10 @@ app.use("/api/shipping", shippingRouter);
 app.use("/api", testRouter);
 app.use("/api/banners", bannerRouter);
 
+// Vendor routes
+import vendorRouter from './route/vendor.route.js';
+app.use("/api/vendor", vendorRouter);
+
 // 404 handler (must be after all routes)
 app.use(notFoundHandler);
 

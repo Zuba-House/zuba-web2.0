@@ -431,6 +431,12 @@ const ProductSchema = new mongoose.Schema({
   
   // ========== SELLER/VENDOR INFORMATION ==========
   seller: SellerSchema,
+  vendor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vendor',
+    default: null,
+    index: true
+  },
   vendorId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Vendor',
@@ -461,12 +467,12 @@ const ProductSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  commissionOverrideType: {
+  commissionType: {
     type: String,
     enum: ['PERCENT', 'FLAT'],
     default: 'PERCENT'
   },
-  commissionOverrideValue: {
+  commissionValue: {
     type: Number,
     default: 0,
     min: 0

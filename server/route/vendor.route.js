@@ -1,0 +1,47 @@
+import { Router } from 'express';
+import auth from '../middlewares/auth.js';
+import { requireVendor } from '../middlewares/vendorAuth.js';
+
+// Controllers (to be implemented)
+import * as vendorController from '../controllers/vendor.controller.js';
+import * as vendorProductController from '../controllers/vendorProduct.controller.js';
+import * as vendorOrderController from '../controllers/vendorOrder.controller.js';
+import * as vendorFinanceController from '../controllers/vendorFinance.controller.js';
+import * as vendorCouponController from '../controllers/vendorCoupon.controller.js';
+
+const router = Router();
+
+// All routes require authentication and vendor role
+router.use(auth, requireVendor);
+
+// Profile & Dashboard
+router.get('/me', vendorController.getMyProfile);
+router.put('/me', vendorController.updateMyProfile);
+router.get('/dashboard', vendorController.getDashboardStats);
+
+// Products
+router.get('/products', vendorProductController.list);
+router.post('/products', vendorProductController.create);
+router.get('/products/:id', vendorProductController.get);
+router.put('/products/:id', vendorProductController.update);
+router.delete('/products/:id', vendorProductController.remove);
+
+// Orders
+router.get('/orders', vendorOrderController.list);
+router.get('/orders/:id', vendorOrderController.detail);
+router.put('/orders/:id/status', vendorOrderController.updateStatus);
+
+// Coupons
+router.get('/coupons', vendorCouponController.list);
+router.post('/coupons', vendorCouponController.create);
+router.get('/coupons/:id', vendorCouponController.get);
+router.put('/coupons/:id', vendorCouponController.update);
+router.delete('/coupons/:id', vendorCouponController.remove);
+
+// Finance / Payouts
+router.get('/finance/summary', vendorFinanceController.summary);
+router.get('/payouts', vendorFinanceController.listPayouts);
+router.post('/payouts/request', vendorFinanceController.requestPayout);
+
+export default router;
+

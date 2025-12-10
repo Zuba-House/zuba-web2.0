@@ -66,6 +66,11 @@ const userSchema = mongoose.Schema({
         enum: ['ADMIN', 'USER', 'VENDOR'],
         default: "USER"
     },
+    vendor: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Vendor',
+        default: null
+    },
     vendorId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Vendor',
