@@ -321,7 +321,7 @@ const vendorReviewSchema = new mongoose.Schema({
 // ═══════════════════════════════════════════════════════
 vendorReviewSchema.index({ vendorId: 1, status: 1 });
 vendorReviewSchema.index({ vendorId: 1, rating: -1 });
-vendorReviewSchema.index({ customerId: 1 });
+// Note: customerId already has index: true in field definition
 vendorReviewSchema.index({ orderId: 1 });
 vendorReviewSchema.index({ rating: -1 });
 vendorReviewSchema.index({ createdAt: -1 });
