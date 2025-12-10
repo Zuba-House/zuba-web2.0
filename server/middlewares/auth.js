@@ -61,17 +61,33 @@ const auth = async(request, response, next) => {
 // Optional auth - attaches user if token exists, but doesn't require it
 export const optionalAuth = async (request, response, next) => {
     try {
-        const token = request.cookies.accessToken || request?.headers?.authorization?.split(" ")[1];
+        const token = request.cookies?.accessToken || request?.headers?.authorization?.split(" ")?.[1];
 
         if (token) {
             try {
                 const decode = await jwt.verify(token, process.env.SECRET_KEY_ACCESS_TOKEN);
                 if (decode) {
                     request.userId = decode.id;
+                    request.userRole = decode.role || 'USER';
+                    request.vendorId = decode.vendorId || null;
+                    
+                    // Get user details to include role and vendorId
+                    try {
+                        const UserModel = (await import('../models/user.model.js')).default;
+                        const user = await UserModel.findById(decode.id).select('role vendor vendorId');
+                        if (user) {
+                            request.userRole = user.role || 'USER';
+                            request.vendorId = user.vendorId || user.vendor || null;
+                        }
+                    } catch (userError) {
+                        // If user lookup fails, continue with token data
+                        console.error('Optional auth - user lookup failed:', userError);
+                    }
                 }
             } catch (error) {
                 // If token is invalid, just continue without user
                 // Don't throw error for optional auth
+                console.log('Optional auth - invalid token, continuing as guest');
             }
         }
         
@@ -79,6 +95,7 @@ export const optionalAuth = async (request, response, next) => {
         next();
     } catch (error) {
         // If any error occurs, just continue without user
+        console.error('Optional auth error:', error);
         next();
     }
 }
