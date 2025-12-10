@@ -442,6 +442,35 @@ const ProductSchema = new mongoose.Schema({
     default: '',
     index: true
   },
+  // NEW: Product ownership type
+  productOwnerType: {
+    type: String,
+    enum: ['PLATFORM', 'VENDOR'],
+    default: 'PLATFORM',
+    index: true
+  },
+  // NEW: Product approval status (for vendor products)
+  approvalStatus: {
+    type: String,
+    enum: ['APPROVED', 'PENDING_REVIEW', 'REJECTED'],
+    default: 'APPROVED',
+    index: true
+  },
+  // NEW: Per-product commission override (optional)
+  commissionOverride: {
+    type: Boolean,
+    default: false
+  },
+  commissionOverrideType: {
+    type: String,
+    enum: ['PERCENT', 'FLAT'],
+    default: 'PERCENT'
+  },
+  commissionOverrideValue: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   
   // ========== PRICING (Simple Products) ==========
   pricing: PricingSchema,

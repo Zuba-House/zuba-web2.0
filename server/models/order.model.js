@@ -98,8 +98,8 @@ const orderSchema = new mongoose.Schema({
             // Vendor-specific order tracking
             vendorStatus: {
                 type: String,
-                enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
-                default: 'pending'
+                enum: ['RECEIVED', 'PROCESSING', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'],
+                default: 'RECEIVED'
             },
             trackingNumber: {
                 type: String,
@@ -111,6 +111,31 @@ const orderSchema = new mongoose.Schema({
             },
             deliveredAt: {
                 type: Date,
+                default: null
+            },
+            // NEW: Commission and earnings per item
+            commissionType: {
+                type: String,
+                enum: ['PERCENT', 'FLAT'],
+                default: 'PERCENT'
+            },
+            commissionValue: {
+                type: Number,
+                default: 0,
+                min: 0
+            },
+            commissionAmount: {
+                type: Number,
+                default: 0,
+                min: 0
+            },
+            vendorEarning: {
+                type: Number,
+                default: 0,
+                min: 0
+            },
+            unitPrice: {
+                type: Number,
                 default: null
             }
         }
@@ -125,6 +150,42 @@ const orderSchema = new mongoose.Schema({
         totalAmount: Number,
         commission: Number,
         vendorEarning: Number
+    }],
+    // NEW: Vendor summary for finance tracking
+    vendorSummary: [{
+        vendor: {
+            type: mongoose.Schema.ObjectId,
+            ref: 'Vendor',
+            required: true
+        },
+        vendorShopName: {
+            type: String,
+            default: ''
+        },
+        grossAmount: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+        commissionAmount: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+        netEarning: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+        payoutStatus: {
+            type: String,
+            enum: ['PENDING', 'ON_HOLD', 'PAID'],
+            default: 'PENDING'
+        },
+        itemsCount: {
+            type: Number,
+            default: 0
+        }
     }],
     paymentId: {
         type: String,

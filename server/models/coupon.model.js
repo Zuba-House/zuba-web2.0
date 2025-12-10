@@ -99,6 +99,19 @@ const CouponSchema = new mongoose.Schema({
     default: true,
     index: true
   },
+  // NEW: Vendor-specific coupons
+  vendor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vendor',
+    default: null,
+    index: true
+  },
+  scope: {
+    type: String,
+    enum: ['GLOBAL', 'VENDOR'],
+    default: 'GLOBAL',
+    index: true
+  },
   usedBy: [{
     userId: {
       type: mongoose.Schema.Types.ObjectId,
