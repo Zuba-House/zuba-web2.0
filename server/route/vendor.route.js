@@ -11,7 +11,13 @@ import * as vendorCouponController from '../controllers/vendorCoupon.controller.
 
 const router = Router();
 
-// All routes require authentication and vendor role
+// ========== PUBLIC ROUTES (No auth required) ==========
+// Vendor application endpoint - anyone can apply
+router.post('/apply', vendorController.applyToBecomeVendor);
+router.get('/application-status/:email', vendorController.getApplicationStatus);
+
+// ========== PROTECTED ROUTES (Require auth + vendor role) ==========
+// All routes below this middleware will require authentication and vendor role
 router.use(auth, requireVendor);
 
 // Profile & Dashboard

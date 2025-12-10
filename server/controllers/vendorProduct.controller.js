@@ -1,43 +1,232 @@
-// Placeholder vendor product controller
-// TODO: Implement these functions
+import ProductModel from '../models/product.model.js';
 
+/**
+ * GET /api/vendor/products
+ * List vendor's products (scoped to vendor)
+ */
 export const list = async (req, res) => {
-  return res.status(501).json({
-    error: false,
-    success: false,
-    message: 'Not implemented yet'
-  });
+  try {
+    const vendorId = req.vendorId;
+    const { page = 1, limit = 20, search = '', status, approvalStatus } = req.query;
+
+    const filter = { vendor: vendorId };
+
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    if (status) {
+      filter.status = status;
+    }
+
+    if (approvalStatus) {
+      filter.approvalStatus = approvalStatus;
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [items, total] = await Promise.all([
+      ProductModel.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .populate('categories', 'name slug')
+        .lean(),
+      ProductModel.countDocuments(filter)
+    ]);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      data: {
+        items,
+        total,
+        page: Number(page),
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('vendorProduct.list error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
 };
 
+/**
+ * POST /api/vendor/products
+ * Create a new product (vendor-scoped)
+ */
 export const create = async (req, res) => {
-  return res.status(501).json({
-    error: false,
-    success: false,
-    message: 'Not implemented yet'
-  });
+  try {
+    const vendorId = req.vendorId;
+    const data = req.body;
+
+    // Ensure vendor fields are set
+    const productData = {
+      ...data,
+      vendor: vendorId,
+      vendorId: vendorId, // Keep both for backward compatibility
+      productOwnerType: 'VENDOR',
+      approvalStatus: 'PENDING_REVIEW' // Requires admin approval
+    };
+
+    const product = new ProductModel(productData);
+    await product.save();
+
+    return res.status(201).json({
+      error: false,
+      success: true,
+      message: 'Product created successfully. Waiting for approval.',
+      data: product
+    });
+  } catch (error) {
+    console.error('vendorProduct.create error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
 };
 
+/**
+ * GET /api/vendor/products/:id
+ * Get single product (vendor-scoped)
+ */
 export const get = async (req, res) => {
-  return res.status(501).json({
-    error: false,
-    success: false,
-    message: 'Not implemented yet'
-  });
+  try {
+    const vendorId = req.vendorId;
+    const productId = req.params.id;
+
+    const product = await ProductModel.findOne({
+      _id: productId,
+      vendor: vendorId
+    })
+      .populate('categories', 'name slug')
+      .populate('vendor', 'storeName storeSlug');
+
+    if (!product) {
+      return res.status(404).json({
+        error: true,
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      data: product
+    });
+  } catch (error) {
+    console.error('vendorProduct.get error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
 };
 
+/**
+ * PUT /api/vendor/products/:id
+ * Update product (vendor-scoped)
+ */
 export const update = async (req, res) => {
-  return res.status(501).json({
-    error: false,
-    success: false,
-    message: 'Not implemented yet'
-  });
+  try {
+    const vendorId = req.vendorId;
+    const productId = req.params.id;
+    const updates = req.body;
+
+    // Remove fields vendor shouldn't change
+    delete updates.vendor;
+    delete updates.vendorId;
+    delete updates.productOwnerType;
+    delete updates.approvalStatus; // Only admin can change this
+
+    // If updating, set approval back to pending if it was approved
+    if (updates.status === 'PUBLISHED' || Object.keys(updates).length > 0) {
+      updates.approvalStatus = 'PENDING_REVIEW';
+    }
+
+    const product = await ProductModel.findOneAndUpdate(
+      { _id: productId, vendor: vendorId },
+      { $set: updates },
+      { new: true, runValidators: true }
+    )
+      .populate('categories', 'name slug');
+
+    if (!product) {
+      return res.status(404).json({
+        error: true,
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message: 'Product updated successfully. Waiting for approval.',
+      data: product
+    });
+  } catch (error) {
+    console.error('vendorProduct.update error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
 };
 
+/**
+ * DELETE /api/vendor/products/:id
+ * Soft delete product (vendor-scoped)
+ */
 export const remove = async (req, res) => {
-  return res.status(501).json({
-    error: false,
-    success: false,
-    message: 'Not implemented yet'
-  });
+  try {
+    const vendorId = req.vendorId;
+    const productId = req.params.id;
+
+    // Soft delete: set status to draft and approval to rejected
+    const product = await ProductModel.findOneAndUpdate(
+      { _id: productId, vendor: vendorId },
+      {
+        $set: {
+          status: 'DRAFT',
+          approvalStatus: 'REJECTED'
+        }
+      },
+      { new: true }
+    );
+
+    if (!product) {
+      return res.status(404).json({
+        error: true,
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message: 'Product removed successfully'
+    });
+  } catch (error) {
+    console.error('vendorProduct.remove error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
 };
 

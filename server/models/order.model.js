@@ -86,6 +86,11 @@ const orderSchema = new mongoose.Schema({
                 type: Number
             },
             // Vendor information
+            vendor: {
+                type: mongoose.Schema.ObjectId,
+                ref: 'Vendor',
+                default: null
+            },
             vendorId: {
                 type: mongoose.Schema.ObjectId,
                 ref: 'Vendor',
