@@ -109,7 +109,10 @@ export const createOrderController = async (request, response) => {
             try {
                 const vendor = await VendorModel.findById(vendorId);
                 if (vendor && vendor.status === 'approved') {
-                    const commissionRate = vendor.commissionRate || 0.12;
+                    // Commission rate is stored as 0-100 (percentage) OR 0-1 (legacy)
+                    // Convert to decimal: if > 1, assume it's a percentage (12 = 12%)
+                    let rawRate = vendor.commissionRate ?? 12;
+                    const commissionRate = rawRate > 1 ? rawRate / 100 : rawRate;
                     const commissionType = vendor.commissionType || 'percentage';
                     
                     if (commissionType === 'percentage') {
@@ -117,8 +120,8 @@ export const createOrderController = async (request, response) => {
                         vendorTotal.vendorEarning = vendorTotal.totalAmount * (1 - commissionRate);
                     } else {
                         // Fixed commission (simplified)
-                        vendorTotal.commission = commissionRate;
-                        vendorTotal.vendorEarning = Math.max(0, vendorTotal.totalAmount - commissionRate);
+                        vendorTotal.commission = rawRate;
+                        vendorTotal.vendorEarning = Math.max(0, vendorTotal.totalAmount - rawRate);
                     }
                 }
             } catch (error) {
@@ -298,7 +301,10 @@ export const createOrderController = async (request, response) => {
                         if (vendor && vendor.status === 'approved') {
                             // Calculate vendor earnings (product price - commission)
                             const productTotal = orderProduct.subTotal || (orderProduct.price * orderProduct.quantity);
-                            const commissionRate = vendor.commissionRate || 0.12;
+                            // Commission rate is stored as 0-100 (percentage) OR 0-1 (legacy)
+                            // Convert to decimal: if > 1, assume it's a percentage (12 = 12%)
+                            let rawRate = vendor.commissionRate ?? 12;
+                            const commissionRate = rawRate > 1 ? rawRate / 100 : rawRate;
                             const commissionType = vendor.commissionType || 'percentage';
                             
                             let vendorEarning = 0;
@@ -306,7 +312,7 @@ export const createOrderController = async (request, response) => {
                                 vendorEarning = productTotal * (1 - commissionRate);
                             } else {
                                 // Fixed commission
-                                vendorEarning = Math.max(0, productTotal - commissionRate);
+                                vendorEarning = Math.max(0, productTotal - rawRate);
                             }
                             
                             // Add to vendor earnings (pending until order is completed)
