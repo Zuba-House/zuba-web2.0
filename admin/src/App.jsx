@@ -34,6 +34,8 @@ import ManageLogo from "./Pages/ManageLogo";
 import LoadingBar from "react-top-loading-bar";
 import NotFound from "./Pages/NotFound";
 import Analytics from "./Pages/Analytics";
+import Vendors from "./Pages/Vendors";
+import { VendorDetails } from "./Pages/Vendors/vendorDetails";
 
 import { useParams } from 'react-router-dom';
 
@@ -552,6 +554,56 @@ function App() {
                 style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
               >
                 <Analytics />
+              </div>
+            </div>
+          </section>
+        </>
+      ),
+    },
+    {
+      path: "/vendors",
+      exact: true,
+      element: (
+        <>
+          <section className="main">
+            <Header />
+            <div className="contentMain flex">
+              <div
+                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
+                  } transition-all`}
+              >
+                <Sidebar />
+              </div>
+              <div
+                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
+                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
+              >
+                <Vendors />
+              </div>
+            </div>
+          </section>
+        </>
+      ),
+    },
+    {
+      path: "/vendor/:id",
+      exact: true,
+      element: (
+        <>
+          <section className="main">
+            <Header />
+            <div className="contentMain flex">
+              <div
+                className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? windowWidth < 992 ? `w-[${sidebarWidth / 1.5}%]` : `w-[20%]` : "w-[0px] opacity-0 invisible"
+                  } transition-all`}
+              >
+                <Sidebar />
+              </div>
+              <div
+                className={`contentRight overflow-hidden py-4 px-5 ${isSidebarOpen === true && windowWidth < 992 && 'opacity-0'}  transition-all`}
+                style={{ width: isSidebarOpen === false ? "100%" : '80%' }}
+              >
+                <VendorDetails />
               </div>
             </div>
           </section>
