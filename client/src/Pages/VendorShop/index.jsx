@@ -7,7 +7,7 @@ import { formatCurrency } from '../../utils/currency';
 import ProductItem from '../../components/ProductItem';
 
 const VendorShopPage = () => {
-  const { shopSlug } = useParams();
+  const { slug: shopSlug } = useParams(); // Route uses :slug
   const [loading, setLoading] = useState(true);
   const [vendor, setVendor] = useState(null);
   const [products, setProducts] = useState([]);

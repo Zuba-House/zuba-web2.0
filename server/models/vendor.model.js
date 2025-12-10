@@ -715,52 +715,60 @@ const VendorSchema = new mongoose.Schema({
 // 🔧 PRE-SAVE MIDDLEWARE
 // ═══════════════════════════════════════════════════════
 VendorSchema.pre('save', async function(next) {
-  // Generate vendor code if not exists
-  if (!this.vendorCode) {
-    const count = await this.constructor.countDocuments();
-    this.vendorCode = `ZUBA-V-${String(count + 1).padStart(6, '0')}`;
+  try {
+    // Generate vendor code if not exists (with timestamp to prevent race conditions)
+    if (!this.vendorCode) {
+      const timestamp = Date.now().toString(36).toUpperCase();
+      const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+      this.vendorCode = `ZUBA-V-${timestamp}${random}`;
+    }
+    
+    // Generate shop slug from shop name
+    if (this.shopName && !this.shopSlug) {
+      this.shopSlug = this.shopName
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
+    
+    // Calculate performance score (only if stats modified)
+    if (this.isModified('stats') && typeof this.calculatePerformanceScore === 'function') {
+      this.calculatePerformanceScore();
+    }
+    
+    // Set commission rate based on subscription tier (if not custom)
+    if (this.isModified('subscriptionTier') && !this.hasSpecialRate) {
+      const tierCommission = {
+        free: 15,
+        bronze: 12,
+        silver: 10,
+        gold: 8,
+        platinum: 5
+      };
+      this.commissionRate = tierCommission[this.subscriptionTier] || 12;
+    }
+    
+    // Set features based on subscription tier
+    if (this.isModified('subscriptionTier')) {
+      const tierFeatures = {
+        free: { maxProducts: 50, storageLimit: 500, canUsePromotions: false, canUseCoupons: false, canUseAdvancedAnalytics: false },
+        bronze: { maxProducts: 200, storageLimit: 2048, canUsePromotions: true, canUseCoupons: true, canUseAdvancedAnalytics: false },
+        silver: { maxProducts: 500, storageLimit: 10240, canUsePromotions: true, canUseCoupons: true, canUseAdvancedAnalytics: true },
+        gold: { maxProducts: 2000, storageLimit: 51200, canUsePromotions: true, canUseCoupons: true, canUseAdvancedAnalytics: true, apiAccess: true },
+        platinum: { maxProducts: -1, storageLimit: 204800, canUsePromotions: true, canUseCoupons: true, canUseAdvancedAnalytics: true, apiAccess: true, dedicatedAccountManager: true, prioritySupport: true }
+      };
+      const features = tierFeatures[this.subscriptionTier] || tierFeatures.free;
+      if (this.features) {
+        Object.assign(this.features, features);
+      }
+    }
+    
+    next();
+  } catch (error) {
+    console.error('Vendor pre-save error:', error);
+    next(error);
   }
-  
-  // Generate shop slug from shop name
-  if (this.shopName && !this.shopSlug) {
-    this.shopSlug = this.shopName
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-  }
-  
-  // Calculate performance score
-  if (this.isModified('stats')) {
-    this.calculatePerformanceScore();
-  }
-  
-  // Set commission rate based on subscription tier (if not custom)
-  if (this.isModified('subscriptionTier') && !this.hasSpecialRate) {
-    const tierCommission = {
-      free: 15,
-      bronze: 12,
-      silver: 10,
-      gold: 8,
-      platinum: 5
-    };
-    this.commissionRate = tierCommission[this.subscriptionTier] || 12;
-  }
-  
-  // Set features based on subscription tier
-  if (this.isModified('subscriptionTier')) {
-    const tierFeatures = {
-      free: { maxProducts: 50, storageLimit: 500, canUsePromotions: false, canUseCoupons: false, canUseAdvancedAnalytics: false },
-      bronze: { maxProducts: 200, storageLimit: 2048, canUsePromotions: true, canUseCoupons: true, canUseAdvancedAnalytics: false },
-      silver: { maxProducts: 500, storageLimit: 10240, canUsePromotions: true, canUseCoupons: true, canUseAdvancedAnalytics: true },
-      gold: { maxProducts: 2000, storageLimit: 51200, canUsePromotions: true, canUseCoupons: true, canUseAdvancedAnalytics: true, apiAccess: true },
-      platinum: { maxProducts: -1, storageLimit: 204800, canUsePromotions: true, canUseCoupons: true, canUseAdvancedAnalytics: true, apiAccess: true, dedicatedAccountManager: true, prioritySupport: true }
-    };
-    const features = tierFeatures[this.subscriptionTier] || tierFeatures.free;
-    Object.assign(this.features, features);
-  }
-  
-  next();
 });
 
 // ═══════════════════════════════════════════════════════
