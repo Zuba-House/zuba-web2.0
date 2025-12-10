@@ -271,7 +271,7 @@ const subscriptionPlanSchema = new mongoose.Schema({
 // ═══════════════════════════════════════════════════════
 // 📊 INDEXES
 // ═══════════════════════════════════════════════════════
-subscriptionPlanSchema.index({ slug: 1 });
+// Note: name and slug already have unique: true which creates indexes automatically
 subscriptionPlanSchema.index({ isActive: 1, displayOrder: 1 });
 subscriptionPlanSchema.index({ 'pricing.monthly': 1 });
 

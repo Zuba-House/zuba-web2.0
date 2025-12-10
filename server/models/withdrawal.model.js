@@ -165,8 +165,8 @@ const withdrawalSchema = new mongoose.Schema({
       ref: 'User'
     },
     updatedAt: {
-      type: Date,
-      default: Date.now
+    type: Date,
+    default: Date.now
     }
   }],
 
@@ -349,7 +349,7 @@ withdrawalSchema.index({ vendor: 1, status: 1 });
 withdrawalSchema.index({ vendor: 1, createdAt: -1 });
 withdrawalSchema.index({ status: 1, requestedAt: -1 });
 withdrawalSchema.index({ batchId: 1 });
-withdrawalSchema.index({ withdrawalCode: 1 });
+// Note: withdrawalCode already has unique: true which creates an index automatically
 withdrawalSchema.index({ scheduledDate: 1, status: 1 });
 withdrawalSchema.index({ createdAt: -1 });
 

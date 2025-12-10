@@ -303,7 +303,7 @@ commissionTransactionSchema.index({ vendorId: 1, status: 1 });
 commissionTransactionSchema.index({ vendorId: 1, createdAt: -1 });
 commissionTransactionSchema.index({ orderId: 1 });
 commissionTransactionSchema.index({ clearanceDate: 1 });
-commissionTransactionSchema.index({ transactionCode: 1 });
+// Note: transactionCode already has unique: true which creates an index automatically
 commissionTransactionSchema.index({ category: 1 });
 commissionTransactionSchema.index({ createdAt: -1 });
 
