@@ -775,7 +775,7 @@ VendorSchema.index({ 'stats.averageRating': -1 });
 VendorSchema.index({ 'earnings.availableBalance': -1 });
 VendorSchema.index({ createdAt: -1 });
 VendorSchema.index({ email: 1 });
-VendorSchema.index({ vendorCode: 1 });
+// Note: vendorCode already has unique: true which creates an index automatically
 
 // ═══════════════════════════════════════════════════════
 // 💡 VIRTUALS
