@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast';
 import axios from 'axios';
 
 const Register = () => {
-  const [step, setStep] = useState(2); // 1: Email verification, 2: Registration form (start with form)
+  const [step, setStep] = useState(1); // 1: Email verification (MANDATORY), 2: Registration form
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [emailVerified, setEmailVerified] = useState(false);
@@ -99,8 +99,12 @@ const Register = () => {
 
       if (response.data?.error === false) {
         setEmailVerified(true);
-        toast.success('Email verified successfully!');
-        setStep(2);
+        setFormData(prev => ({ ...prev, email: email.toLowerCase().trim() }));
+        toast.success('Email verified successfully! You can now complete your registration.');
+        // Automatically proceed to registration form after verification
+        setTimeout(() => {
+          setStep(2);
+        }, 1000);
       } else {
         toast.error(response.data?.message || 'Invalid OTP');
       }
@@ -156,6 +160,18 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // MANDATORY: Email must be verified before registration
+    if (!emailVerified || !email) {
+      toast.error('Please verify your email address first');
+      setStep(1);
+      return;
+    }
+
+    // Ensure email is set in formData
+    if (!formData.email || formData.email !== email.toLowerCase().trim()) {
+      setFormData(prev => ({ ...prev, email: email.toLowerCase().trim() }));
+    }
     
     // Validation
     if (formData.password !== formData.confirmPassword) {
@@ -262,7 +278,7 @@ const Register = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      setFormData(prev => ({ ...prev, email }));
+                      setFormData(prev => ({ ...prev, email: email.toLowerCase().trim() }));
                       setStep(2);
                     }}
                     className="flex-1 bg-[#efb291] text-white py-2 rounded-lg hover:bg-[#e5a67d] font-medium transition-colors"
@@ -313,17 +329,7 @@ const Register = () => {
               )}
         </div>
 
-        <div className="mt-6 space-y-3 text-center">
-          <button
-            type="button"
-            onClick={() => {
-              setFormData(prev => ({ ...prev, email: email || '' }));
-              setStep(2);
-            }}
-            className="w-full text-sm text-[#efb291] hover:text-[#e5a67d] font-medium transition-colors underline"
-          >
-            Skip email verification and continue to registration form →
-          </button>
+        <div className="mt-6 text-center">
           <p className="text-gray-600">Already have a vendor account?</p>
           <Link
             to="/login"
