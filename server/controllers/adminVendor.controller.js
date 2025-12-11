@@ -36,19 +36,32 @@ export const getAllVendors = async (req, res) => {
     ]);
 
     // Ensure all vendor fields have safe defaults to prevent frontend crashes
-    const safeVendors = vendors.map(vendor => ({
-      ...vendor,
-      storeName: vendor?.storeName || 'N/A',
-      storeSlug: vendor?.storeSlug || '',
-      email: vendor?.email || '',
-      status: vendor?.status || 'PENDING',
-      availableBalance: vendor?.availableBalance || 0,
-      totalSales: vendor?.totalSales || 0,
-      totalEarnings: vendor?.totalEarnings || 0,
-      createdAt: vendor?.createdAt || new Date(),
-      ownerUser: vendor?.ownerUser || { name: 'N/A', email: '' },
-      categories: vendor?.categories || []
-    }));
+    // Convert all string fields to strings explicitly to prevent toLowerCase() errors
+    const safeVendors = vendors.map(vendor => {
+      // Ensure ownerUser is properly formatted
+      const ownerUser = vendor?.ownerUser ? {
+        _id: vendor.ownerUser._id || null,
+        name: String(vendor.ownerUser.name || 'N/A'),
+        email: String(vendor.ownerUser.email || ''),
+        phone: String(vendor.ownerUser.phone || ''),
+        ...vendor.ownerUser
+      } : { name: 'N/A', email: '', phone: '' };
+
+      return {
+        ...vendor,
+        _id: vendor?._id || null,
+        storeName: String(vendor?.storeName || 'N/A'),
+        storeSlug: String(vendor?.storeSlug || ''),
+        email: String(vendor?.email || ''),
+        status: String(vendor?.status || 'PENDING'),
+        availableBalance: Number(vendor?.availableBalance || 0),
+        totalSales: Number(vendor?.totalSales || 0),
+        totalEarnings: Number(vendor?.totalEarnings || 0),
+        createdAt: vendor?.createdAt || new Date(),
+        ownerUser: ownerUser,
+        categories: Array.isArray(vendor?.categories) ? vendor.categories : []
+      };
+    });
 
     return res.status(200).json({
       error: false,

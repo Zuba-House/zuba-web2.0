@@ -99,22 +99,29 @@ export const Vendors = () => {
         fetchDataFromApi(url).then((res) => {
             if (res?.error === false && res?.data) {
                 // Ensure vendors array exists and has safe defaults
-                const safeVendors = (res.data.vendors || []).map(vendor => {
+                // Filter out any null/undefined vendors first
+                const validVendors = (res.data.vendors || []).filter(v => v && v._id);
+                
+                const safeVendors = validVendors.map(vendor => {
                     // Ensure all string fields are strings, not undefined
+                    // This prevents toLowerCase() errors
                     const safeVendor = {
                         ...vendor,
-                        _id: vendor?._id || '',
-                        storeName: String(vendor?.storeName || 'N/A'),
-                        storeSlug: String(vendor?.storeSlug || ''),
-                        email: String(vendor?.email || ''),
-                        status: String(vendor?.status || 'PENDING'),
-                        availableBalance: Number(vendor?.availableBalance || 0),
-                        createdAt: vendor?.createdAt || new Date(),
-                        ownerUser: vendor?.ownerUser ? {
-                            name: String(vendor.ownerUser?.name || 'N/A'),
-                            email: String(vendor.ownerUser?.email || ''),
+                        _id: String(vendor._id || ''),
+                        storeName: String(vendor.storeName || 'N/A'),
+                        storeSlug: String(vendor.storeSlug || ''),
+                        email: String(vendor.email || ''),
+                        status: String(vendor.status || 'PENDING'),
+                        availableBalance: Number(vendor.availableBalance || 0),
+                        createdAt: vendor.createdAt || new Date(),
+                        ownerUser: vendor.ownerUser ? {
+                            _id: vendor.ownerUser._id || null,
+                            name: String(vendor.ownerUser.name || 'N/A'),
+                            email: String(vendor.ownerUser.email || ''),
+                            phone: String(vendor.ownerUser.phone || ''),
                             ...vendor.ownerUser
-                        } : { name: 'N/A', email: '' }
+                        } : { name: 'N/A', email: '', phone: '' },
+                        categories: Array.isArray(vendor.categories) ? vendor.categories : []
                     };
                     return safeVendor;
                 });
@@ -312,7 +319,8 @@ export const Vendors = () => {
                                                 </div>
                                             </TableCell>
                                         </TableRow>
-                                    ))
+                                        );
+                                    }).filter(Boolean) // Remove any null entries
                                 ) : (
                                     <TableRow>
                                         <TableCell colSpan={columns.length} className="text-center py-10 text-gray-500">
