@@ -59,8 +59,8 @@ const getStatusColor = (status) => {
 export const Vendors = () => {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(25);
-    const [vendorData, setVendorData] = useState([]);
-    const [vendorTotalData, setVendorTotalData] = useState([]);
+    const [vendorData, setVendorData] = useState({ vendors: [], total: 0, page: 1, pages: 0 });
+    const [vendorTotalData, setVendorTotalData] = useState({ vendors: [], total: 0, page: 1, pages: 0 });
     const [isLoading, setIsLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
@@ -76,7 +76,7 @@ export const Vendors = () => {
 
     useEffect(() => {
         // Reset to page 0 when search changes
-        if (searchQuery !== undefined) {
+        if (searchQuery !== undefined && searchQuery !== null) {
             setPage(0);
             getVendors(0, rowsPerPage, statusFilter);
         }
@@ -99,26 +99,42 @@ export const Vendors = () => {
         fetchDataFromApi(url).then((res) => {
             if (res?.error === false && res?.data) {
                 // Ensure vendors array exists and has safe defaults
-                const safeData = {
-                    ...res.data,
-                    vendors: (res.data.vendors || []).map(vendor => ({
+                const safeVendors = (res.data.vendors || []).map(vendor => {
+                    // Ensure all string fields are strings, not undefined
+                    const safeVendor = {
                         ...vendor,
-                        storeName: vendor?.storeName || 'N/A',
-                        storeSlug: vendor?.storeSlug || '',
-                        email: vendor?.email || '',
-                        status: vendor?.status || 'PENDING',
-                        availableBalance: vendor?.availableBalance || 0,
+                        _id: vendor?._id || '',
+                        storeName: String(vendor?.storeName || 'N/A'),
+                        storeSlug: String(vendor?.storeSlug || ''),
+                        email: String(vendor?.email || ''),
+                        status: String(vendor?.status || 'PENDING'),
+                        availableBalance: Number(vendor?.availableBalance || 0),
                         createdAt: vendor?.createdAt || new Date(),
-                        ownerUser: vendor?.ownerUser || { name: 'N/A' }
-                    }))
+                        ownerUser: vendor?.ownerUser ? {
+                            name: String(vendor.ownerUser?.name || 'N/A'),
+                            email: String(vendor.ownerUser?.email || ''),
+                            ...vendor.ownerUser
+                        } : { name: 'N/A', email: '' }
+                    };
+                    return safeVendor;
+                });
+                
+                const safeData = {
+                    vendors: safeVendors,
+                    total: Number(res.data.total || 0),
+                    page: Number(res.data.page || 1),
+                    pages: Number(res.data.pages || 0)
                 };
+                
                 setVendorData(safeData);
                 setVendorTotalData(safeData);
             } else {
                 // Set empty data structure to prevent crashes
                 setVendorData({ vendors: [], total: 0, page: 1, pages: 0 });
                 setVendorTotalData({ vendors: [], total: 0, page: 1, pages: 0 });
-                toast.error(res?.message || 'Failed to fetch vendors');
+                if (res?.message) {
+                    toast.error(res.message);
+                }
             }
             setIsLoading(false);
         }).catch((error) => {
@@ -131,11 +147,6 @@ export const Vendors = () => {
         });
     };
 
-    useEffect(() => {
-        // Reset to page 0 when search changes
-        setPage(0);
-        getVendors(0, rowsPerPage, statusFilter);
-    }, [searchQuery]);
 
     const handleChangePage = (event, newPage) => {
         setPage(newPage);
