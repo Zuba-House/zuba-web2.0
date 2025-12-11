@@ -177,9 +177,13 @@ export const ProductDetailsComponent = (props) => {
       brand: product?.brand || '',
       productType: product?.productType || (product?.variations && product.variations.length > 0 ? 'variable' : 'simple'),
       variation: selectedVariation ? {
+        _id: selectedVariation._id,
         attributes: selectedVariation.attributes || [],
         sku: selectedVariation.sku || '',
-        image: getImageUrl(selectedVariation.image) || ''
+        image: getImageUrl(selectedVariation.image) || '',
+        price: selectedVariation.price,
+        salePrice: selectedVariation.salePrice,
+        regularPrice: selectedVariation.regularPrice
       } : null
     }
 

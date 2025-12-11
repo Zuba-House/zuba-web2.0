@@ -509,9 +509,23 @@ function App() {
     }
 
     // Determine price for variable products
-    const displayPrice = product?.selectedVariation 
-      ? (product.selectedVariation.salePrice || product.selectedVariation.regularPrice || product.selectedVariation.price)
+    // ProductDetails passes 'variation' not 'selectedVariation'
+    const variation = product?.variation || product?.selectedVariation;
+    const displayPrice = variation 
+      ? (variation.salePrice || variation.regularPrice || variation.price)
       : (product?.salePrice || product?.price || product?.oldPrice);
+
+    // Get variationId - ProductDetails passes variationId directly, or we can extract from variation object
+    const variationId = product?.variationId || variation?._id || null;
+
+    // Get productType - ensure it's correctly set
+    const productType = product?.productType || (variation ? 'variable' : 'simple');
+
+    // For variable products, ensure variationId is present
+    if (productType === 'variable' && !variationId) {
+      alertBox("error", "Please select a product variation (size, color, etc.) before adding to cart");
+      return false;
+    }
 
     const data = {
       productTitle: product?.name,
@@ -522,19 +536,25 @@ function App() {
       discount: product?.discount,
       quantity: quantity,
       subTotal: parseFloat(displayPrice || 0) * quantity,
-      productId: product?._id,
+      // Prioritize productId over _id (since _id might be variation's _id for variable products)
+      productId: product?.productId || product?._id,
       countInStock: product?.countInStock || product?.stock || 0,
       brand: product?.brand,
       size: product?.size,
       weight: product?.weight,
       ram: product?.ram,
-      // Variable product fields
-      productType: product?.productType || 'simple',
-      variationId: product?.variationId || product?.selectedVariation?._id || null,
-      variation: product?.variation || product?.selectedVariation || null
+      // Variable product fields - ensure these are correctly passed
+      productType: productType,
+      variationId: variationId,
+      variation: variation || null
     }
 
-    console.log('🛒 Adding to cart:', { productId: data.productId, productType: data.productType, variationId: data.variationId });
+    console.log('🛒 Adding to cart:', { 
+      productId: data.productId, 
+      productType: data.productType, 
+      variationId: data.variationId,
+      hasVariation: !!data.variation
+    });
 
     postData("/api/cart/add", data).then((res) => {
       if (res?.error === false) {
@@ -547,7 +567,6 @@ function App() {
       console.error('Cart add error:', error);
       alertBox("error", error?.message || "Failed to add product to cart. Please try again.");
     })
-
 
   }
 
