@@ -81,26 +81,27 @@ export const applyToBecomeVendor = async (req, res) => {
         user.otpExpires = Date.now() + 600000;
         await user.save();
 
-      // Send OTP email
-      console.log('📧 Sending vendor registration OTP email to:', email);
+      // Send OTP email (using same pattern as order emails)
+      console.log('📧 Preparing to send vendor registration OTP email to:', email);
+      const recipients = [email];
       try {
-        const emailSent = await sendEmailFun({
-          sendTo: email,
+        const emailResult = await sendEmailFun({
+          sendTo: recipients,
           subject: "Verify Your Email - Zuba House Vendor Registration",
           text: "",
           html: VerificationEmail(user.name, verifyCode)
         });
-
-        if (emailSent) {
-          console.log('✅ Vendor OTP email sent successfully to:', email);
-        } else {
-          console.error('❌ Failed to send vendor OTP email to:', email);
-          // Log warning but don't fail registration
-          console.warn('⚠️ Registration will continue, but email verification may not work until email service is configured.');
-        }
+        console.log('✅ Vendor OTP email sent successfully:', {
+          to: email,
+          result: emailResult
+        });
       } catch (emailError) {
-        console.error('❌ Error sending vendor OTP email:', emailError);
-        // Don't fail registration, but log the error
+        console.error('❌ Failed to send vendor OTP email:', {
+          to: email,
+          error: emailError.message,
+          stack: emailError.stack
+        });
+        // Don't fail registration if email fails, but log the error
       }
       }
     } else {
