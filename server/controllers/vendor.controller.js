@@ -286,18 +286,20 @@ export const resendVendorOTP = async (req, res) => {
 
     const user = await UserModel.findOne({ email: email.toLowerCase().trim() });
 
+    // If user doesn't exist yet, that's okay - they can register first
+    // OTP will be sent during registration
     if (!user) {
-      return res.status(400).json({
-        error: true,
-        success: false,
-        message: 'User not found'
+      return res.status(200).json({
+        error: false,
+        success: true,
+        message: 'Please complete registration first. OTP will be sent after registration.'
       });
     }
 
     if (user.verify_email) {
-      return res.status(400).json({
-        error: true,
-        success: false,
+      return res.status(200).json({
+        error: false,
+        success: true,
         message: 'Email is already verified'
       });
     }
@@ -314,7 +316,7 @@ export const resendVendorOTP = async (req, res) => {
       sendTo: email,
       subject: "Verify Your Email - Zuba House Vendor Registration",
       text: "",
-      html: VerificationEmail(user.name, verifyCode)
+      html: VerificationEmail(user.name || email, verifyCode)
     });
 
     if (emailSent) {

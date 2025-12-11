@@ -139,9 +139,10 @@ const Login = () => {
           
           // Check user role and redirect accordingly
           if (userData?.role === 'VENDOR' || location.state?.fromVendorSetup) {
-            // Vendor login - redirect to vendor dashboard
+            // Vendor login - redirect to vendor panel dashboard
+            const vendorUrl = process.env.REACT_APP_VENDOR_URL || "https://vendor.zubahouse.com";
             setTimeout(() => {
-              history("/vendor/dashboard");
+              window.location.href = `${vendorUrl}/dashboard`;
             }, 1000);
           } else {
             // Regular user login - redirect to home
