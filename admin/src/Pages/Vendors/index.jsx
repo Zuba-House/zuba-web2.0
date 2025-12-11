@@ -319,8 +319,7 @@ export const Vendors = () => {
                                                 </div>
                                             </TableCell>
                                         </TableRow>
-                                        );
-                                    }).filter(Boolean) // Remove any null entries
+                                    )).filter(Boolean) // Remove any null entries
                                 ) : (
                                     <TableRow>
                                         <TableCell colSpan={columns.length} className="text-center py-10 text-gray-500">
