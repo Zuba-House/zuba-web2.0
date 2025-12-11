@@ -173,8 +173,8 @@ export const applyToBecomeVendor = async (req, res) => {
     }
 
     // Check if vendor already exists for this user
-    const existingVendor = await VendorModel.findOne({ ownerUser: user._id });
-    if (existingVendor) {
+    const existingVendorByUser = await VendorModel.findOne({ ownerUser: user._id });
+    if (existingVendorByUser) {
       return res.status(400).json({
         error: true,
         success: false,
