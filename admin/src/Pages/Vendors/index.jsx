@@ -74,16 +74,18 @@ export const Vendors = () => {
         getVendors(page, rowsPerPage, statusFilter);
     }, [page, rowsPerPage, statusFilter]);
 
-    const getVendors = (page, limit, status = "") => {
+    const getVendors = (pageNum, limit, status = "") => {
         setIsLoading(true);
         const queryParams = new URLSearchParams({
-            page: (page + 1).toString(),
+            page: (pageNum + 1).toString(),
             limit: limit.toString()
         });
         if (status) queryParams.append('status', status);
-        if (searchQuery) queryParams.append('search', searchQuery);
+        if (searchQuery && searchQuery.trim()) {
+            queryParams.append('search', searchQuery.trim());
+        }
 
-        fetchDataFromApi(`/api/admin/vendors?${queryParams}`).then((res) => {
+        fetchDataFromApi(`/api/admin/vendors?${queryParams.toString()}`).then((res) => {
             if (res?.error === false && res?.data) {
                 // Ensure vendors array exists and has safe defaults
                 const safeData = {
@@ -119,11 +121,9 @@ export const Vendors = () => {
     };
 
     useEffect(() => {
-        if (searchQuery !== "") {
-            getVendors(page, rowsPerPage, statusFilter);
-        } else {
-            getVendors(page, rowsPerPage, statusFilter);
-        }
+        // Reset to page 0 when search changes
+        setPage(0);
+        getVendors(0, rowsPerPage, statusFilter);
     }, [searchQuery]);
 
     const handleChangePage = (event, newPage) => {

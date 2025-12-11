@@ -8,6 +8,16 @@ export const addToCartItemController = async (request, response) => {
     try {
         const userId = request.userId;
         
+        // Debug logging
+        console.log('🛒 Add to cart request:', {
+            hasUserId: !!userId,
+            userId: userId,
+            headers: {
+                authorization: request.headers?.authorization ? 'present' : 'missing',
+                cookie: request.cookies ? 'present' : 'missing'
+            }
+        });
+        
         // For guest users, require login for cart functionality
         // In future, can implement session-based cart for guests
         if (!userId) {

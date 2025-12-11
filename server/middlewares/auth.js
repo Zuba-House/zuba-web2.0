@@ -61,12 +61,25 @@ const auth = async(request, response, next) => {
 // Optional auth - attaches user if token exists, but doesn't require it
 export const optionalAuth = async (request, response, next) => {
     try {
-        const token = request.cookies?.accessToken || request?.headers?.authorization?.split(" ")?.[1];
+        // Try multiple ways to get the token
+        let token = request.cookies?.accessToken;
+        
+        // Check Authorization header (Bearer token)
+        if (!token && request?.headers?.authorization) {
+            const authHeader = request.headers.authorization;
+            if (authHeader.startsWith('Bearer ')) {
+                token = authHeader.substring(7);
+            } else if (authHeader.includes(' ')) {
+                token = authHeader.split(' ')[1];
+            } else {
+                token = authHeader;
+            }
+        }
 
         if (token) {
             try {
                 const decode = await jwt.verify(token, process.env.SECRET_KEY_ACCESS_TOKEN);
-                if (decode) {
+                if (decode && decode.id) {
                     request.userId = decode.id;
                     request.userRole = decode.role || 'USER';
                     request.vendorId = decode.vendorId || null;
@@ -76,6 +89,7 @@ export const optionalAuth = async (request, response, next) => {
                         const UserModel = (await import('../models/user.model.js')).default;
                         const user = await UserModel.findById(decode.id).select('role vendor vendorId');
                         if (user) {
+                            request.userId = user._id.toString();
                             request.userRole = user.role || 'USER';
                             request.vendorId = user.vendorId || user.vendor || null;
                         }
@@ -87,7 +101,7 @@ export const optionalAuth = async (request, response, next) => {
             } catch (error) {
                 // If token is invalid, just continue without user
                 // Don't throw error for optional auth
-                console.log('Optional auth - invalid token, continuing as guest');
+                console.log('Optional auth - invalid token, continuing as guest:', error.message);
             }
         }
         
