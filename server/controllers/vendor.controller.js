@@ -163,23 +163,73 @@ export const applyToBecomeVendor = async (req, res) => {
       }
     }
 
+    // Validate user._id exists before creating vendor
+    if (!user || !user._id) {
+      return res.status(500).json({
+        error: true,
+        success: false,
+        message: 'User account error. Please try again.'
+      });
+    }
+
+    // Check if vendor already exists for this user
+    const existingVendor = await VendorModel.findOne({ ownerUser: user._id });
+    if (existingVendor) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'You already have a vendor account'
+      });
+    }
+
     // Create vendor profile
-    const vendor = await VendorModel.create({
-      ownerUser: user._id,
-      storeName: storeName.trim(),
-      storeSlug: storeSlug.toLowerCase().trim(),
-      description: description || '',
-      email: email.toLowerCase().trim(),
-      phone: phone || '',
-      whatsapp: whatsapp || '',
-      country: country || '',
-      city: city || '',
-      addressLine1: addressLine1 || '',
-      addressLine2: addressLine2 || '',
-      postalCode: postalCode || '',
-      categories: categories || [],
-      status: 'PENDING' // Requires admin approval
-    });
+    let vendor;
+    try {
+      vendor = await VendorModel.create({
+        ownerUser: user._id,
+        storeName: storeName.trim(),
+        storeSlug: storeSlug.toLowerCase().trim(),
+        description: description || '',
+        email: email.toLowerCase().trim(),
+        phone: phone || '',
+        whatsapp: whatsapp || '',
+        country: country || '',
+        city: city || '',
+        addressLine1: addressLine1 || '',
+        addressLine2: addressLine2 || '',
+        postalCode: postalCode || '',
+        categories: categories || [],
+        status: 'PENDING' // Requires admin approval
+      });
+    } catch (createError) {
+      // Handle duplicate key error
+      if (createError.code === 11000) {
+        // Check if it's a duplicate ownerUser
+        if (createError.keyPattern?.ownerUser) {
+          return res.status(400).json({
+            error: true,
+            success: false,
+            message: 'You already have a vendor account'
+          });
+        }
+        // Check if it's a duplicate storeSlug
+        if (createError.keyPattern?.storeSlug) {
+          return res.status(400).json({
+            error: true,
+            success: false,
+            message: 'Store slug already taken. Please choose another.'
+          });
+        }
+        // Generic duplicate key error
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'A vendor account with these details already exists'
+        });
+      }
+      // Re-throw other errors
+      throw createError;
+    }
 
     // Link vendor to user
     user.vendor = vendor._id;

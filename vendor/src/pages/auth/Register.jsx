@@ -452,7 +452,7 @@ const Register = () => {
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
                 required
-                pattern="[a-z0-9-]+"
+                pattern="[a-z0-9\-]+"
                 title="Only lowercase letters, numbers, and hyphens"
               />
               <p className="text-xs text-gray-500 mt-1">e.g., my-store-name</p>

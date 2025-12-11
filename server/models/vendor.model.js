@@ -7,6 +7,7 @@ const VendorSchema = new mongoose.Schema(
       ref: 'User', 
       required: true,
       unique: true,
+      sparse: true, // Allow null values in unique index
       index: true
     },
     storeName: { 
