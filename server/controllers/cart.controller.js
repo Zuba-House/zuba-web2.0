@@ -101,7 +101,16 @@ export const addToCartItemController = async (request, response) => {
 
         // For variable products, check variation stock status
         let actualStock = normalizedStock;
-        if (productType === 'variable' && variationId) {
+        if (productType === 'variable') {
+            // Variable products MUST have a variationId
+            if (!variationId) {
+                return response.status(400).json({
+                    error: true,
+                    success: false,
+                    message: "Variation selection is required for variable products. Please select a size, color, or other variation."
+                });
+            }
+            
             // Use 'foundVariation' to avoid shadowing the 'variation' from request body
             const foundVariation = actualProduct.variations?.find(
                 v => v._id && v._id.toString() === variationId.toString()
@@ -111,16 +120,18 @@ export const addToCartItemController = async (request, response) => {
                 // Log for debugging
                 console.log('Variation lookup failed:', {
                     variationId,
+                    productId,
                     availableVariations: actualProduct.variations?.map(v => ({
                         id: v._id?.toString(),
-                        sku: v.sku
+                        sku: v.sku,
+                        attributes: v.attributes
                     }))
                 });
                 
                 return response.status(404).json({
                     error: true,
                     success: false,
-                    message: "Product variation not found"
+                    message: "Product variation not found. Please refresh the page and try again."
                 });
             }
             
