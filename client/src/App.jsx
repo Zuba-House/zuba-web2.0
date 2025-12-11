@@ -333,34 +333,50 @@ function App() {
   const addToGuestCart = (product, quantity) => {
     const guestCart = getGuestCart();
     
-    // Check if product already in cart
-    const existingIndex = guestCart.findIndex(item => 
-      item.productId === product?._id &&
-      item.size === product?.size &&
-      item.weight === product?.weight &&
-      item.ram === product?.ram &&
-      JSON.stringify(item.variation) === JSON.stringify(product?.variation)
-    );
+    // Extract variationId from variation object if not directly available
+    let variationId = product?.variationId;
+    if (!variationId && product?.variation && product.variation._id) {
+      variationId = product.variation._id;
+    }
+    
+    // Determine productType
+    const productType = product?.productType || (variationId || product?.variation ? 'variable' : 'simple');
+    
+    // For variable products, use variationId for comparison
+    // For simple products, use size/weight/ram for comparison
+    const existingIndex = guestCart.findIndex(item => {
+      if (item.productId === (product?.productId || product?._id)) {
+        if (productType === 'variable' && variationId) {
+          return item.variationId === variationId;
+        } else {
+          return item.size === product?.size &&
+                 item.weight === product?.weight &&
+                 item.ram === product?.ram &&
+                 (!item.variationId && !variationId);
+        }
+      }
+      return false;
+    });
 
     const cartItem = {
       _id: `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      productTitle: product?.name,
-      image: product?.image,
-      rating: product?.rating,
-      price: product?.price,
-      oldPrice: product?.oldPrice,
-      discount: product?.discount,
-      quantity: quantity,
-      subTotal: parseFloat(product?.price || 0) * quantity,
-      productId: product?._id,
-      countInStock: product?.countInStock,
-      brand: product?.brand,
-      size: product?.size,
-      weight: product?.weight,
-      ram: product?.ram,
-      variation: product?.variation,
-      productType: product?.productType,
-      variationId: product?.variationId
+      productTitle: product?.name || product?.productTitle || '',
+      image: product?.image || '',
+      rating: product?.rating || 0,
+      price: product?.price || 0,
+      oldPrice: product?.oldPrice || null,
+      discount: product?.discount || 0,
+      quantity: quantity || 1,
+      subTotal: parseFloat(product?.price || 0) * (quantity || 1),
+      productId: product?.productId || product?._id,
+      countInStock: product?.countInStock || product?.stock || 0,
+      brand: product?.brand || '',
+      size: product?.size || null,
+      weight: product?.weight || null,
+      ram: product?.ram || null,
+      variation: product?.variation || null,
+      productType: productType,
+      variationId: variationId || null
     };
 
     if (existingIndex !== -1) {
@@ -405,12 +421,30 @@ function App() {
   const mergeGuestCartWithServer = async () => {
     const guestCart = getGuestCart();
     
-    if (guestCart.length === 0) return;
+    if (guestCart.length === 0) {
+      // No guest cart, just load server cart
+      fetchDataFromApi(`/api/cart/get`).then((res) => {
+        if (res?.error === false) {
+          setCartData(res?.data);
+        }
+      });
+      return;
+    }
 
-    console.log('🛒 Merging guest cart with server cart...');
+    console.log('🛒 Merging guest cart with server cart...', { itemCount: guestCart.length });
+    
+    let successCount = 0;
+    let errorCount = 0;
+    const errors = [];
     
     for (const item of guestCart) {
       try {
+        // Extract variationId from variation object if not directly available
+        let variationId = item.variationId;
+        if (!variationId && item.variation && item.variation._id) {
+          variationId = item.variation._id;
+        }
+        
         const data = {
           productTitle: item.productTitle,
           image: item.image,
@@ -427,25 +461,48 @@ function App() {
           weight: item.weight,
           ram: item.ram,
           variation: item.variation,
-          productType: item.productType,
-          variationId: item.variationId
+          productType: item.productType || (item.variationId || item.variation ? 'variable' : 'simple'),
+          variationId: variationId
         };
         
-        await postData("/api/cart/add", data);
+        console.log('🛒 Merging item:', { productId: data.productId, productType: data.productType, variationId: data.variationId });
+        
+        const res = await postData("/api/cart/add", data);
+        
+        if (res?.error === false) {
+          successCount++;
+          console.log('✅ Item merged successfully:', item.productTitle);
+        } else {
+          errorCount++;
+          const errorMsg = res?.message || 'Failed to add item';
+          errors.push(`${item.productTitle}: ${errorMsg}`);
+          console.error('❌ Failed to merge item:', item.productTitle, res);
+        }
       } catch (error) {
-        console.error('Error merging cart item:', error);
+        errorCount++;
+        errors.push(`${item.productTitle}: ${error.message || 'Network error'}`);
+        console.error('❌ Error merging cart item:', error);
       }
     }
     
-    // Clear guest cart after merge
+    // Clear guest cart after merge attempt (regardless of success/failure)
     clearGuestCart();
+    
     // Refresh cart from server
     fetchDataFromApi(`/api/cart/get`).then((res) => {
       if (res?.error === false) {
         setCartData(res?.data);
       }
     });
-    alertBox("success", "Your cart items have been saved to your account");
+    
+    // Show appropriate message
+    if (successCount > 0 && errorCount === 0) {
+      alertBox("success", `All ${successCount} cart item(s) have been saved to your account`);
+    } else if (successCount > 0 && errorCount > 0) {
+      alertBox("error", `${successCount} item(s) saved, but ${errorCount} item(s) failed. ${errors.join('; ')}`);
+    } else if (errorCount > 0) {
+      alertBox("error", `Failed to save cart items: ${errors.join('; ')}`);
+    }
   };
 
   // Internal merge function for use after login validation
@@ -462,10 +519,20 @@ function App() {
       return;
     }
 
-    console.log('🛒 Merging guest cart after login...');
+    console.log('🛒 Merging guest cart after login...', { itemCount: guestCart.length });
+    
+    let successCount = 0;
+    let errorCount = 0;
+    const errors = [];
     
     for (const item of guestCart) {
       try {
+        // Extract variationId from variation object if not directly available
+        let variationId = item.variationId;
+        if (!variationId && item.variation && item.variation._id) {
+          variationId = item.variation._id;
+        }
+        
         const data = {
           productTitle: item.productTitle,
           image: item.image,
@@ -482,24 +549,48 @@ function App() {
           weight: item.weight,
           ram: item.ram,
           variation: item.variation,
-          productType: item.productType,
-          variationId: item.variationId
+          productType: item.productType || (variationId || item.variation ? 'variable' : 'simple'),
+          variationId: variationId
         };
         
-        await postData("/api/cart/add", data);
+        console.log('🛒 Merging item:', { productId: data.productId, productType: data.productType, variationId: data.variationId });
+        
+        const res = await postData("/api/cart/add", data);
+        
+        if (res?.error === false) {
+          successCount++;
+          console.log('✅ Item merged successfully:', item.productTitle);
+        } else {
+          errorCount++;
+          const errorMsg = res?.message || 'Failed to add item';
+          errors.push(`${item.productTitle}: ${errorMsg}`);
+          console.error('❌ Failed to merge item:', item.productTitle, res);
+        }
       } catch (error) {
-        console.error('Error merging cart item:', error);
+        errorCount++;
+        errors.push(`${item.productTitle}: ${error.message || 'Network error'}`);
+        console.error('❌ Error merging cart item:', error);
       }
     }
     
-    // Clear guest cart after merge
+    // Clear guest cart after merge attempt (regardless of success/failure)
     clearGuestCart();
+    
     // Refresh cart from server
     fetchDataFromApi(`/api/cart/get`).then((res) => {
       if (res?.error === false) {
         setCartData(res?.data);
       }
     });
+    
+    // Show appropriate message
+    if (successCount > 0 && errorCount === 0) {
+      alertBox("success", `All ${successCount} cart item(s) have been saved to your account`);
+    } else if (successCount > 0 && errorCount > 0) {
+      alertBox("error", `${successCount} item(s) saved, but ${errorCount} item(s) failed. ${errors.slice(0, 2).join('; ')}${errors.length > 2 ? '...' : ''}`);
+    } else if (errorCount > 0) {
+      alertBox("error", `Failed to save cart items. Please try adding them again.`);
+    }
   };
 
   const addToCart = (product, userId, quantity) => {
@@ -511,38 +602,60 @@ function App() {
     // Determine price for variable products
     // ProductDetails passes 'variation' not 'selectedVariation'
     const variation = product?.variation || product?.selectedVariation;
-    const displayPrice = variation 
-      ? (variation.salePrice || variation.regularPrice || variation.price)
-      : (product?.salePrice || product?.price || product?.oldPrice);
-
+    
     // Get variationId - ProductDetails passes variationId directly, or we can extract from variation object
-    const variationId = product?.variationId || variation?._id || null;
+    let variationId = product?.variationId;
+    if (!variationId && variation) {
+      // Try to get _id from variation object
+      variationId = variation._id || variation.id || null;
+    }
 
     // Get productType - ensure it's correctly set
-    const productType = product?.productType || (variation ? 'variable' : 'simple');
+    // Check if product has variations or if variationId exists
+    const hasVariations = product?.variations && product.variations.length > 0;
+    const productType = product?.productType || (variationId || variation || hasVariations ? 'variable' : 'simple');
 
     // For variable products, ensure variationId is present
     if (productType === 'variable' && !variationId) {
+      console.error('❌ Variable product missing variationId:', {
+        productId: product?.productId || product?._id,
+        productType,
+        hasVariation: !!variation,
+        variationKeys: variation ? Object.keys(variation) : []
+      });
       alertBox("error", "Please select a product variation (size, color, etc.) before adding to cart");
       return false;
     }
 
+    // Determine price - use variation price if available, otherwise use product price
+    const displayPrice = variation 
+      ? (variation.salePrice || variation.regularPrice || variation.price || 0)
+      : (product?.salePrice || product?.price || product?.oldPrice || 0);
+
+    // Ensure we have a valid productId (prioritize productId over _id)
+    const productId = product?.productId || product?._id;
+    
+    if (!productId) {
+      console.error('❌ Missing productId:', product);
+      alertBox("error", "Product information is incomplete. Please refresh the page and try again.");
+      return false;
+    }
+
     const data = {
-      productTitle: product?.name,
-      image: product?.image,
-      rating: product?.rating,
-      price: displayPrice,
-      oldPrice: product?.oldPrice,
-      discount: product?.discount,
-      quantity: quantity,
-      subTotal: parseFloat(displayPrice || 0) * quantity,
-      // Prioritize productId over _id (since _id might be variation's _id for variable products)
-      productId: product?.productId || product?._id,
+      productTitle: product?.name || product?.productTitle || '',
+      image: product?.image || '',
+      rating: product?.rating || 0,
+      price: parseFloat(displayPrice) || 0,
+      oldPrice: product?.oldPrice ? parseFloat(product.oldPrice) : null,
+      discount: product?.discount || 0,
+      quantity: quantity || 1,
+      subTotal: parseFloat(displayPrice || 0) * (quantity || 1),
+      productId: productId,
       countInStock: product?.countInStock || product?.stock || 0,
-      brand: product?.brand,
-      size: product?.size,
-      weight: product?.weight,
-      ram: product?.ram,
+      brand: product?.brand || '',
+      size: product?.size || null,
+      weight: product?.weight || null,
+      ram: product?.ram || null,
       // Variable product fields - ensure these are correctly passed
       productType: productType,
       variationId: variationId,
@@ -553,7 +666,9 @@ function App() {
       productId: data.productId, 
       productType: data.productType, 
       variationId: data.variationId,
-      hasVariation: !!data.variation
+      hasVariation: !!data.variation,
+      price: data.price,
+      quantity: data.quantity
     });
 
     postData("/api/cart/add", data).then((res) => {
@@ -561,10 +676,11 @@ function App() {
         alertBox("success", res?.message || "Product added to cart successfully");
         getCartItems();
       } else {
+        console.error('❌ Cart add failed:', res);
         alertBox("error", res?.message || "Failed to add product to cart");
       }
     }).catch((error) => {
-      console.error('Cart add error:', error);
+      console.error('❌ Cart add error:', error);
       alertBox("error", error?.message || "Failed to add product to cart. Please try again.");
     })
 
