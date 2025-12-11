@@ -381,18 +381,24 @@ const Register = () => {
               <input
                 type="email"
                 name="email"
-                value={formData.email || email}
+                value={formData.email || email || ''}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] bg-gray-50"
                 required
-                disabled={!!email}
+                disabled={true}
+                readOnly
               />
-              {email && (
+              {emailVerified && email && (
                 <p className="text-xs text-green-600 mt-1 flex items-center">
                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                   Email verified
+                </p>
+              )}
+              {!emailVerified && (
+                <p className="text-xs text-red-600 mt-1">
+                  ⚠️ Please verify your email in step 1 before proceeding
                 </p>
               )}
             </div>
