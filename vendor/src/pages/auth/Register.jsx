@@ -55,17 +55,29 @@ const Register = () => {
       );
 
       if (otpResponse.data?.error === false) {
-        toast.success('OTP code sent to your email');
+        toast.success(otpResponse.data?.message || 'OTP code sent to your email. Please check your inbox (and spam folder).');
         setFormData(prev => ({ ...prev, email }));
       } else {
         // If user doesn't exist yet, that's okay - OTP will be sent during registration
-        setFormData(prev => ({ ...prev, email }));
-        toast.info('Please continue. OTP will be sent after registration.');
+        if (otpResponse.data?.message?.includes('complete registration first')) {
+          setFormData(prev => ({ ...prev, email }));
+          toast.info('Please continue with registration. OTP will be sent after registration.');
+        } else {
+          toast.error(otpResponse.data?.message || 'Failed to send OTP. Please try again or continue with registration.');
+          setFormData(prev => ({ ...prev, email }));
+        }
       }
     } catch (error) {
-      // If no application exists, proceed to step 2
-      setFormData(prev => ({ ...prev, email }));
-      // OTP will be sent during registration
+      // Handle error response
+      if (error.response?.data?.error === true) {
+        toast.error(error.response.data?.message || 'Failed to send OTP email. Please check your email configuration or try again later.');
+      } else if (error.response?.status === 500) {
+        toast.error('Email service error. Please try again later or contact support.');
+      } else {
+        // If no application exists, proceed to step 2
+        setFormData(prev => ({ ...prev, email }));
+        toast.info('Please continue with registration. OTP will be sent after registration.');
+      }
     } finally {
       setOtpLoading(false);
     }

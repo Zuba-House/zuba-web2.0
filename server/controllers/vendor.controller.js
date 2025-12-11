@@ -81,8 +81,9 @@ export const applyToBecomeVendor = async (req, res) => {
         user.otpExpires = Date.now() + 600000;
         await user.save();
 
-        // Send OTP email
-        console.log('📧 Sending vendor registration OTP email to:', email);
+      // Send OTP email
+      console.log('📧 Sending vendor registration OTP email to:', email);
+      try {
         const emailSent = await sendEmailFun({
           sendTo: email,
           subject: "Verify Your Email - Zuba House Vendor Registration",
@@ -94,7 +95,13 @@ export const applyToBecomeVendor = async (req, res) => {
           console.log('✅ Vendor OTP email sent successfully to:', email);
         } else {
           console.error('❌ Failed to send vendor OTP email to:', email);
+          // Log warning but don't fail registration
+          console.warn('⚠️ Registration will continue, but email verification may not work until email service is configured.');
         }
+      } catch (emailError) {
+        console.error('❌ Error sending vendor OTP email:', emailError);
+        // Don't fail registration, but log the error
+      }
       }
     } else {
       // Create new user account
@@ -133,17 +140,24 @@ export const applyToBecomeVendor = async (req, res) => {
 
       // Send OTP email
       console.log('📧 Sending vendor registration OTP email to:', email);
-      const emailSent = await sendEmailFun({
-        sendTo: email,
-        subject: "Verify Your Email - Zuba House Vendor Registration",
-        text: "",
-        html: VerificationEmail(name, verifyCode)
-      });
+      try {
+        const emailSent = await sendEmailFun({
+          sendTo: email,
+          subject: "Verify Your Email - Zuba House Vendor Registration",
+          text: "",
+          html: VerificationEmail(name, verifyCode)
+        });
 
-      if (emailSent) {
-        console.log('✅ Vendor OTP email sent successfully to:', email);
-      } else {
-        console.error('❌ Failed to send vendor OTP email to:', email);
+        if (emailSent) {
+          console.log('✅ Vendor OTP email sent successfully to:', email);
+        } else {
+          console.error('❌ Failed to send vendor OTP email to:', email);
+          // Log warning but don't fail registration
+          console.warn('⚠️ Registration will continue, but email verification may not work until email service is configured.');
+        }
+      } catch (emailError) {
+        console.error('❌ Error sending vendor OTP email:', emailError);
+        // Don't fail registration, but log the error
       }
     }
 
@@ -312,25 +326,39 @@ export const resendVendorOTP = async (req, res) => {
 
     // Send OTP email
     console.log('📧 Resending vendor OTP email to:', email);
-    const emailSent = await sendEmailFun({
-      sendTo: email,
-      subject: "Verify Your Email - Zuba House Vendor Registration",
-      text: "",
-      html: VerificationEmail(user.name || email, verifyCode)
-    });
-
-    if (emailSent) {
-      console.log('✅ Vendor OTP email resent successfully to:', email);
-      return res.status(200).json({
-        error: false,
-        success: true,
-        message: 'OTP code sent to your email'
+    try {
+      const emailSent = await sendEmailFun({
+        sendTo: email,
+        subject: "Verify Your Email - Zuba House Vendor Registration",
+        text: "",
+        html: VerificationEmail(user.name || email, verifyCode)
       });
-    } else {
+
+      if (emailSent) {
+        console.log('✅ Vendor OTP email resent successfully to:', email);
+        return res.status(200).json({
+          error: false,
+          success: true,
+          message: 'OTP code sent to your email. Please check your inbox (and spam folder).'
+        });
+      } else {
+        console.error('❌ Failed to send vendor OTP email - sendEmailFun returned false');
+        // Still return the OTP in development, but warn the user
+        const isDevelopment = process.env.NODE_ENV !== 'production';
+        return res.status(500).json({
+          error: true,
+          success: false,
+          message: 'Failed to send OTP email. Please check your email configuration or try again later.',
+          ...(isDevelopment && { debug: 'Email service returned false. Check SENDGRID_API_KEY and email configuration.' })
+        });
+      }
+    } catch (emailError) {
+      console.error('❌ Error sending vendor OTP email:', emailError);
       return res.status(500).json({
         error: true,
         success: false,
-        message: 'Failed to send OTP email. Please try again.'
+        message: 'Failed to send OTP email. Please check your email configuration.',
+        debug: process.env.NODE_ENV !== 'production' ? emailError.message : undefined
       });
     }
   } catch (error) {
