@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast';
 import axios from 'axios';
 
 const Register = () => {
-  const [step, setStep] = useState(1); // 1: Email verification, 2: Registration form
+  const [step, setStep] = useState(2); // 1: Email verification, 2: Registration form (start with form)
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [emailVerified, setEmailVerified] = useState(false);
@@ -301,7 +301,17 @@ const Register = () => {
               )}
         </div>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 space-y-3 text-center">
+          <button
+            type="button"
+            onClick={() => {
+              setFormData(prev => ({ ...prev, email: email || '' }));
+              setStep(2);
+            }}
+            className="w-full text-sm text-[#efb291] hover:text-[#e5a67d] font-medium transition-colors underline"
+          >
+            Skip email verification and continue to registration form →
+          </button>
           <p className="text-gray-600">Already have a vendor account?</p>
           <Link
             to="/login"
