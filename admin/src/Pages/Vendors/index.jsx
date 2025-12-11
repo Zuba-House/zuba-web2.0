@@ -74,6 +74,14 @@ export const Vendors = () => {
         getVendors(page, rowsPerPage, statusFilter);
     }, [page, rowsPerPage, statusFilter]);
 
+    useEffect(() => {
+        // Reset to page 0 when search changes
+        if (searchQuery !== undefined) {
+            setPage(0);
+            getVendors(0, rowsPerPage, statusFilter);
+        }
+    }, [searchQuery]);
+
     const getVendors = (pageNum, limit, status = "") => {
         setIsLoading(true);
         const queryParams = new URLSearchParams({
@@ -85,7 +93,10 @@ export const Vendors = () => {
             queryParams.append('search', searchQuery.trim());
         }
 
-        fetchDataFromApi(`/api/admin/vendors?${queryParams.toString()}`).then((res) => {
+        const url = `/api/admin/vendors?${queryParams.toString()}`;
+        console.log('🔍 Fetching vendors:', url);
+        
+        fetchDataFromApi(url).then((res) => {
             if (res?.error === false && res?.data) {
                 // Ensure vendors array exists and has safe defaults
                 const safeData = {
