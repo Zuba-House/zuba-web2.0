@@ -9,6 +9,7 @@ import { createContext, useState } from "react";
 import Login from "./Pages/Login";
 import SignUp from "./Pages/SignUp";
 import Products from "./Pages/Products";
+import ErrorBoundary from "./Components/ErrorBoundary";
 
 import HomeSliderBanners from "./Pages/HomeSliderBanners";
 import CategoryList from "./Pages/Categegory";
@@ -668,7 +669,7 @@ function App() {
   };
 
   return (
-    <>
+    <ErrorBoundary>
       <MyContext.Provider value={values}>
         <RouterProvider router={router} />
         <LoadingBar
@@ -680,7 +681,7 @@ function App() {
         />
         <Toaster />
       </MyContext.Provider>
-    </>
+    </ErrorBoundary>
   );
 }
 

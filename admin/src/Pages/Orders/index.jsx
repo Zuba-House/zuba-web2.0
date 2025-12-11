@@ -107,9 +107,9 @@ export const Orders = () => {
     if (searchQuery !== "") {
       const filteredOrders = totalOrdersData?.data?.filter((order) =>
         order._id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order?.userId?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order?.userId?.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order?.createdAt.includes(searchQuery)
+        order?.userId?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order?.userId?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order?.createdAt?.includes(searchQuery)
       );
       setOrdersData(filteredOrders)
     } else {

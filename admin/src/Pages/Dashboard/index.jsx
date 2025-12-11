@@ -95,9 +95,9 @@ const Dashboard = () => {
     if (orderSearchQuery !== "") {
       const filteredOrders = totalOrdersData?.data?.filter((order) =>
         order._id?.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
-        order?.userId?.name.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
-        order?.userId?.email.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
-        order?.createdAt.includes(orderSearchQuery)
+        order?.userId?.name?.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
+        order?.userId?.email?.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
+        order?.createdAt?.includes(orderSearchQuery)
       );
       setOrdersData(filteredOrders)
     } else {

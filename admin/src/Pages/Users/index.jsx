@@ -94,7 +94,7 @@ export const Users = () => {
         if (searchQuery !== "") {
             const filteredItems = userTotalData?.totalUsers?.filter((user) =>
                 user._id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                user?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                user?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 user?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 user?.createdAt?.toLowerCase().includes(searchQuery.toLowerCase())
 

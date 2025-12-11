@@ -97,7 +97,7 @@ export const Products = () => {
         if (searchQuery !== "") {
             const filteredOrders = productTotalData?.totalProducts?.filter((product) =>
                 product._id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                product?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                product?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 product?.catName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 product?.subCat?.includes(searchQuery)
             );
