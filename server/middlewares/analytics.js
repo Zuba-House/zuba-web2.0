@@ -16,8 +16,7 @@ const BOT_PATTERNS = [
 
 // Pages to skip tracking (API endpoints, health checks, etc.)
 const SKIP_PATHS = [
-    '/api/analytics',
-    '/api/health',
+    '/api/',  // Skip ALL API endpoints (not just /api/analytics)
     '/favicon.ico',
     '/robots.txt',
     '/sitemap.xml',
