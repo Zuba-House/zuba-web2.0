@@ -10,6 +10,7 @@ import Home from "./Pages/Home";
 import ProductListing from "./Pages/ProductListing";
 import { ProductDetails } from "./Pages/ProductDetails";
 import NGOMAProductsPage from "./Pages/NGOMAProducts";
+import BrandProductsPage from "./Pages/BrandProducts";
 import { createContext } from "react";
 
 import Login from "./Pages/Login";
@@ -791,6 +792,7 @@ function App() {
               path={"/products"}
               element={<ProductListing />}
             />
+            {/* Legacy NGOMA routes - kept for backward compatibility */}
             <Route
               path={"/ngoma"}
               exact={true}
@@ -801,6 +803,23 @@ function App() {
               exact={true}
               element={<NGOMAProductsPage />}
             />
+            
+            {/* Dynamic brand pages - handles all brands with case-insensitive URLs */}
+            {/* Generic brand route: /brand/brandname */}
+            <Route
+              path={"/brand/:brandSlug"}
+              exact={true}
+              element={<BrandProductsPage />}
+            />
+            
+            {/* Direct brand URLs - add more as needed */}
+            {/* KanyanaWorld brand - /kanyanaworld or /KanyanaWorld */}
+            <Route
+              path={"/kanyanaworld"}
+              exact={true}
+              element={<BrandProductsPage />}
+            />
+            
             <Route
               path={"/product/:id"}
               exact={true}
