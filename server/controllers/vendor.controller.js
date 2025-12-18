@@ -80,14 +80,31 @@ export const sendOTP = async (req, res) => {
       existingUser.otpExpires = Date.now() + 600000; // 10 minutes
       await existingUser.save();
       
-      // Send email
-      await sendOTPEmail(normalizedEmail, existingUser.name || 'Vendor', verifyCode);
+      console.log(`\n🔐 ====== OTP GENERATED FOR EXISTING USER ======`);
+      console.log(`📧 Email: ${normalizedEmail}`);
+      console.log(`👤 Name: ${existingUser.name || 'Vendor'}`);
+      console.log(`🔑 OTP Code: ${verifyCode}`);
+      console.log(`⏰ Expires in: 10 minutes`);
+      console.log(`================================================\n`);
+
+      // Try to send email
+      let emailSent = false;
+      try {
+        emailSent = await sendOTPEmail(normalizedEmail, existingUser.name || 'Vendor', verifyCode);
+      } catch (emailError) {
+        console.error('❌ Email sending failed, but OTP is stored:', emailError.message);
+      }
       
       return res.status(200).json({
         error: false,
         success: true,
-        message: 'OTP sent to your email. Please check your inbox.',
-        data: { email: normalizedEmail }
+        message: emailSent 
+          ? 'OTP sent to your email. Please check your inbox (and spam folder).'
+          : 'OTP generated. Please check your email or contact support.',
+        data: { 
+          email: normalizedEmail,
+          emailSent: emailSent
+        }
       });
     }
 
@@ -100,16 +117,31 @@ export const sendOTP = async (req, res) => {
       verified: false
     });
 
-    // Send email
-    await sendOTPEmail(normalizedEmail, 'Vendor', verifyCode);
-    
-    console.log(`📧 OTP for new vendor ${normalizedEmail}: ${verifyCode}`);
+    console.log(`\n🔐 ====== OTP GENERATED FOR NEW USER ======`);
+    console.log(`📧 Email: ${normalizedEmail}`);
+    console.log(`🔑 OTP Code: ${verifyCode}`);
+    console.log(`⏰ Expires in: 10 minutes`);
+    console.log(`==========================================\n`);
+
+    // Try to send email
+    let emailSent = false;
+    try {
+      emailSent = await sendOTPEmail(normalizedEmail, 'Vendor', verifyCode);
+    } catch (emailError) {
+      console.error('❌ Email sending failed, but OTP is stored:', emailError.message);
+      // Continue - OTP is stored and logged to console for testing
+    }
 
     return res.status(200).json({
       error: false,
       success: true,
-      message: 'OTP sent to your email. Please check your inbox.',
-      data: { email: normalizedEmail }
+      message: emailSent 
+        ? 'OTP sent to your email. Please check your inbox (and spam folder).'
+        : 'OTP generated. Please check your email or contact support.',
+      data: { 
+        email: normalizedEmail,
+        emailSent: emailSent
+      }
     });
   } catch (error) {
     console.error('Send OTP error:', error);
@@ -750,23 +782,35 @@ export const getDashboardStats = async (req, res) => {
 
 // Helper function to send OTP email
 async function sendOTPEmail(email, name, otp) {
-  console.log('📧 Sending vendor OTP email to:', email);
+  console.log('\n📧 ====== SENDING VENDOR OTP EMAIL ======');
+  console.log('📧 Recipient:', email);
+  console.log('👤 Name:', name);
+  console.log('🔐 OTP:', otp);
   
   try {
     const result = await sendEmailFun({
-      sendTo: [email],
-      subject: "Verify Your Email - Zuba House Vendor Registration",
-      text: `Your verification code is: ${otp}. This code expires in 10 minutes.`,
+      sendTo: email, // Can be string or array
+      subject: "🔐 Verify Your Email - Zuba House Vendor Registration",
+      text: `Hi ${name},\n\nYour verification code is: ${otp}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, please ignore this email.\n\nBest regards,\nZuba House Team`,
       html: VerificationEmail(name, otp)
     });
     
-    console.log('✅ Vendor OTP email sent successfully to:', email);
-    return result;
+    if (result) {
+      console.log('✅ Vendor OTP email sent successfully to:', email);
+      console.log('====================================\n');
+      return true;
+    } else {
+      console.log('⚠️ SendEmailFun returned false for:', email);
+      console.log('====================================\n');
+      return false;
+    }
   } catch (error) {
     console.error('❌ Failed to send vendor OTP email:', {
       to: email,
-      error: error.message
+      error: error.message,
+      stack: error.stack
     });
+    console.log('====================================\n');
     throw error;
   }
 }
