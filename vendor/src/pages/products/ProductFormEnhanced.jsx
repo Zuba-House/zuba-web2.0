@@ -20,6 +20,7 @@ const ProductFormEnhanced = () => {
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
+  const [thirdLevelCategories, setThirdLevelCategories] = useState([]);
   const [imagePreview, setImagePreview] = useState([]);
   const [expandedSections, setExpandedSections] = useState({
     basic: true,
@@ -41,8 +42,11 @@ const ProductFormEnhanced = () => {
     // Categories
     category: '',
     categories: [],
+    catName: '',
     subCat: '',
     subCatId: '',
+    thirdsubCat: '',
+    thirdsubCatId: '',
     
     // Identification
     sku: '',
@@ -60,6 +64,8 @@ const ProductFormEnhanced = () => {
     pricing: {
       regularPrice: 0,
       salePrice: null,
+      saleStartDate: null,
+      saleEndDate: null,
       currency: 'USD',
       taxStatus: 'taxable',
       taxClass: 'standard'
@@ -246,8 +252,11 @@ const ProductFormEnhanced = () => {
       categories: prev.categories.includes(categoryId) 
         ? prev.categories.filter(id => id !== categoryId) 
         : [...prev.categories, categoryId],
+      catName: selectedCategory?.name || '',
       subCat: '',
-      subCatId: ''
+      subCatId: '',
+      thirdsubCat: '',
+      thirdsubCatId: ''
     }));
     
     if (selectedCategory?.children && selectedCategory.children.length > 0) {
@@ -255,6 +264,33 @@ const ProductFormEnhanced = () => {
     } else {
       setSubCategories([]);
     }
+    setThirdLevelCategories([]);
+  };
+
+  const handleSubCategoryChange = (subCatId) => {
+    const selectedSubCat = subCategories.find(sub => sub._id === subCatId);
+    setFormData(prev => ({
+      ...prev,
+      subCatId: subCatId,
+      subCat: selectedSubCat?.name || '',
+      thirdsubCat: '',
+      thirdsubCatId: ''
+    }));
+    
+    if (selectedSubCat?.children && selectedSubCat.children.length > 0) {
+      setThirdLevelCategories(selectedSubCat.children);
+    } else {
+      setThirdLevelCategories([]);
+    }
+  };
+
+  const handleThirdLevelCategoryChange = (thirdCatId) => {
+    const selectedThirdCat = thirdLevelCategories.find(cat => cat._id === thirdCatId);
+    setFormData(prev => ({
+      ...prev,
+      thirdsubCatId: thirdCatId,
+      thirdsubCat: selectedThirdCat?.name || ''
+    }));
   };
 
   const handleCategoryToggle = (categoryId) => {
@@ -522,8 +558,8 @@ const ProductFormEnhanced = () => {
     }
 
     // Category validation
-    if (!formData.categories || formData.categories.length === 0) {
-      toast.error('Please select at least one category');
+    if (!formData.category) {
+      toast.error('Please select a primary category');
       return;
     }
     
@@ -561,8 +597,14 @@ const ProductFormEnhanced = () => {
         ...formData,
         productType,
         
-        // Set category (required) - use first category if available
-        category: formData.categories[0],
+        // Set category (required)
+        category: formData.category,
+        categories: formData.categories.length > 0 ? formData.categories : [formData.category],
+        catName: formData.catName || '',
+        subCat: formData.subCat || '',
+        subCatId: formData.subCatId || '',
+        thirdsubCat: formData.thirdsubCat || '',
+        thirdsubCatId: formData.thirdsubCatId || '',
         
         // Ensure images are properly formatted as objects with url
         images: formData.images.map((img, index) => {
@@ -582,13 +624,15 @@ const ProductFormEnhanced = () => {
           };
         }),
         
-        // Pricing with required price field
+        // Pricing with required price field and sale dates
         pricing: {
           regularPrice: regularPrice,
           salePrice: salePrice,
           price: effectivePrice, // This is required by backend
           currency: formData.pricing?.currency || 'USD',
           onSale: salePrice && salePrice < regularPrice,
+          saleStartDate: formData.pricing?.saleStartDate || null,
+          saleEndDate: formData.pricing?.saleEndDate || null,
           taxStatus: formData.pricing?.taxStatus || 'taxable',
           taxClass: formData.pricing?.taxClass || 'standard'
         },
@@ -826,12 +870,68 @@ const ProductFormEnhanced = () => {
                 </div>
               </div>
 
-              {/* Categories */}
+              {/* Primary Category */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Categories <span className="text-red-500">*</span>
+                  Primary Category <span className="text-red-500">*</span>
                 </label>
-                <div className="max-h-48 overflow-y-auto border border-gray-300 rounded-lg p-3">
+                <select
+                  value={formData.category}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#efb291] focus:border-transparent"
+                  required
+                >
+                  <option value="">Select Category</option>
+                  {categories.map((cat) => (
+                    <option key={cat._id} value={cat._id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sub Category */}
+              {subCategories.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Sub Category
+                  </label>
+                  <select
+                    value={formData.subCatId}
+                    onChange={(e) => handleSubCategoryChange(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#efb291] focus:border-transparent"
+                  >
+                    <option value="">Select Sub Category (Optional)</option>
+                    {subCategories.map((subCat) => (
+                      <option key={subCat._id} value={subCat._id}>{subCat.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Third Level Category */}
+              {thirdLevelCategories.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Third Level Category
+                  </label>
+                  <select
+                    value={formData.thirdsubCatId}
+                    onChange={(e) => handleThirdLevelCategoryChange(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#efb291] focus:border-transparent"
+                  >
+                    <option value="">Select Third Level (Optional)</option>
+                    {thirdLevelCategories.map((thirdCat) => (
+                      <option key={thirdCat._id} value={thirdCat._id}>{thirdCat.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Additional Categories */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Additional Categories (Optional)
+                </label>
+                <div className="max-h-32 overflow-y-auto border border-gray-300 rounded-lg p-3">
                   {categories.map((cat) => (
                     <label key={cat._id} className="flex items-center gap-2 py-1 cursor-pointer hover:bg-gray-50 px-2 rounded">
                       <input
@@ -1025,6 +1125,38 @@ const ProductFormEnhanced = () => {
                     </select>
                   </div>
                 </div>
+
+                {/* Sale Dates - only show if sale price is set */}
+                {formData.pricing?.salePrice && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-200">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Sale Start Date (Optional)
+                      </label>
+                      <input
+                        type="datetime-local"
+                        name="pricing.saleStartDate"
+                        value={formData.pricing?.saleStartDate ? new Date(formData.pricing.saleStartDate).toISOString().slice(0, 16) : ''}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#efb291] focus:border-transparent"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Leave empty for immediate sale</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Sale End Date (Optional)
+                      </label>
+                      <input
+                        type="datetime-local"
+                        name="pricing.saleEndDate"
+                        value={formData.pricing?.saleEndDate ? new Date(formData.pricing.saleEndDate).toISOString().slice(0, 16) : ''}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#efb291] focus:border-transparent"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Leave empty for no end date</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
