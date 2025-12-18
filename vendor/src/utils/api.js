@@ -86,9 +86,8 @@ export const uploadApi = {
   uploadImage: async (file) => {
     const formData = new FormData();
     formData.append('image', file);
-    return api.post('/upload/image', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    // DO NOT set Content-Type for FormData - axios will set it automatically with boundary
+    return api.post('/upload/image', formData);
   },
   // Upload product images - uses the same endpoint as admin
   uploadProductImages: async (files) => {
@@ -98,9 +97,9 @@ export const uploadApi = {
     } else {
       formData.append('images', files);
     }
-    return api.post('/product/uploadImages', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    // DO NOT set Content-Type for FormData - axios will set it automatically with boundary
+    // Setting it manually removes the boundary string and breaks the upload!
+    return api.post('/product/uploadImages', formData);
   },
 };
 
