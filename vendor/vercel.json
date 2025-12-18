@@ -5,11 +5,24 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/:path((?!manifest\\.json|favicon\\.ico|favicon\\.png|logo192\\.png|logo512\\.png|robots\\.txt|assets/).*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
+    {
+      "source": "/manifest.json",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
+    },
     {
       "source": "/(.*)",
       "headers": [
