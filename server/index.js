@@ -373,12 +373,18 @@ app.use("/api/banners", bannerRouter);
 // SEO Routes - Sitemap, robots.txt, product feeds
 app.use("/api/seo", seoRouter);
 
-// Serve robots.txt at root level
+// Serve robots.txt at root level (fallback - frontend proxies to /api/seo/robots.txt)
 app.get("/robots.txt", (req, res) => {
     const SITE_URL = process.env.FRONTEND_URL || 'https://zubahouse.com';
+    res.set({
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'public, max-age=86400'
+    });
     const robots = `# Zuba House Robots.txt
 User-agent: *
 Allow: /
+Allow: /products
+Allow: /product/
 Disallow: /api/
 Disallow: /my-account
 Disallow: /my-orders
@@ -387,10 +393,16 @@ Disallow: /checkout
 Disallow: /login
 Disallow: /register
 
-Sitemap: ${SITE_URL}/api/seo/sitemap.xml
+# Sitemap at root level
+Sitemap: ${SITE_URL}/sitemap.xml
 `;
-    res.set('Content-Type', 'text/plain');
-    res.send(robots);
+    res.status(200).send(robots);
+});
+
+// Serve sitemap.xml at root level (fallback - frontend proxies to /api/seo/sitemap.xml)
+app.get("/sitemap.xml", async (req, res) => {
+    // Redirect to the API endpoint for the actual sitemap
+    res.redirect(301, '/api/seo/sitemap.xml');
 });
 
 // Vendor routes

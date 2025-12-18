@@ -28,6 +28,5 @@ Disallow: /order/
 # Crawl-delay for politeness
 Crawl-delay: 1
 
-# Sitemap
-Sitemap: https://zubahouse.com/api/seo/sitemap.xml
-
+# Sitemap - accessible at root level
+Sitemap: https://zubahouse.com/sitemap.xml

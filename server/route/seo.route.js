@@ -9,9 +9,19 @@ const SITE_URL = process.env.FRONTEND_URL || 'https://zubahouse.com';
 /**
  * GET /api/seo/sitemap.xml
  * Generates a dynamic sitemap for all products and categories
+ * 
+ * CRITICAL: This endpoint returns RAW XML - no HTML, no JSX, no React
+ * Google expects plain XML with Content-Type: application/xml
  */
 router.get('/sitemap.xml', async (req, res) => {
     try {
+        // Set headers FIRST to ensure proper content type
+        res.set({
+            'Content-Type': 'application/xml; charset=utf-8',
+            'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+            'X-Content-Type-Options': 'nosniff'
+        });
+
         // Fetch all published products
         const products = await ProductModel.find({ 
             status: 'published',
@@ -23,20 +33,16 @@ router.get('/sitemap.xml', async (req, res) => {
 
         const currentDate = new Date().toISOString().split('T')[0];
 
-        // Generate XML sitemap
+        // Generate XML sitemap - plain text, NO HTML
         let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
-
-    <!-- Homepage -->
     <url>
         <loc>${SITE_URL}/</loc>
         <lastmod>${currentDate}</lastmod>
         <changefreq>daily</changefreq>
         <priority>1.0</priority>
     </url>
-
-    <!-- Static Pages -->
     <url>
         <loc>${SITE_URL}/products</loc>
         <lastmod>${currentDate}</lastmod>
@@ -84,9 +90,7 @@ router.get('/sitemap.xml', async (req, res) => {
         <lastmod>${currentDate}</lastmod>
         <changefreq>yearly</changefreq>
         <priority>0.3</priority>
-    </url>
-
-`;
+    </url>`;
 
         // Add category pages
         for (const category of categories) {
@@ -94,13 +98,13 @@ router.get('/sitemap.xml', async (req, res) => {
                 ? new Date(category.updatedAt).toISOString().split('T')[0]
                 : currentDate;
             
-            xml += `    <url>
+            xml += `
+    <url>
         <loc>${SITE_URL}/products?category=${encodeURIComponent(category._id)}</loc>
         <lastmod>${lastMod}</lastmod>
         <changefreq>weekly</changefreq>
         <priority>0.8</priority>
-    </url>
-`;
+    </url>`;
         }
 
         // Add product pages
@@ -109,24 +113,30 @@ router.get('/sitemap.xml', async (req, res) => {
                 ? new Date(product.updatedAt).toISOString().split('T')[0]
                 : currentDate;
             
-            xml += `    <url>
+            xml += `
+    <url>
         <loc>${SITE_URL}/product/${product._id}</loc>
         <lastmod>${lastMod}</lastmod>
         <changefreq>weekly</changefreq>
         <priority>0.8</priority>
-    </url>
-`;
+    </url>`;
         }
 
-        xml += '</urlset>';
+        xml += `
+</urlset>`;
 
-        res.set('Content-Type', 'application/xml');
-        res.set('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
-        res.send(xml);
+        // Send raw XML response
+        res.status(200).send(xml);
 
     } catch (error) {
         console.error('Error generating sitemap:', error);
-        res.status(500).send('Error generating sitemap');
+        // Even errors should return XML format for consistency
+        res.status(500).set('Content-Type', 'application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+        <loc>${SITE_URL}/</loc>
+    </url>
+</urlset>`);
     }
 });
 
@@ -135,8 +145,14 @@ router.get('/sitemap.xml', async (req, res) => {
  * Serves robots.txt for search engine crawlers
  */
 router.get('/robots.txt', (req, res) => {
+    // Set headers FIRST
+    res.set({
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'public, max-age=86400, s-maxage=86400'
+    });
+
     const robots = `# Zuba House Robots.txt
-# Allow search engines to crawl our site
+# https://zubahouse.com
 
 User-agent: *
 Allow: /
@@ -146,6 +162,7 @@ Allow: /about
 Allow: /faq
 Allow: /help-center
 Allow: /shipping-info
+Allow: /brand/
 
 # Disallow private/auth pages
 Disallow: /my-account
@@ -161,11 +178,14 @@ Disallow: /address
 Disallow: /delete-account
 Disallow: /order/
 
-# Disallow API endpoints
+# Disallow API endpoints from direct indexing
 Disallow: /api/
 
-# Allow product images
-Allow: /uploads/
+# Allow SEO endpoints for sitemap discovery
+Allow: /api/seo/sitemap.xml
+Allow: /sitemap.xml
+
+# Allow images
 Allow: /*.jpg$
 Allow: /*.jpeg$
 Allow: /*.png$
@@ -175,13 +195,11 @@ Allow: /*.webp$
 # Crawl-delay for politeness
 Crawl-delay: 1
 
-# Sitemap location
-Sitemap: ${SITE_URL}/api/seo/sitemap.xml
+# Sitemap location (root level - proxied from API)
+Sitemap: ${SITE_URL}/sitemap.xml
 `;
 
-    res.set('Content-Type', 'text/plain');
-    res.set('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
-    res.send(robots);
+    res.status(200).send(robots);
 });
 
 /**
@@ -325,5 +343,22 @@ router.get('/products-feed', async (req, res) => {
     }
 });
 
-export default router;
+/**
+ * GET /api/seo/test
+ * Simple test endpoint to verify SEO routes are working
+ */
+router.get('/test', (req, res) => {
+    res.json({
+        success: true,
+        message: 'SEO routes are working',
+        endpoints: {
+            sitemap: '/api/seo/sitemap.xml',
+            robots: '/api/seo/robots.txt',
+            productFeed: '/api/seo/products-feed',
+            productSeo: '/api/seo/product/:id'
+        },
+        siteUrl: SITE_URL
+    });
+});
 
+export default router;
