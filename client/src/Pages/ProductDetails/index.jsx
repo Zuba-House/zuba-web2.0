@@ -10,6 +10,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { Reviews } from "./reviews";
 import { normalizeProduct } from "../../utils/productNormalizer";
 import { isInStock } from "../../utils/productUtils";
+import { ProductSEO, BreadcrumbSEO } from "../../components/SEO";
 
 export const ProductDetails = () => {
 
@@ -98,6 +99,18 @@ export const ProductDetails = () => {
 
   return (
     <>
+      {/* SEO Meta Tags and JSON-LD Structured Data */}
+      {productData && (
+        <>
+          <ProductSEO product={productData} url={`/product/${id}`} />
+          <BreadcrumbSEO items={[
+            { name: 'Home', url: '/' },
+            { name: productData.catName || 'Products', url: '/products' },
+            { name: productData.name }
+          ]} />
+        </>
+      )}
+
       <div className="py-5 hidden">
         <div className="container">
           <Breadcrumbs aria-label="breadcrumb">

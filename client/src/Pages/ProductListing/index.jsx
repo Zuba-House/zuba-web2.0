@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Sidebar } from "../../components/Sidebar";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 import ProductItem from "../../components/ProductItem";
@@ -12,6 +13,7 @@ import Pagination from "@mui/material/Pagination";
 import ProductLoadingGrid from "../../components/ProductLoading/productLoadingGrid";
 import { postData } from "../../utils/api";
 import { MyContext } from "../../App";
+import { CategorySEO } from "../../components/SEO";
 
 const ProductListing = () => {
   const [itemView, setItemView] = useState("grid");
@@ -24,8 +26,14 @@ const ProductListing = () => {
   const [totalPages, setTotalPages] = useState(1);
 
   const [selectedSortVal, setSelectedSortVal] = useState("Name, A to Z");
+  const [searchParams] = useSearchParams();
 
   const context = useContext(MyContext);
+  
+  // Get category info from URL params for SEO
+  const categoryId = searchParams.get('catId') || searchParams.get('category');
+  const subCategoryId = searchParams.get('subCatId');
+  const categoryName = context?.catData?.find(cat => cat._id === categoryId)?.name;
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -56,6 +64,12 @@ const ProductListing = () => {
 
   return (
     <section className=" pb-0">
+      {/* SEO Meta Tags for Product Listing */}
+      <CategorySEO 
+        category={categoryName || 'All Products'}
+        products={productsData?.products || []}
+        url={`/products${categoryId ? `?catId=${categoryId}` : ''}`}
+      />
 
       <div className="bg-white p-2">
         <div className="container flex gap-3">

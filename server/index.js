@@ -33,6 +33,7 @@ import bannerRouter from './route/banner.route.js';
 import { transporter } from './config/emailService.js';
 import analyticsRouter from './route/analytics.route.js';
 import { analyticsMiddleware } from './middlewares/analytics.js';
+import seoRouter from './route/seo.route.js';
 
 // Validate environment variables at startup
 try {
@@ -368,6 +369,29 @@ app.use("/api", notificationRouter);
 app.use("/api/shipping", shippingRouter);
 app.use("/api", testRouter);
 app.use("/api/banners", bannerRouter);
+
+// SEO Routes - Sitemap, robots.txt, product feeds
+app.use("/api/seo", seoRouter);
+
+// Serve robots.txt at root level
+app.get("/robots.txt", (req, res) => {
+    const SITE_URL = process.env.FRONTEND_URL || 'https://zubahouse.com';
+    const robots = `# Zuba House Robots.txt
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /my-account
+Disallow: /my-orders
+Disallow: /cart
+Disallow: /checkout
+Disallow: /login
+Disallow: /register
+
+Sitemap: ${SITE_URL}/api/seo/sitemap.xml
+`;
+    res.set('Content-Type', 'text/plain');
+    res.send(robots);
+});
 
 // Vendor routes
 import vendorRouter from './route/vendor.route.js';

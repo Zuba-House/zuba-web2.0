@@ -25,6 +25,7 @@ import { Button } from "@mui/material";
 import { MdArrowRightAlt } from "react-icons/md";
 import { Link } from "react-router-dom";
 import NGOMAProducts from "../../components/NGOMAProducts";
+import { SEO } from "../../components/SEO";
 
 const Home = () => {
   const [value, setValue] = useState(0);
@@ -158,6 +159,14 @@ const Home = () => {
 
   return (
     <>
+      {/* SEO Meta Tags for Homepage */}
+      <SEO 
+        title="African Fashion, Clothing & Accessories - Shop Online"
+        description="Discover authentic African fashion at Zuba House. Shop our curated collection of traditional and modern African clothing, dresses, accessories, and handcrafted products. Free shipping on orders over $50."
+        url="/"
+        keywords={['African fashion', 'African clothing', 'African dresses', 'Ankara', 'African accessories', 'traditional African wear', 'online shopping', 'African marketplace']}
+      />
+
       {/* Responsive Hero Banner - supports mobile/desktop banners */}
       <ResponsiveHeroBanner />
       
