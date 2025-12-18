@@ -21,6 +21,13 @@ router.post('/verify-otp', vendorController.verifyOTP);
 // Step 3: Complete registration (requires verified email)
 router.post('/apply', vendorController.applyToBecomeVendor);
 
+// Vendor Login (dedicated endpoint)
+router.post('/login', vendorController.vendorLogin);
+
+// Password Reset
+router.post('/forgot-password', vendorController.forgotPassword);
+router.post('/reset-password', vendorController.resetPassword);
+
 // Legacy endpoints (kept for backward compatibility)
 router.post('/verify-email', vendorController.verifyVendorEmail);
 router.post('/resend-otp', vendorController.resendVendorOTP);

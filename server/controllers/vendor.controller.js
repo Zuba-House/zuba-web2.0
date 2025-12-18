@@ -351,9 +351,26 @@ export const applyToBecomeVendor = async (req, res) => {
           message: 'This email already has a vendor account'
         });
       }
-      // Update user role to VENDOR
+      
+      // Update existing user to become vendor
       user.role = 'VENDOR';
+      user.verify_email = true; // Ensure email is marked as verified
+      user.status = 'Active'; // Ensure account is active
+      
+      // Update name if provided
+      if (name) {
+        user.name = name;
+      }
+      
+      // Update password if provided (for existing users who want to set/change password)
+      if (password && password.length >= 6) {
+        const salt = await bcryptjs.genSalt(10);
+        user.password = await bcryptjs.hash(password, salt);
+        console.log('✅ Password updated for existing user:', normalizedEmail);
+      }
+      
       await user.save();
+      console.log('✅ Existing user updated to VENDOR:', normalizedEmail);
     } else {
       // Create new user account
       if (!password || password.length < 6) {
@@ -548,6 +565,317 @@ export const getApplicationStatus = async (req, res) => {
       error: true,
       success: false,
       message: error.message || 'Failed to check application status'
+    });
+  }
+};
+
+/**
+ * POST /api/vendor/login
+ * Public endpoint - Vendor login
+ */
+export const vendorLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Email and password are required'
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log('🔐 Vendor login attempt:', normalizedEmail);
+
+    // Find user with vendor role
+    const user = await UserModel.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    // Check if user is a vendor
+    if (user.role !== 'VENDOR') {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'No vendor account found for this email. Please register as a vendor first.'
+      });
+    }
+
+    // Check account status
+    if (user.status !== 'Active') {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Your account is inactive. Please contact support.'
+      });
+    }
+
+    // Verify password
+    const isPasswordValid = await bcryptjs.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    // Get vendor profile
+    const vendor = await VendorModel.findOne({ ownerUser: user._id });
+    if (!vendor) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Vendor profile not found. Please contact support.'
+      });
+    }
+
+    // Check vendor status
+    if (vendor.status === 'SUSPENDED') {
+      return res.status(403).json({
+        error: true,
+        success: false,
+        message: 'Your vendor account has been suspended. Please contact support.',
+        vendorStatus: 'SUSPENDED'
+      });
+    }
+
+    // Import token generator
+    const generatedAccessToken = (await import('../utils/generatedAccessToken.js')).default;
+    const genertedRefreshToken = (await import('../utils/generatedRefreshToken.js')).default;
+
+    const accessToken = await generatedAccessToken(user._id);
+    const refreshToken = await genertedRefreshToken(user._id);
+
+    // Update last login
+    user.last_login_date = new Date();
+    await user.save();
+
+    console.log('✅ Vendor login successful:', normalizedEmail);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message: 'Login successful',
+      data: {
+        accesstoken: accessToken,
+        refreshToken: refreshToken,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role
+        },
+        vendor: {
+          id: vendor._id,
+          storeName: vendor.storeName,
+          storeSlug: vendor.storeSlug,
+          status: vendor.status
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Vendor login error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Login failed'
+    });
+  }
+};
+
+/**
+ * POST /api/vendor/forgot-password
+ * Public endpoint - Send password reset OTP
+ */
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log('🔐 Forgot password request for:', normalizedEmail);
+
+    // Find user
+    const user = await UserModel.findOne({ email: normalizedEmail, role: 'VENDOR' });
+
+    if (!user) {
+      // Don't reveal if email exists or not for security
+      return res.status(200).json({
+        error: false,
+        success: true,
+        message: 'If an account exists with this email, you will receive a password reset code.'
+      });
+    }
+
+    // Generate OTP
+    const resetOTP = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Store OTP in user document
+    user.otp = resetOTP;
+    user.otpExpires = Date.now() + 600000; // 10 minutes
+    await user.save();
+
+    console.log(`🔐 Password reset OTP for ${normalizedEmail}: ${resetOTP}`);
+
+    // Send email
+    try {
+      await sendEmailFun({
+        sendTo: normalizedEmail,
+        subject: "🔐 Reset Your Password - Zuba House Vendor",
+        text: `Your password reset code is: ${resetOTP}. This code expires in 10 minutes.`,
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: 'Segoe UI', Arial, sans-serif; background: #f8f9fa; margin: 0; padding: 20px; }
+              .container { max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+              .header { background: linear-gradient(135deg, #0b2735, #1a3d52); color: white; padding: 30px; text-align: center; }
+              .header h1 { margin: 0; font-size: 24px; color: #efb291; }
+              .content { padding: 30px; text-align: center; }
+              .otp-box { background: linear-gradient(135deg, #efb291, #eeb190); border-radius: 10px; padding: 25px; margin: 20px 0; }
+              .otp-code { font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #0b2735; font-family: monospace; }
+              .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 20px 0; text-align: left; font-size: 14px; }
+              .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>Password Reset</h1>
+                <p style="margin: 10px 0 0 0; opacity: 0.9;">Zuba House Vendor Portal</p>
+              </div>
+              <div class="content">
+                <p>Hello ${user.name || 'Vendor'},</p>
+                <p>You requested to reset your password. Use the code below:</p>
+                <div class="otp-box">
+                  <div class="otp-code">${resetOTP}</div>
+                </div>
+                <div class="warning">
+                  <strong>⏰ This code expires in 10 minutes.</strong><br>
+                  If you didn't request this, please ignore this email.
+                </div>
+              </div>
+              <div class="footer">
+                <p>© ${new Date().getFullYear()} Zuba House. All rights reserved.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `
+      });
+      console.log('✅ Password reset email sent to:', normalizedEmail);
+    } catch (emailError) {
+      console.error('❌ Failed to send password reset email:', emailError);
+    }
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message: 'If an account exists with this email, you will receive a password reset code.'
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Failed to process request'
+    });
+  }
+};
+
+/**
+ * POST /api/vendor/reset-password
+ * Public endpoint - Reset password with OTP
+ */
+export const resetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Email, OTP, and new password are required'
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Password must be at least 6 characters'
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Find user
+    const user = await UserModel.findOne({ email: normalizedEmail, role: 'VENDOR' });
+
+    if (!user) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Invalid request'
+      });
+    }
+
+    // Verify OTP
+    if (user.otp !== otp.trim()) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Invalid OTP code'
+      });
+    }
+
+    if (!user.otpExpires || Date.now() > user.otpExpires) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'OTP expired. Please request a new one.'
+      });
+    }
+
+    // Hash new password
+    const salt = await bcryptjs.genSalt(10);
+    const hashedPassword = await bcryptjs.hash(newPassword, salt);
+
+    // Update password and clear OTP
+    user.password = hashedPassword;
+    user.otp = null;
+    user.otpExpires = null;
+    await user.save();
+
+    console.log('✅ Password reset successful for:', normalizedEmail);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message: 'Password reset successful! You can now login with your new password.'
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Failed to reset password'
     });
   }
 };
