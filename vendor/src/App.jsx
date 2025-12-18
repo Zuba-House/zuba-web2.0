@@ -19,6 +19,7 @@ import DashboardHome from './pages/dashboard/DashboardHome';
 // Products
 import ProductList from './pages/products/ProductList';
 import ProductForm from './pages/products/ProductForm';
+import ProductFormEnhanced from './pages/products/ProductFormEnhanced';
 
 // Orders
 import OrderList from './pages/orders/OrderList';
@@ -110,14 +111,14 @@ function App() {
         <Route path="/products/new" element={
           <ProtectedRoute>
             <VendorDashboardLayout>
-              <ProductForm />
+              <ProductFormEnhanced />
             </VendorDashboardLayout>
           </ProtectedRoute>
         } />
         <Route path="/products/:id/edit" element={
           <ProtectedRoute>
             <VendorDashboardLayout>
-              <ProductForm />
+              <ProductFormEnhanced />
             </VendorDashboardLayout>
           </ProtectedRoute>
         } />
