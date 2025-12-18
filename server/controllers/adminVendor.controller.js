@@ -2,6 +2,7 @@ import VendorModel from '../models/vendor.model.js';
 import UserModel from '../models/user.model.js';
 import ProductModel from '../models/product.model.js';
 import OrderModel from '../models/order.model.js';
+import { sendVendorWelcome, sendVendorStatusChange } from '../utils/vendorEmails.js';
 
 /**
  * GET /api/admin/vendors
@@ -180,7 +181,18 @@ export const updateVendorStatus = async (req, res) => {
 
     await vendor.save();
 
-    // TODO: Send email notification to vendor about status change
+    // Send email notification to vendor about status change (non-blocking)
+    if (vendor.email) {
+      if (status === 'APPROVED') {
+        sendVendorWelcome(vendor).catch(err => {
+          console.error('Failed to send vendor welcome email:', err);
+        });
+      } else {
+        sendVendorStatusChange(vendor, status, notes || '').catch(err => {
+          console.error('Failed to send vendor status change email:', err);
+        });
+      }
+    }
 
     return res.status(200).json({
       error: false,

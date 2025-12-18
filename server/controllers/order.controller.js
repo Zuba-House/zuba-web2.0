@@ -2,12 +2,15 @@ import OrderModel from "../models/order.model.js";
 import ProductModel from '../models/product.model.js';
 import UserModel from '../models/user.model.js';
 import AddressModel from "../models/address.model.js";
+import VendorModel from '../models/vendor.model.js';
 // PayPal removed - using Stripe for payments
 // import paypal from "@paypal/checkout-server-sdk";
 import OrderConfirmationEmail from "../utils/orderEmailTemplate.js";
 import OrderCancellationEmail from "../utils/orderCancellationEmailTemplate.js";
 import AdminOrderNotificationEmail from "../utils/adminOrderNotificationEmailTemplate.js";
 import sendEmailFun from "../config/sendEmail.js";
+import { calculateOrderCommissions, creditVendorBalance } from "../utils/commissionCalculator.js";
+import { sendVendorNewOrder } from "../utils/vendorEmails.js";
 
 export const createOrderController = async (request, response) => {
     try {
@@ -140,6 +143,68 @@ export const createOrderController = async (request, response) => {
                 message: 'Failed to save order to database',
                 details: process.env.NODE_ENV === 'development' ? saveError.message : undefined
             });
+        }
+
+        // ========================================
+        // CALCULATE VENDOR COMMISSIONS
+        // ========================================
+        try {
+            // Check if any products belong to vendors
+            const vendorProducts = request.body.products.filter(p => p.vendor || p.vendorId);
+            
+            if (vendorProducts.length > 0) {
+                console.log('💰 Calculating vendor commissions for', vendorProducts.length, 'vendor products');
+                
+                // Calculate commissions for all order items
+                const commissionResult = await calculateOrderCommissions(request.body.products);
+                
+                // Update order products with commission info
+                for (let i = 0; i < order.products.length; i++) {
+                    const updatedItem = commissionResult.items.find(item => 
+                        (item.productId?.toString() || item.productId) === (order.products[i].productId?.toString() || order.products[i].productId)
+                    );
+                    if (updatedItem) {
+                        order.products[i].vendorEarning = updatedItem.vendorEarning || 0;
+                        order.products[i].platformCommission = updatedItem.platformCommission || 0;
+                        order.products[i].commissionRate = updatedItem.commissionRate || 15;
+                    }
+                }
+                
+                // Add vendor summary to order
+                if (commissionResult.vendorSummary?.length > 0) {
+                    order.vendorSummary = commissionResult.vendorSummary.map(vs => ({
+                        vendor: vs.vendorId,
+                        vendorShopName: vs.vendorName || '',
+                        totalAmount: vs.totalAmount,
+                        commission: vs.commission,
+                        vendorEarning: vs.vendorEarning
+                    }));
+                }
+                
+                // Save order with commission data
+                await order.save();
+                console.log('✅ Order updated with commission data');
+                
+                // Send email notifications to vendors (non-blocking)
+                for (const vendorSum of (commissionResult.vendorSummary || [])) {
+                    try {
+                        const vendor = await VendorModel.findById(vendorSum.vendorId);
+                        if (vendor?.email) {
+                            const vendorItems = order.products.filter(p => 
+                                (p.vendor?.toString() || p.vendorId?.toString()) === vendorSum.vendorId.toString()
+                            );
+                            sendVendorNewOrder(vendor, order, vendorItems).catch(err => {
+                                console.error('Failed to send vendor order notification:', err);
+                            });
+                        }
+                    } catch (vendorEmailErr) {
+                        console.error('Error sending vendor notification:', vendorEmailErr);
+                    }
+                }
+            }
+        } catch (commissionError) {
+            console.error('⚠️ Commission calculation error (non-blocking):', commissionError);
+            // Don't fail order creation if commission calculation fails
         }
 
         // Update inventory only for successful or COD orders
@@ -541,6 +606,58 @@ export const updateOrderStatusController = async (request, response) => {
             order_statusProvided: order_status,
             updateData: updateData
         });
+
+        // ========================================
+        // CREDIT VENDOR BALANCE WHEN ORDER IS DELIVERED
+        // ========================================
+        const isDelivered = newStatus === 'Delivered' || newStatus === 'delivered' || order_status === 'delivered';
+        const wasNotDelivered = oldStatus !== 'Delivered' && oldStatus !== 'delivered';
+        
+        if (isDelivered && wasNotDelivered) {
+            console.log('💰 Order delivered - crediting vendor balances...');
+            try {
+                // Get vendor items from order
+                const vendorItems = savedOrder.products.filter(p => p.vendor || p.vendorId);
+                
+                if (vendorItems.length > 0) {
+                    // Group earnings by vendor
+                    const vendorEarnings = {};
+                    
+                    for (const item of vendorItems) {
+                        const vendorId = (item.vendor || item.vendorId)?.toString();
+                        if (vendorId) {
+                            if (!vendorEarnings[vendorId]) {
+                                vendorEarnings[vendorId] = 0;
+                            }
+                            // Use vendorEarning if calculated, otherwise use subTotal
+                            vendorEarnings[vendorId] += item.vendorEarning || item.subTotal || 0;
+                            
+                            // Update item status to delivered
+                            item.vendorStatus = 'DELIVERED';
+                            item.deliveredAt = new Date();
+                        }
+                    }
+                    
+                    // Credit each vendor
+                    for (const [vendorId, earning] of Object.entries(vendorEarnings)) {
+                        if (earning > 0) {
+                            try {
+                                await creditVendorBalance(vendorId, earning, savedOrder._id);
+                                console.log(`✅ Credited $${earning} to vendor ${vendorId}`);
+                            } catch (creditErr) {
+                                console.error(`❌ Failed to credit vendor ${vendorId}:`, creditErr);
+                            }
+                        }
+                    }
+                    
+                    // Save order with updated vendor statuses
+                    await savedOrder.save();
+                }
+            } catch (vendorCreditError) {
+                console.error('⚠️ Vendor credit error (non-blocking):', vendorCreditError);
+                // Don't fail status update if vendor credit fails
+            }
+        }
 
         // Send email notification if status changed (check both status and order_status)
         // Always send email if status is provided (even if it's the same, admin might want to notify customer)

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import auth from '../middlewares/auth.js';
 import { requireVendor } from '../middlewares/vendorAuth.js';
 
-// Controllers (to be implemented)
+// Controllers
 import * as vendorController from '../controllers/vendor.controller.js';
 import * as vendorProductController from '../controllers/vendorProduct.controller.js';
 import * as vendorOrderController from '../controllers/vendorOrder.controller.js';
@@ -42,14 +42,18 @@ router.put('/orders/:id/status', vendorOrderController.updateStatus);
 // Coupons
 router.get('/coupons', vendorCouponController.list);
 router.post('/coupons', vendorCouponController.create);
+router.get('/coupons/stats', vendorCouponController.getStats); // Must be before :id route
 router.get('/coupons/:id', vendorCouponController.get);
 router.put('/coupons/:id', vendorCouponController.update);
+router.put('/coupons/:id/toggle', vendorCouponController.toggleStatus);
 router.delete('/coupons/:id', vendorCouponController.remove);
 
 // Finance / Payouts
 router.get('/finance/summary', vendorFinanceController.summary);
 router.get('/payouts', vendorFinanceController.listPayouts);
 router.post('/payouts/request', vendorFinanceController.requestPayout);
+router.get('/payouts/:id', vendorFinanceController.getPayoutDetails);
+router.put('/me/payout-settings', vendorFinanceController.updatePayoutSettings);
 
 export default router;
 
