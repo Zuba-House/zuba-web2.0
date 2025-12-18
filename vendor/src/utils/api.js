@@ -90,6 +90,18 @@ export const uploadApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+  // Upload product images - uses the same endpoint as admin
+  uploadProductImages: async (files) => {
+    const formData = new FormData();
+    if (Array.isArray(files)) {
+      files.forEach(file => formData.append('images', file));
+    } else {
+      formData.append('images', files);
+    }
+    return api.post('/product/uploadImages', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
 
 export default api;

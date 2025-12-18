@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { vendorApi, categoryApi } from '../../utils/api';
+import { vendorApi, categoryApi, uploadApi } from '../../utils/api';
 import { 
   ArrowLeft, Upload, X, Save, Loader, Package, 
   DollarSign, Box, Tag, Image, Settings, ChevronDown, ChevronUp,
@@ -307,20 +307,9 @@ const ProductFormEnhanced = () => {
     
     for (const file of files) {
       try {
-        // Create FormData for upload
-        const uploadFormData = new FormData();
-        uploadFormData.append('images', file);
-        
-        // Upload to server
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://zuba-api.onrender.com'}/api/product/uploadImages`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-          },
-          body: uploadFormData
-        });
-        
-        const data = await response.json();
+        // Upload using the api utility (includes auth token automatically)
+        const response = await uploadApi.uploadProductImages(file);
+        const data = response.data;
         
         if (data.images && data.images.length > 0) {
           const imageUrl = data.images[0];
@@ -337,10 +326,13 @@ const ProductFormEnhanced = () => {
             ...prev,
             images: [...prev.images, imageObj]
           }));
+          toast.success('Image uploaded successfully');
+        } else {
+          toast.error('Failed to upload image');
         }
       } catch (error) {
         console.error('Image upload error:', error);
-        toast.error('Failed to upload image');
+        toast.error(error.response?.data?.message || 'Failed to upload image');
       }
     }
   };
