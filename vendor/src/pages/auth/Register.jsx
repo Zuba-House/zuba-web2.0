@@ -3,10 +3,13 @@ import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://zuba-api.onrender.com';
+
 const Register = () => {
-  const [step, setStep] = useState(1); // 1: Email verification (MANDATORY), 2: Registration form
+  const [step, setStep] = useState(1); // 1: Email + OTP, 2: Registration form
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -28,7 +31,7 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Step 1: Send OTP to email
+  // Step 1a: Send OTP to email
   const handleSendOTP = async () => {
     if (!email || !email.includes('@')) {
       toast.error('Please enter a valid email address');
@@ -37,79 +40,59 @@ const Register = () => {
 
     setOtpLoading(true);
     try {
-      // First check if email already has vendor account
-      const checkResponse = await axios.get(
-        `${import.meta.env.VITE_API_URL || 'https://zuba-api.onrender.com'}/api/vendor/application-status/${email}`
-      );
+      const response = await axios.post(`${API_URL}/api/vendor/send-otp`, {
+        email: email.toLowerCase().trim()
+      });
 
-      if (checkResponse.data?.data?.hasApplication) {
-        toast.error('This email already has a vendor application');
-        setOtpLoading(false);
-        return;
-      }
-
-      // Send OTP for verification
-      const otpResponse = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'https://zuba-api.onrender.com'}/api/vendor/resend-otp`,
-        { email }
-      );
-
-      if (otpResponse.data?.error === false) {
-        toast.success(otpResponse.data?.message || 'OTP code sent to your email. Please check your inbox (and spam folder).');
-        setFormData(prev => ({ ...prev, email }));
-      } else {
-        // If user doesn't exist yet, that's okay - OTP will be sent during registration
-        if (otpResponse.data?.message?.includes('complete registration first')) {
-          setFormData(prev => ({ ...prev, email }));
-          toast.info('Please continue with registration. OTP will be sent after registration.');
+      if (response.data?.error === false) {
+        if (response.data?.data?.emailVerified) {
+          // Email already verified
+          setEmailVerified(true);
+          setFormData(prev => ({ ...prev, email: email.toLowerCase().trim() }));
+          toast.success('Email already verified! Continue with registration.');
+          setTimeout(() => setStep(2), 500);
         } else {
-          toast.error(otpResponse.data?.message || 'Failed to send OTP. Please try again or continue with registration.');
-          setFormData(prev => ({ ...prev, email }));
+          // OTP sent successfully
+          setOtpSent(true);
+          toast.success('Verification code sent to your email!');
         }
+      } else {
+        toast.error(response.data?.message || 'Failed to send verification code');
       }
     } catch (error) {
-      // Handle error response
-      if (error.response?.data?.error === true) {
-        toast.error(error.response.data?.message || 'Failed to send OTP email. Please check your email configuration or try again later.');
-      } else if (error.response?.status === 500) {
-        toast.error('Email service error. Please try again later or contact support.');
-      } else {
-        // If no application exists, proceed to step 2
-        setFormData(prev => ({ ...prev, email }));
-        toast.info('Please continue with registration. OTP will be sent after registration.');
-      }
+      const errorMsg = error.response?.data?.message || 'Failed to send verification code';
+      toast.error(errorMsg);
+      console.error('Send OTP error:', error);
     } finally {
       setOtpLoading(false);
     }
   };
 
-  // Verify OTP
+  // Step 1b: Verify OTP
   const handleVerifyOTP = async () => {
     if (!otp || otp.length !== 6) {
-      toast.error('Please enter a valid 6-digit OTP');
+      toast.error('Please enter the 6-digit verification code');
       return;
     }
 
     setOtpLoading(true);
     try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'https://zuba-api.onrender.com'}/api/vendor/verify-email`,
-        { email, otp }
-      );
+      const response = await axios.post(`${API_URL}/api/vendor/verify-otp`, {
+        email: email.toLowerCase().trim(),
+        otp: otp.trim()
+      });
 
       if (response.data?.error === false) {
         setEmailVerified(true);
         setFormData(prev => ({ ...prev, email: email.toLowerCase().trim() }));
-        toast.success('Email verified successfully! You can now complete your registration.');
-        // Automatically proceed to registration form after verification
-        setTimeout(() => {
-          setStep(2);
-        }, 1000);
+        toast.success('Email verified successfully!');
+        setTimeout(() => setStep(2), 1000);
       } else {
-        toast.error(response.data?.message || 'Invalid OTP');
+        toast.error(response.data?.message || 'Invalid verification code');
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to verify OTP');
+      toast.error(error.response?.data?.message || 'Invalid verification code');
+      console.error('Verify OTP error:', error);
     } finally {
       setOtpLoading(false);
     }
@@ -117,24 +100,8 @@ const Register = () => {
 
   // Resend OTP
   const handleResendOTP = async () => {
-    setOtpLoading(true);
-    try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'https://zuba-api.onrender.com'}/api/vendor/resend-otp`,
-        { email }
-      );
-
-      if (response.data?.error === false) {
-        toast.success('OTP code sent to your email');
-        setOtp('');
-      } else {
-        toast.error(response.data?.message || 'Failed to resend OTP');
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to resend OTP');
-    } finally {
-      setOtpLoading(false);
-    }
+    setOtp('');
+    await handleSendOTP();
   };
 
   const handleChange = (e) => {
@@ -158,19 +125,15 @@ const Register = () => {
     }
   };
 
+  // Step 2: Complete Registration
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // MANDATORY: Email must be verified before registration
-    if (!emailVerified || !email) {
+    // Email must be verified
+    if (!emailVerified) {
       toast.error('Please verify your email address first');
       setStep(1);
       return;
-    }
-
-    // Ensure email is set in formData
-    if (!formData.email || formData.email !== email.toLowerCase().trim()) {
-      setFormData(prev => ({ ...prev, email: email.toLowerCase().trim() }));
     }
     
     // Validation
@@ -184,7 +147,7 @@ const Register = () => {
       return;
     }
 
-    if (!formData.storeName || !formData.storeSlug || !formData.email) {
+    if (!formData.name || !formData.storeName || !formData.storeSlug) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -192,46 +155,45 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'https://zuba-api.onrender.com'}/api/vendor/apply`,
-        {
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          storeName: formData.storeName,
-          storeSlug: formData.storeSlug,
-          description: formData.description,
-          phone: formData.phone,
-          whatsapp: formData.whatsapp,
-          country: formData.country,
-          city: formData.city,
-          addressLine1: formData.addressLine1,
-          addressLine2: formData.addressLine2,
-          postalCode: formData.postalCode
-        }
-      );
+      const response = await axios.post(`${API_URL}/api/vendor/apply`, {
+        name: formData.name,
+        email: email.toLowerCase().trim(),
+        password: formData.password,
+        storeName: formData.storeName,
+        storeSlug: formData.storeSlug,
+        description: formData.description,
+        phone: formData.phone,
+        whatsapp: formData.whatsapp,
+        country: formData.country,
+        city: formData.city,
+        addressLine1: formData.addressLine1,
+        addressLine2: formData.addressLine2,
+        postalCode: formData.postalCode
+      });
 
       if (response.data?.error === false) {
-        if (response.data.data?.requiresEmailVerification) {
-          // Show OTP verification step
-          setStep(1);
-          setEmail(formData.email);
-          toast.success('Please verify your email. Check your inbox for the OTP code.');
-        } else {
-          toast.success('Vendor application submitted successfully! We will review your application and get back to you.');
-          navigate('/login');
-        }
+        toast.success(response.data?.message || 'Application submitted successfully!');
+        setTimeout(() => navigate('/login'), 2000);
       } else {
-        toast.error(response.data?.message || 'Registration failed');
+        // Check if email verification is required
+        if (response.data?.data?.requiresEmailVerification) {
+          toast.error('Please verify your email first');
+          setEmailVerified(false);
+          setStep(1);
+        } else {
+          toast.error(response.data?.message || 'Registration failed');
+        }
       }
     } catch (error) {
-      if (error.response?.data?.data?.requiresEmailVerification) {
+      const errorData = error.response?.data;
+      if (errorData?.data?.requiresEmailVerification) {
+        toast.error('Please verify your email first');
+        setEmailVerified(false);
         setStep(1);
-        setEmail(formData.email);
-        toast.success('Please verify your email. Check your inbox for the OTP code.');
       } else {
-        toast.error(error.response?.data?.message || 'Registration failed. Please try again.');
+        toast.error(errorData?.message || 'Registration failed. Please try again.');
       }
+      console.error('Registration error:', error);
     } finally {
       setLoading(false);
     }
@@ -241,95 +203,144 @@ const Register = () => {
   if (step === 1) {
     return (
       <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
-        <h1 className="text-2xl font-bold mb-6 text-gray-800">Verify Your Email</h1>
-        <p className="text-gray-600 mb-6">Enter your email address to receive a verification code.</p>
+        <h1 className="text-2xl font-bold mb-2 text-gray-800">Become a Vendor</h1>
+        <p className="text-gray-600 mb-6">First, let's verify your email address.</p>
+        
+        {/* Progress Indicator */}
+        <div className="flex items-center justify-center mb-6">
+          <div className="flex items-center">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+              emailVerified ? 'bg-green-500 text-white' : 'bg-[#efb291] text-white'
+            }`}>
+              {emailVerified ? '✓' : '1'}
+            </div>
+            <div className={`w-16 h-1 ${emailVerified ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+              emailVerified ? 'bg-[#efb291] text-white' : 'bg-gray-300 text-gray-500'
+            }`}>
+              2
+            </div>
+          </div>
+        </div>
         
         <div className="space-y-4">
+          {/* Email Input */}
           <div>
             <label className="block mb-2 text-gray-700 font-medium">Email Address *</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] disabled:bg-gray-100"
               placeholder="your@email.com"
               required
-              disabled={emailVerified}
+              disabled={emailVerified || otpSent}
             />
           </div>
 
-              {email && !emailVerified && (
-                <div>
-                  <label className="block mb-2 text-gray-700 font-medium">Enter OTP Code *</label>
-                  <input
-                    type="text"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] text-center text-2xl tracking-widest"
-                    placeholder="000000"
-                    maxLength={6}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Enter the 6-digit code sent to your email</p>
-                </div>
+          {/* Send OTP Button */}
+          {!otpSent && !emailVerified && (
+            <button
+              type="button"
+              onClick={handleSendOTP}
+              disabled={otpLoading || !email}
+              className="w-full bg-[#efb291] text-white py-3 rounded-lg hover:bg-[#e5a67d] disabled:opacity-50 font-medium transition-colors"
+            >
+              {otpLoading ? (
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Sending...
+                </span>
+              ) : (
+                'Send Verification Code'
               )}
+            </button>
+          )}
 
-              <div className="flex gap-2">
-                {email && emailVerified ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData(prev => ({ ...prev, email: email.toLowerCase().trim() }));
-                      setStep(2);
-                    }}
-                    className="flex-1 bg-[#efb291] text-white py-2 rounded-lg hover:bg-[#e5a67d] font-medium transition-colors"
-                  >
-                    Continue with Registration →
-                  </button>
-                ) : email && otp.length === 6 ? (
-                  <button
-                    type="button"
-                    onClick={handleVerifyOTP}
-                    disabled={otpLoading}
-                    className="flex-1 bg-[#efb291] text-white py-2 rounded-lg hover:bg-[#e5a67d] disabled:opacity-50 font-medium transition-colors"
-                  >
-                    {otpLoading ? 'Verifying...' : 'Verify OTP'}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleSendOTP}
-                    disabled={otpLoading || !email}
-                    className="flex-1 bg-[#efb291] text-white py-2 rounded-lg hover:bg-[#e5a67d] disabled:opacity-50 font-medium transition-colors"
-                  >
-                    {otpLoading ? 'Sending...' : 'Send OTP'}
-                  </button>
-                )}
+          {/* OTP Input (shown after OTP is sent) */}
+          {otpSent && !emailVerified && (
+            <>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <p className="text-blue-800 text-sm">
+                  📧 We sent a 6-digit code to <strong>{email}</strong>
+                </p>
+                <p className="text-blue-600 text-xs mt-1">Check your inbox and spam folder</p>
               </div>
 
-              {email && !emailVerified && (
+              <div>
+                <label className="block mb-2 text-gray-700 font-medium">Enter Verification Code *</label>
+                <input
+                  type="text"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] text-center text-2xl tracking-[0.5em] font-mono"
+                  placeholder="000000"
+                  maxLength={6}
+                  autoFocus
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleVerifyOTP}
+                disabled={otpLoading || otp.length !== 6}
+                className="w-full bg-[#efb291] text-white py-3 rounded-lg hover:bg-[#e5a67d] disabled:opacity-50 font-medium transition-colors"
+              >
+                {otpLoading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Verifying...
+                  </span>
+                ) : (
+                  'Verify Code'
+                )}
+              </button>
+
+              <div className="text-center">
                 <button
                   type="button"
                   onClick={handleResendOTP}
                   disabled={otpLoading}
-                  className="w-full text-sm text-gray-600 hover:text-[#efb291] disabled:opacity-50 transition-colors"
+                  className="text-sm text-gray-600 hover:text-[#efb291] disabled:opacity-50 transition-colors underline"
                 >
-                  Resend OTP Code
+                  Didn't receive the code? Resend
                 </button>
-              )}
+              </div>
 
-              {emailVerified && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-2">
-                  <div className="flex items-center text-green-800">
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-sm font-medium">Email verified!</span>
-                  </div>
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setOtpSent(false);
+                  setOtp('');
+                }}
+                className="w-full text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                ← Change email address
+              </button>
+            </>
+          )}
+
+          {/* Email Verified Success */}
+          {emailVerified && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center text-green-800">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="font-medium">Email verified successfully!</span>
+              </div>
+              <p className="text-green-700 text-sm mt-1">Proceeding to registration...</p>
+            </div>
+          )}
         </div>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 text-center border-t pt-6">
           <p className="text-gray-600">Already have a vendor account?</p>
           <Link
             to="/login"
@@ -347,23 +358,24 @@ const Register = () => {
     <div className="bg-white p-8 rounded-lg shadow-md max-w-2xl w-full">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Become a Vendor</h1>
-          <p className="text-gray-600 mt-1">Fill out the form below to apply as a vendor on Zuba House.</p>
+          <h1 className="text-2xl font-bold text-gray-800">Complete Your Registration</h1>
+          <p className="text-gray-600 mt-1">Fill out the form below to apply as a vendor.</p>
         </div>
-        {emailVerified && (
-          <div className="flex items-center text-green-600">
-            <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            <span className="text-sm font-medium">Email Verified</span>
-          </div>
-        )}
+        <div className="flex items-center text-green-600 bg-green-50 px-3 py-1 rounded-full">
+          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="text-sm font-medium">{email}</span>
+        </div>
       </div>
       
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-6">
         {/* Personal Information */}
-        <div className="border-b pb-4">
-          <h2 className="text-lg font-semibold mb-4 text-gray-700">Personal Information</h2>
+        <div className="border-b pb-6">
+          <h2 className="text-lg font-semibold mb-4 text-gray-700 flex items-center">
+            <span className="w-6 h-6 bg-[#efb291] text-white rounded-full text-sm flex items-center justify-center mr-2">1</span>
+            Personal Information
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block mb-2 text-gray-700 font-medium">Full Name *</label>
@@ -373,34 +385,9 @@ const Register = () => {
                 value={formData.name}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                placeholder="John Doe"
                 required
               />
-            </div>
-            <div>
-              <label className="block mb-2 text-gray-700 font-medium">Email *</label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email || email || ''}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] bg-gray-50"
-                required
-                disabled={true}
-                readOnly
-              />
-              {emailVerified && email && (
-                <p className="text-xs text-green-600 mt-1 flex items-center">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Email verified
-                </p>
-              )}
-              {!emailVerified && (
-                <p className="text-xs text-red-600 mt-1">
-                  ⚠️ Please verify your email in step 1 before proceeding
-                </p>
-              )}
             </div>
             <div>
               <label className="block mb-2 text-gray-700 font-medium">Password *</label>
@@ -410,11 +397,12 @@ const Register = () => {
                 value={formData.password}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                placeholder="Min 6 characters"
                 required
                 minLength={6}
               />
             </div>
-            <div>
+            <div className="md:col-span-2">
               <label className="block mb-2 text-gray-700 font-medium">Confirm Password *</label>
               <input
                 type="password"
@@ -422,6 +410,7 @@ const Register = () => {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                placeholder="Confirm your password"
                 required
               />
             </div>
@@ -429,8 +418,11 @@ const Register = () => {
         </div>
 
         {/* Store Information */}
-        <div className="border-b pb-4">
-          <h2 className="text-lg font-semibold mb-4 text-gray-700">Store Information</h2>
+        <div className="border-b pb-6">
+          <h2 className="text-lg font-semibold mb-4 text-gray-700 flex items-center">
+            <span className="w-6 h-6 bg-[#efb291] text-white rounded-full text-sm flex items-center justify-center mr-2">2</span>
+            Store Information
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block mb-2 text-gray-700 font-medium">Store Name *</label>
@@ -440,6 +432,7 @@ const Register = () => {
                 value={formData.storeName}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                placeholder="My Amazing Store"
                 required
               />
             </div>
@@ -451,11 +444,12 @@ const Register = () => {
                 value={formData.storeSlug}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                placeholder="my-amazing-store"
                 required
-                pattern="[a-z0-9\-]+"
-                title="Only lowercase letters, numbers, and hyphens"
               />
-              <p className="text-xs text-gray-500 mt-1">e.g., my-store-name</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Your store will be at: zubahouse.com/vendor/{formData.storeSlug || 'your-store'}
+              </p>
             </div>
             <div className="md:col-span-2">
               <label className="block mb-2 text-gray-700 font-medium">Store Description</label>
@@ -465,14 +459,18 @@ const Register = () => {
                 onChange={handleChange}
                 rows={3}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                placeholder="Tell customers about your store and products..."
               />
             </div>
           </div>
         </div>
 
         {/* Contact Information */}
-        <div className="border-b pb-4">
-          <h2 className="text-lg font-semibold mb-4 text-gray-700">Contact Information</h2>
+        <div className="border-b pb-6">
+          <h2 className="text-lg font-semibold mb-4 text-gray-700 flex items-center">
+            <span className="w-6 h-6 bg-[#efb291] text-white rounded-full text-sm flex items-center justify-center mr-2">3</span>
+            Contact Information
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block mb-2 text-gray-700 font-medium">Phone</label>
@@ -482,6 +480,7 @@ const Register = () => {
                 value={formData.phone}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                placeholder="+1 234 567 8900"
               />
             </div>
             <div>
@@ -492,6 +491,7 @@ const Register = () => {
                 value={formData.whatsapp}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                placeholder="+1 234 567 8900"
               />
             </div>
           </div>
@@ -499,7 +499,10 @@ const Register = () => {
 
         {/* Address Information */}
         <div>
-          <h2 className="text-lg font-semibold mb-4 text-gray-700">Address Information</h2>
+          <h2 className="text-lg font-semibold mb-4 text-gray-700 flex items-center">
+            <span className="w-6 h-6 bg-[#efb291] text-white rounded-full text-sm flex items-center justify-center mr-2">4</span>
+            Address Information
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block mb-2 text-gray-700 font-medium">Country</label>
@@ -509,6 +512,7 @@ const Register = () => {
                 value={formData.country}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                placeholder="Canada"
               />
             </div>
             <div>
@@ -519,6 +523,7 @@ const Register = () => {
                 value={formData.city}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                placeholder="Ottawa"
               />
             </div>
             <div className="md:col-span-2">
@@ -529,6 +534,7 @@ const Register = () => {
                 value={formData.addressLine1}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                placeholder="123 Main Street"
               />
             </div>
             <div className="md:col-span-2">
@@ -539,6 +545,7 @@ const Register = () => {
                 value={formData.addressLine2}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                placeholder="Apt 4B"
               />
             </div>
             <div>
@@ -549,21 +556,47 @@ const Register = () => {
                 value={formData.postalCode}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                placeholder="K1A 0B1"
               />
             </div>
           </div>
         </div>
 
+        {/* Submit Button */}
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-[#efb291] text-white py-3 rounded-lg hover:bg-[#e5a67d] disabled:opacity-50 font-medium transition-colors mt-6"
+          className="w-full bg-[#efb291] text-white py-3 rounded-lg hover:bg-[#e5a67d] disabled:opacity-50 font-medium transition-colors text-lg"
         >
-          {loading ? 'Submitting Application...' : 'Submit Application'}
+          {loading ? (
+            <span className="flex items-center justify-center">
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Submitting Application...
+            </span>
+          ) : (
+            'Submit Vendor Application'
+          )}
+        </button>
+
+        {/* Back to Step 1 */}
+        <button
+          type="button"
+          onClick={() => {
+            setStep(1);
+            setEmailVerified(false);
+            setOtpSent(false);
+            setOtp('');
+          }}
+          className="w-full text-gray-500 hover:text-gray-700 text-sm transition-colors"
+        >
+          ← Back to email verification
         </button>
       </form>
 
-      <div className="mt-6 text-center">
+      <div className="mt-6 text-center border-t pt-6">
         <p className="text-gray-600">Already have a vendor account?</p>
         <Link
           to="/login"
@@ -577,4 +610,3 @@ const Register = () => {
 };
 
 export default Register;
-

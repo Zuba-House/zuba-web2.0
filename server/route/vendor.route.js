@@ -12,10 +12,20 @@ import * as vendorCouponController from '../controllers/vendorCoupon.controller.
 const router = Router();
 
 // ========== PUBLIC ROUTES (No auth required) ==========
-// Vendor application endpoint - anyone can apply
+// Step 1: Send OTP to email (works for new and existing users)
+router.post('/send-otp', vendorController.sendOTP);
+
+// Step 2: Verify OTP
+router.post('/verify-otp', vendorController.verifyOTP);
+
+// Step 3: Complete registration (requires verified email)
 router.post('/apply', vendorController.applyToBecomeVendor);
-router.post('/verify-email', vendorController.verifyVendorEmail); // Verify email with OTP
-router.post('/resend-otp', vendorController.resendVendorOTP); // Resend OTP
+
+// Legacy endpoints (kept for backward compatibility)
+router.post('/verify-email', vendorController.verifyVendorEmail);
+router.post('/resend-otp', vendorController.resendVendorOTP);
+
+// Check application status
 router.get('/application-status/:email', vendorController.getApplicationStatus);
 
 // ========== PROTECTED ROUTES (Require auth + vendor role) ==========
