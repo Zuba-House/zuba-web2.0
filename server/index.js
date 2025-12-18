@@ -180,6 +180,59 @@ app.get("/api/health", (request, response) => {
     });
 });
 
+// Debug auth endpoint - Check user authentication status
+app.get("/api/auth/debug", async (request, response) => {
+    try {
+        const token = request.cookies?.accessToken || request?.headers?.authorization?.split(" ")[1];
+        
+        if (!token) {
+            return response.json({
+                authenticated: false,
+                message: 'No token provided',
+                tokenSource: 'none'
+            });
+        }
+        
+        const jwt = (await import('jsonwebtoken')).default;
+        const UserModel = (await import('./models/user.model.js')).default;
+        
+        try {
+            const decoded = jwt.verify(token, process.env.SECRET_KEY_ACCESS_TOKEN);
+            const user = await UserModel.findById(decoded.id).select('name email role vendor vendorId status');
+            
+            return response.json({
+                authenticated: true,
+                tokenValid: true,
+                tokenData: {
+                    id: decoded.id,
+                    role: decoded.role,
+                    vendorId: decoded.vendorId
+                },
+                userData: user ? {
+                    id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    status: user.status,
+                    isAdmin: (user.role || '').toUpperCase() === 'ADMIN',
+                    isVendor: (user.role || '').toUpperCase() === 'VENDOR'
+                } : null
+            });
+        } catch (jwtError) {
+            return response.json({
+                authenticated: false,
+                tokenValid: false,
+                error: jwtError.message
+            });
+        }
+    } catch (error) {
+        return response.status(500).json({
+            error: true,
+            message: error.message
+        });
+    }
+});
+
 // Test email endpoint (for testing SMTP configuration)
 app.get("/test-email", async (req, res) => {
     try {

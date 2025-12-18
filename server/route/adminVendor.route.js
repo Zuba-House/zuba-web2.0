@@ -8,13 +8,28 @@ const router = Router();
 // All routes require authentication
 router.use(auth);
 
-// Check if user is admin (you can add admin middleware here)
+// Check if user is admin
 const requireAdmin = (req, res, next) => {
-  if (req.userRole !== 'ADMIN') {
+  // Normalize role comparison (case-insensitive)
+  const userRole = (req.userRole || '').toUpperCase();
+  
+  console.log('🔐 Admin check:', {
+    userId: req.userId,
+    userRole: req.userRole,
+    normalizedRole: userRole,
+    isAdmin: userRole === 'ADMIN'
+  });
+  
+  if (userRole !== 'ADMIN') {
+    console.log('❌ Admin access denied for role:', req.userRole);
     return res.status(403).json({
       error: true,
       success: false,
-      message: 'Admin access only'
+      message: 'Admin access only',
+      debug: {
+        userRole: req.userRole,
+        required: 'ADMIN'
+      }
     });
   }
   next();

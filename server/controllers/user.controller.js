@@ -1089,13 +1089,18 @@ export async function getAllReviews(request, response) {
     try {
         const adminId = request.userId;
         
-        // Check if user is admin
+        // Check if user is admin (case-insensitive)
         const user = await UserModel.findById(adminId);
-        if (!user || user.role !== 'ADMIN') {
+        const userRole = (user?.role || '').toUpperCase();
+        
+        console.log('🔐 Reviews admin check:', { userId: adminId, role: user?.role, isAdmin: userRole === 'ADMIN' });
+        
+        if (!user || userRole !== 'ADMIN') {
             return response.status(403).json({
                 error: true,
                 success: false,
-                message: 'Admin access required'
+                message: 'Admin access required',
+                debug: { userRole: user?.role }
             });
         }
         
