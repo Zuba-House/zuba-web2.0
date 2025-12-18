@@ -28,7 +28,8 @@ router.get('/:id', adminVendorController.getVendorById);
 router.put('/:id', adminVendorController.updateVendor);
 router.put('/:id/status', adminVendorController.updateVendorStatus);
 router.put('/:id/withdrawal-access', adminVendorController.updateWithdrawalAccess);
-router.delete('/:id', adminVendorController.deleteVendor);
+router.delete('/:id', adminVendorController.deleteVendor); // Deletes vendor, keeps user
+router.delete('/:id/permanent', adminVendorController.deleteVendorPermanent); // Deletes vendor AND user
 
 // Payout management routes
 router.get('/payouts/all', adminPayoutController.getAllPayouts);

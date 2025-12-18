@@ -259,9 +259,92 @@ export const updateVendor = async (req, res) => {
 
 /**
  * DELETE /api/admin/vendors/:id
- * Delete vendor (soft delete - set status to REJECTED)
+ * Delete vendor PERMANENTLY from database
+ * This allows the user to re-register as a vendor with the same email
  */
 export const deleteVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { deleteUserToo = false } = req.query; // Option to also delete user account
+
+    const vendor = await VendorModel.findById(id);
+    if (!vendor) {
+      return res.status(404).json({
+        error: true,
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    const vendorEmail = vendor.email;
+    const ownerUserId = vendor.ownerUser;
+
+    console.log(`🗑️ Deleting vendor: ${vendor.storeName} (${vendorEmail})`);
+
+    // Delete vendor's products (optional - uncomment if you want to delete products too)
+    // await ProductModel.deleteMany({ vendor: id });
+    // console.log('   - Deleted vendor products');
+
+    // Delete vendor's payouts
+    try {
+      const PayoutModel = (await import('../models/payout.model.js')).default;
+      await PayoutModel.deleteMany({ vendor: id });
+      console.log('   - Deleted vendor payouts');
+    } catch (e) {
+      console.log('   - No payout model or no payouts to delete');
+    }
+
+    // Delete the vendor document
+    await VendorModel.findByIdAndDelete(id);
+    console.log('   - Deleted vendor document');
+
+    // Update or delete the user
+    if (ownerUserId) {
+      const user = await UserModel.findById(ownerUserId);
+      if (user) {
+        if (deleteUserToo === 'true') {
+          // Completely delete the user account
+          await UserModel.findByIdAndDelete(ownerUserId);
+          console.log('   - Deleted user account');
+        } else {
+          // Just remove vendor association and change role back to USER
+          // This allows them to re-register as vendor
+          user.vendor = null;
+          user.vendorId = null;
+          user.role = 'USER';
+          await user.save();
+          console.log('   - User account kept but vendor association removed');
+        }
+      }
+    }
+
+    console.log(`✅ Vendor ${vendor.storeName} deleted successfully`);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message: 'Vendor deleted permanently. The user can now re-register as a vendor.',
+      data: {
+        deletedVendor: vendor.storeName,
+        email: vendorEmail
+      }
+    });
+  } catch (error) {
+    console.error('Delete vendor error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+/**
+ * DELETE /api/admin/vendors/:id/permanent
+ * Delete vendor AND user account permanently
+ * Use this when you want to completely remove all traces
+ */
+export const deleteVendorPermanent = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -274,26 +357,49 @@ export const deleteVendor = async (req, res) => {
       });
     }
 
-    // Soft delete - set status to REJECTED
-    vendor.status = 'REJECTED';
-    await vendor.save();
+    const vendorEmail = vendor.email;
+    const ownerUserId = vendor.ownerUser;
+    const storeName = vendor.storeName;
 
-    // Optionally remove vendor link from user
-    const user = await UserModel.findById(vendor.ownerUser);
-    if (user) {
-      user.vendor = null;
-      user.vendorId = null;
-      user.role = 'USER';
-      await user.save();
+    console.log(`🗑️ PERMANENT DELETE: ${storeName} (${vendorEmail})`);
+
+    // Delete all related data
+    try {
+      // Delete vendor's products
+      const deletedProducts = await ProductModel.deleteMany({ vendor: id });
+      console.log(`   - Deleted ${deletedProducts.deletedCount} products`);
+
+      // Delete vendor's payouts
+      const PayoutModel = (await import('../models/payout.model.js')).default;
+      const deletedPayouts = await PayoutModel.deleteMany({ vendor: id });
+      console.log(`   - Deleted ${deletedPayouts.deletedCount} payouts`);
+    } catch (e) {
+      console.log('   - Error deleting related data:', e.message);
     }
+
+    // Delete the vendor document
+    await VendorModel.findByIdAndDelete(id);
+    console.log('   - Deleted vendor document');
+
+    // Delete the user account
+    if (ownerUserId) {
+      await UserModel.findByIdAndDelete(ownerUserId);
+      console.log('   - Deleted user account');
+    }
+
+    console.log(`✅ Vendor ${storeName} and all related data permanently deleted`);
 
     return res.status(200).json({
       error: false,
       success: true,
-      message: 'Vendor deleted successfully'
+      message: 'Vendor and user account permanently deleted. Email can be used for new registration.',
+      data: {
+        deletedVendor: storeName,
+        email: vendorEmail
+      }
     });
   } catch (error) {
-    console.error('Delete vendor error:', error);
+    console.error('Permanent delete vendor error:', error);
     return res.status(500).json({
       error: true,
       success: false,
