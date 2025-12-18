@@ -49,8 +49,8 @@ const ProductFormEnhanced = () => {
     barcode: '',
     brand: '',
     
-    // Status
-    status: 'DRAFT',
+    // Status (lowercase to match backend enum)
+    status: 'draft',
     isFeatured: false,
     
     // Images
@@ -150,31 +150,41 @@ const ProductFormEnhanced = () => {
         setProductType('variable');
       }
       
+      // Process images - extract URLs for preview
+      const productImages = product.images || [];
+      const imageUrls = productImages.map(img => typeof img === 'string' ? img : (img?.url || img));
+      
       setFormData({
         name: product.name || '',
         description: product.description || '',
         shortDescription: product.shortDescription || '',
-        category: product.category || '',
+        category: product.category?._id || product.category || '',
         categories: product.categories?.map(c => c._id || c) || [],
         subCat: product.subCat || '',
         subCatId: product.subCatId || '',
         sku: product.sku || '',
         barcode: product.barcode || '',
         brand: product.brand || '',
-        status: product.status || 'DRAFT',
+        status: product.status || 'draft',
         isFeatured: product.isFeatured || false,
-        images: product.images || [],
+        images: productImages.map((img, i) => {
+          if (typeof img === 'string') {
+            return { url: img, alt: '', title: '', position: i, isFeatured: i === 0 };
+          }
+          return img;
+        }),
         pricing: product.pricing || {
-          regularPrice: product.price || product.oldPrice || 0,
-          salePrice: product.comparePrice && product.comparePrice > product.price ? product.price : null,
-          currency: 'USD',
+          regularPrice: product.oldPrice || product.price || 0,
+          salePrice: (product.oldPrice && product.price < product.oldPrice) ? product.price : null,
+          price: product.price || product.oldPrice || 0,
+          currency: product.pricing?.currency || 'USD',
           taxStatus: 'taxable',
           taxClass: 'standard'
         },
         inventory: product.inventory || {
           manageStock: true,
           stock: product.stock || product.countInStock || 0,
-          stockStatus: product.stock > 0 ? 'in_stock' : 'out_of_stock',
+          stockStatus: (product.stock || product.countInStock || 0) > 0 ? 'in_stock' : 'out_of_stock',
           endlessStock: false,
           lowStockThreshold: 5
         },
@@ -189,11 +199,11 @@ const ProductFormEnhanced = () => {
         tags: Array.isArray(product.tags) ? product.tags : (product.tags ? product.tags.split(',').map(t => t.trim()) : []),
         seo: product.seo || { metaTitle: '', metaDescription: '', slug: '' },
         price: product.price || 0,
-        comparePrice: product.comparePrice || 0,
+        comparePrice: product.comparePrice || product.oldPrice || 0,
         stock: product.stock || 0
       });
       
-      setImagePreview(product.images || []);
+      setImagePreview(imageUrls);
     } catch (error) {
       console.error('Fetch product error:', error);
       toast.error('Failed to load product');
@@ -260,24 +270,59 @@ const ProductFormEnhanced = () => {
     const files = Array.from(e.target.files);
     
     for (const file of files) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(prev => [...prev, reader.result]);
-        setFormData(prev => ({
-          ...prev,
-          images: [...prev.images, reader.result]
-        }));
-      };
-      reader.readAsDataURL(file);
+      try {
+        // Create FormData for upload
+        const uploadFormData = new FormData();
+        uploadFormData.append('images', file);
+        
+        // Upload to server
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://zuba-api.onrender.com'}/api/product/uploadImages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+          },
+          body: uploadFormData
+        });
+        
+        const data = await response.json();
+        
+        if (data.images && data.images.length > 0) {
+          const imageUrl = data.images[0];
+          const imageObj = {
+            url: imageUrl,
+            alt: formData.name || '',
+            title: formData.name || '',
+            position: imagePreview.length,
+            isFeatured: imagePreview.length === 0
+          };
+          
+          setImagePreview(prev => [...prev, imageUrl]);
+          setFormData(prev => ({
+            ...prev,
+            images: [...prev.images, imageObj]
+          }));
+        }
+      } catch (error) {
+        console.error('Image upload error:', error);
+        toast.error('Failed to upload image');
+      }
     }
   };
 
   const removeImage = (index) => {
     setImagePreview(prev => prev.filter((_, i) => i !== index));
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index)
-    }));
+    setFormData(prev => {
+      const newImages = prev.images.filter((_, i) => i !== index);
+      // Update positions and featured flag
+      return {
+        ...prev,
+        images: newImages.map((img, i) => ({
+          ...img,
+          position: i,
+          isFeatured: i === 0
+        }))
+      };
+    });
   };
 
   const handleTagsChange = (e) => {
@@ -470,6 +515,17 @@ const ProductFormEnhanced = () => {
       toast.error('Product name is required');
       return;
     }
+
+    if (!formData.description.trim()) {
+      toast.error('Product description is required');
+      return;
+    }
+
+    // Category validation
+    if (!formData.categories || formData.categories.length === 0) {
+      toast.error('Please select at least one category');
+      return;
+    }
     
     if (productType === 'simple') {
       const price = formData.pricing?.regularPrice || 0;
@@ -488,7 +544,7 @@ const ProductFormEnhanced = () => {
       }
     }
 
-    if (imagePreview.length === 0) {
+    if (formData.images.length === 0) {
       toast.error('At least one product image is required');
       return;
     }
@@ -496,24 +552,75 @@ const ProductFormEnhanced = () => {
     try {
       setSaving(true);
       
+      // Calculate the actual price
+      const regularPrice = parseFloat(formData.pricing?.regularPrice) || 0;
+      const salePrice = formData.pricing?.salePrice ? parseFloat(formData.pricing.salePrice) : null;
+      const effectivePrice = salePrice && salePrice < regularPrice ? salePrice : regularPrice;
+      
       const payload = {
         ...formData,
         productType,
-        images: imagePreview,
+        
+        // Set category (required) - use first category if available
+        category: formData.categories[0],
+        
+        // Ensure images are properly formatted as objects with url
+        images: formData.images.map((img, index) => {
+          if (typeof img === 'string') {
+            return {
+              url: img,
+              alt: formData.name || '',
+              title: formData.name || '',
+              position: index,
+              isFeatured: index === 0
+            };
+          }
+          return {
+            ...img,
+            position: index,
+            isFeatured: index === 0
+          };
+        }),
+        
+        // Pricing with required price field
+        pricing: {
+          regularPrice: regularPrice,
+          salePrice: salePrice,
+          price: effectivePrice, // This is required by backend
+          currency: formData.pricing?.currency || 'USD',
+          onSale: salePrice && salePrice < regularPrice,
+          taxStatus: formData.pricing?.taxStatus || 'taxable',
+          taxClass: formData.pricing?.taxClass || 'standard'
+        },
+        
+        // Inventory
+        inventory: {
+          manageStock: formData.inventory?.manageStock !== false,
+          stock: parseInt(formData.inventory?.stock) || 0,
+          stockStatus: formData.inventory?.endlessStock ? 'in_stock' : 
+            ((parseInt(formData.inventory?.stock) || 0) > 0 ? 'in_stock' : 'out_of_stock'),
+          endlessStock: formData.inventory?.endlessStock || false,
+          lowStockThreshold: parseInt(formData.inventory?.lowStockThreshold) || 5,
+          allowBackorders: 'no',
+          soldIndividually: false
+        },
         
         // Map to legacy fields for backward compatibility
-        price: formData.pricing?.salePrice || formData.pricing?.regularPrice || 0,
-        oldPrice: formData.pricing?.regularPrice || 0,
-        comparePrice: formData.pricing?.regularPrice || 0,
-        countInStock: formData.inventory?.stock || 0,
-        stock: formData.inventory?.stock || 0,
+        price: effectivePrice,
+        oldPrice: regularPrice,
+        countInStock: parseInt(formData.inventory?.stock) || 0,
         
         // Generate slug if not provided
         seo: {
           ...formData.seo,
           slug: formData.seo?.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-        }
+        },
+        
+        // Set featured image
+        featuredImage: formData.images[0]?.url || (typeof formData.images[0] === 'string' ? formData.images[0] : '')
       };
+
+      console.log('Submitting product payload:', payload);
 
       if (isEditing) {
         await vendorApi.updateProduct(id, payload);
@@ -770,18 +877,19 @@ const ProductFormEnhanced = () => {
 
               {/* Status & Featured */}
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#efb291] focus:border-transparent"
-                  >
-                    <option value="DRAFT">Draft</option>
-                    <option value="PUBLISHED">Publish (Pending Review)</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#efb291] focus:border-transparent"
+                >
+                  <option value="draft">Draft</option>
+                  <option value="pending">Pending Review</option>
+                  <option value="published">Published</option>
+                </select>
+              </div>
                 <div className="flex items-center pt-6">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -806,27 +914,33 @@ const ProductFormEnhanced = () => {
           <div className="p-6">
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
               <div className="flex flex-wrap gap-4 mb-4">
-                {imagePreview.map((img, index) => (
-                  <div key={index} className="relative w-24 h-24">
-                    <img
-                      src={typeof img === 'string' ? img : img.url || img}
-                      alt={`Preview ${index}`}
-                      className="w-full h-full object-cover rounded-lg"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(index)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                    {index === 0 && (
-                      <span className="absolute bottom-0 left-0 right-0 bg-[#efb291] text-white text-xs text-center py-0.5 rounded-b-lg">
-                        Featured
-                      </span>
-                    )}
-                  </div>
-                ))}
+                {imagePreview.map((img, index) => {
+                  const imgUrl = typeof img === 'string' ? img : (img?.url || img);
+                  return (
+                    <div key={index} className="relative w-24 h-24">
+                      <img
+                        src={imgUrl}
+                        alt={`Preview ${index}`}
+                        className="w-full h-full object-cover rounded-lg"
+                        onError={(e) => {
+                          e.target.src = 'https://via.placeholder.com/96?text=Error';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      {index === 0 && (
+                        <span className="absolute bottom-0 left-0 right-0 bg-[#efb291] text-white text-xs text-center py-0.5 rounded-b-lg">
+                          Featured
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               
               <label className="flex flex-col items-center justify-center cursor-pointer py-4">
