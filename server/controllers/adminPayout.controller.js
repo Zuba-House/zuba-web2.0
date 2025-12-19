@@ -179,7 +179,7 @@ export const getPayoutStats = async (req, res) => {
  */
 export const getPayoutById = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { payoutId: id } = req.params;
 
     const payout = await PayoutModel.findById(id)
       .populate('vendor', 'storeName storeSlug email phone payoutMethod payoutDetails availableBalance')
@@ -217,7 +217,7 @@ export const getPayoutById = async (req, res) => {
  */
 export const approvePayout = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { payoutId: id } = req.params;
     const adminId = req.userId;
     const { notes } = req.body;
 
@@ -280,7 +280,7 @@ export const approvePayout = async (req, res) => {
  */
 export const rejectPayout = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { payoutId: id } = req.params;
     const adminId = req.userId;
     const { reason } = req.body;
 
@@ -358,7 +358,7 @@ export const rejectPayout = async (req, res) => {
  */
 export const markPayoutAsPaid = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { payoutId: id } = req.params;
     const adminId = req.userId;
     const { transactionRef, notes } = req.body;
 

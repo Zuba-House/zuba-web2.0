@@ -469,9 +469,12 @@ export const getVendorProducts = async (req, res) => {
     
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Filter for vendor products only
+    // Filter for vendor products - include products with vendor field OR productOwnerType: 'VENDOR'
     const filter = {
-      productOwnerType: 'VENDOR'
+      $or: [
+        { productOwnerType: 'VENDOR' },
+        { vendor: { $exists: true, $ne: null } }
+      ]
     };
 
     // Filter by approval status
@@ -491,17 +494,23 @@ export const getVendorProducts = async (req, res) => {
 
     // Search by name or SKU
     if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { sku: { $regex: search, $options: 'i' } }
+      filter.$and = [
+        { $or: filter.$or },
+        { $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { sku: { $regex: search, $options: 'i' } }
+        ]}
       ];
+      delete filter.$or;
     }
+
+    console.log('📦 Vendor products filter:', JSON.stringify(filter, null, 2));
 
     const [products, total] = await Promise.all([
       ProductModel.find(filter)
         .populate('vendor', 'storeName email storeSlug')
         .populate('category', 'name slug')
-        .select('name sku images featuredImage pricing inventory status approvalStatus vendorShopName createdAt updatedAt')
+        .select('name sku images featuredImage pricing inventory status approvalStatus vendorShopName vendor createdAt updatedAt')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
@@ -509,12 +518,21 @@ export const getVendorProducts = async (req, res) => {
       ProductModel.countDocuments(filter)
     ]);
 
-    // Get counts by approval status
+    // Get counts by approval status (for vendor products)
+    const vendorProductFilter = {
+      $or: [
+        { productOwnerType: 'VENDOR' },
+        { vendor: { $exists: true, $ne: null } }
+      ]
+    };
+
     const [pendingCount, approvedCount, rejectedCount] = await Promise.all([
-      ProductModel.countDocuments({ productOwnerType: 'VENDOR', approvalStatus: 'PENDING_REVIEW' }),
-      ProductModel.countDocuments({ productOwnerType: 'VENDOR', approvalStatus: 'APPROVED' }),
-      ProductModel.countDocuments({ productOwnerType: 'VENDOR', approvalStatus: 'REJECTED' })
+      ProductModel.countDocuments({ ...vendorProductFilter, approvalStatus: 'PENDING_REVIEW' }),
+      ProductModel.countDocuments({ ...vendorProductFilter, approvalStatus: 'APPROVED' }),
+      ProductModel.countDocuments({ ...vendorProductFilter, approvalStatus: 'REJECTED' })
     ]);
+
+    console.log(`📊 Vendor products: ${total} total, ${pendingCount} pending, ${approvedCount} approved, ${rejectedCount} rejected`);
 
     return res.status(200).json({
       error: false,
@@ -542,12 +560,13 @@ export const getVendorProducts = async (req, res) => {
 };
 
 /**
- * GET /api/admin/vendors/products/:id
+ * GET /api/admin/vendors/products/:productId
  * Get single vendor product details
  */
 export const getVendorProductById = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { productId } = req.params;
+    const id = productId;
 
     const product = await ProductModel.findById(id)
       .populate('vendor', 'storeName email storeSlug phone')
@@ -578,12 +597,13 @@ export const getVendorProductById = async (req, res) => {
 };
 
 /**
- * PUT /api/admin/vendors/products/:id/approve
+ * PUT /api/admin/vendors/products/:productId/approve
  * Approve a vendor product
  */
 export const approveVendorProduct = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { productId } = req.params;
+    const id = productId;
     const { notes } = req.body;
 
     const product = await ProductModel.findById(id);
@@ -635,12 +655,13 @@ export const approveVendorProduct = async (req, res) => {
 };
 
 /**
- * PUT /api/admin/vendors/products/:id/reject
+ * PUT /api/admin/vendors/products/:productId/reject
  * Reject a vendor product
  */
 export const rejectVendorProduct = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { productId } = req.params;
+    const id = productId;
     const { reason, notes } = req.body;
 
     if (!reason) {

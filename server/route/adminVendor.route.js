@@ -37,6 +37,28 @@ const requireAdmin = (req, res, next) => {
 
 router.use(requireAdmin);
 
+// ========================================
+// SPECIFIC ROUTES MUST COME BEFORE /:id
+// ========================================
+
+// Vendor product management routes (approval/rejection)
+router.get('/products', adminVendorController.getVendorProducts);
+router.get('/products/:productId', adminVendorController.getVendorProductById);
+router.put('/products/:productId/approve', adminVendorController.approveVendorProduct);
+router.put('/products/:productId/reject', adminVendorController.rejectVendorProduct);
+
+// Payout management routes
+router.get('/payouts/all', adminPayoutController.getAllPayouts);
+router.get('/payouts/stats', adminPayoutController.getPayoutStats);
+router.get('/payouts/:payoutId', adminPayoutController.getPayoutById);
+router.post('/payouts/:payoutId/approve', adminPayoutController.approvePayout);
+router.post('/payouts/:payoutId/reject', adminPayoutController.rejectPayout);
+router.post('/payouts/:payoutId/mark-paid', adminPayoutController.markPayoutAsPaid);
+
+// ========================================
+// PARAMETERIZED VENDOR ROUTES (LAST)
+// ========================================
+
 // Vendor management routes
 router.get('/', adminVendorController.getAllVendors);
 router.get('/:id', adminVendorController.getVendorById);
@@ -45,20 +67,6 @@ router.put('/:id/status', adminVendorController.updateVendorStatus);
 router.put('/:id/withdrawal-access', adminVendorController.updateWithdrawalAccess);
 router.delete('/:id', adminVendorController.deleteVendor); // Deletes vendor, keeps user
 router.delete('/:id/permanent', adminVendorController.deleteVendorPermanent); // Deletes vendor AND user
-
-// Payout management routes
-router.get('/payouts/all', adminPayoutController.getAllPayouts);
-router.get('/payouts/stats', adminPayoutController.getPayoutStats);
-router.get('/payouts/:id', adminPayoutController.getPayoutById);
-router.post('/payouts/:id/approve', adminPayoutController.approvePayout);
-router.post('/payouts/:id/reject', adminPayoutController.rejectPayout);
-router.post('/payouts/:id/mark-paid', adminPayoutController.markPayoutAsPaid);
-
-// Vendor product management routes (approval/rejection)
-router.get('/products', adminVendorController.getVendorProducts);
-router.get('/products/:id', adminVendorController.getVendorProductById);
-router.put('/products/:id/approve', adminVendorController.approveVendorProduct);
-router.put('/products/:id/reject', adminVendorController.rejectVendorProduct);
 
 export default router;
 
