@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { vendorApi, categoryApi, uploadApi } from '../../utils/api';
+import { vendorApi, categoryApi, uploadImages } from '../../utils/api';
 import { 
   ArrowLeft, Upload, X, Save, Loader, Package, 
   DollarSign, Box, Tag, Image, Settings, ChevronDown, ChevronUp,
@@ -305,35 +305,60 @@ const ProductFormEnhanced = () => {
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
     
+    // Validate file types first (same as admin)
     for (const file of files) {
-      try {
-        // Upload using the api utility (includes auth token automatically)
-        const response = await uploadApi.uploadProductImages(file);
-        const data = response.data;
-        
-        if (data.images && data.images.length > 0) {
-          const imageUrl = data.images[0];
-          const imageObj = {
-            url: imageUrl,
-            alt: formData.name || '',
-            title: formData.name || '',
-            position: imagePreview.length,
-            isFeatured: imagePreview.length === 0
-          };
-          
-          setImagePreview(prev => [...prev, imageUrl]);
-          setFormData(prev => ({
-            ...prev,
-            images: [...prev.images, imageObj]
-          }));
-          toast.success('Image uploaded successfully');
-        } else {
-          toast.error('Failed to upload image');
-        }
-      } catch (error) {
-        console.error('Image upload error:', error);
-        toast.error(error.response?.data?.message || 'Failed to upload image');
+      if (!(file.type === "image/jpeg" || file.type === "image/jpg" ||
+            file.type === "image/png" || file.type === "image/webp" || 
+            file.type === "image/svg+xml")) {
+        toast.error("Please select a valid JPG, PNG, SVG or WebP image file.");
+        return;
       }
+    }
+    
+    // Create FormData with all files (same approach as admin UploadBox)
+    const formdata = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formdata.append('images', files[i]);
+    }
+    
+    try {
+      // Use the same uploadImages function as admin panel
+      const res = await uploadImages('/api/product/uploadImages', formdata);
+      
+      // Handle response - same as admin
+      const images = Array.isArray(res?.data?.images) 
+        ? res.data.images 
+        : Array.isArray(res?.images) 
+          ? res.images 
+          : [];
+      
+      if (images.length === 0) {
+        toast.error(res?.message || 'No images were uploaded. Please try again.');
+        return;
+      }
+      
+      // Add each uploaded image
+      images.forEach((imageUrl, index) => {
+        const imageObj = {
+          url: imageUrl,
+          alt: formData.name || '',
+          title: formData.name || '',
+          position: imagePreview.length + index,
+          isFeatured: imagePreview.length === 0 && index === 0
+        };
+        
+        setImagePreview(prev => [...prev, imageUrl]);
+        setFormData(prev => ({
+          ...prev,
+          images: [...prev.images, imageObj]
+        }));
+      });
+      
+      toast.success(`${images.length} image(s) uploaded successfully`);
+      
+    } catch (error) {
+      console.error('Image upload error:', error);
+      toast.error(error?.message || 'Failed to upload image');
     }
   };
 

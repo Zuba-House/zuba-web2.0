@@ -1,16 +1,120 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://zuba-api.onrender.com';
+// API URL - same as admin panel approach
+const apiUrl = import.meta.env.VITE_API_URL || 'https://zuba-api.onrender.com';
 
-// Create axios instance with default config
+// ============================================
+// UPLOAD FUNCTIONS - Matching Admin Panel exactly
+// ============================================
+
+/**
+ * Upload images - EXACT same approach as admin panel
+ * Uses direct axios.post with full URL, no default Content-Type header
+ */
+export const uploadImages = async (url, formData) => {
+  try {
+    const params = {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+        // DO NOT set Content-Type for FormData - axios will set it automatically with boundary
+      },
+    };
+    const res = await axios.post(apiUrl + url, formData, params);
+    return res.data;
+  } catch (error) {
+    console.error('Upload error:', error);
+    return {
+      success: false,
+      error: true,
+      message: error.response?.data?.message || error.message || 'Upload failed',
+      details: error.response?.data?.details
+    };
+  }
+};
+
+/**
+ * Fetch data from API - same as admin
+ */
+export const fetchDataFromApi = async (url) => {
+  try {
+    const params = {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+        'Content-Type': 'application/json',
+      },
+    };
+    const { data } = await axios.get(apiUrl + url, params);
+    return data;
+  } catch (error) {
+    console.log(error);
+    return error;
+  }
+};
+
+/**
+ * Post data to API - same as admin
+ */
+export const postData = async (url, formData) => {
+  try {
+    const response = await fetch(apiUrl + url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(formData)
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return data;
+    } else {
+      const errorData = await response.json();
+      return errorData;
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    return { error: true, message: error.message };
+  }
+};
+
+/**
+ * Edit/Put data to API - same as admin
+ */
+export const editData = async (url, updatedData) => {
+  const params = {
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+      'Content-Type': 'application/json',
+    },
+  };
+  const res = await axios.put(apiUrl + url, updatedData, params);
+  return res.data;
+};
+
+/**
+ * Delete data from API
+ */
+export const deleteData = async (url) => {
+  const params = {
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+      'Content-Type': 'application/json',
+    },
+  };
+  const res = await axios.delete(apiUrl + url, params);
+  return res.data;
+};
+
+// ============================================
+// AXIOS INSTANCE FOR OTHER REQUESTS
+// ============================================
+
 const api = axios.create({
-  baseURL: `${API_URL}/api`,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: `${apiUrl}/api`,
 });
 
-// Request interceptor to add auth token and handle FormData
+// Request interceptor
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken');
@@ -18,25 +122,23 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // CRITICAL: Delete Content-Type header for FormData requests
-    // This allows axios to automatically set multipart/form-data with proper boundary
+    // Delete Content-Type for FormData - let axios set it with boundary
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
+    } else {
+      config.headers['Content-Type'] = 'application/json';
     }
     
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor to handle errors
+// Response interceptor
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid - redirect to login
       localStorage.removeItem('accessToken');
       localStorage.removeItem('userRole');
       localStorage.removeItem('vendorId');
@@ -47,7 +149,10 @@ api.interceptors.response.use(
   }
 );
 
-// Vendor API functions
+// ============================================
+// VENDOR API FUNCTIONS
+// ============================================
+
 export const vendorApi = {
   // Dashboard
   getDashboard: () => api.get('/vendor/dashboard'),
@@ -88,15 +193,14 @@ export const categoryApi = {
   getCategories: () => api.get('/category'),
 };
 
-// Upload API
+// Upload API - uses the direct axios approach like admin
 export const uploadApi = {
   uploadImage: async (file) => {
     const formData = new FormData();
     formData.append('image', file);
-    // DO NOT set Content-Type for FormData - axios will set it automatically with boundary
-    return api.post('/upload/image', formData);
+    return uploadImages('/api/upload/image', formData);
   },
-  // Upload product images - uses the same endpoint as admin
+  // Upload product images - uses EXACT same endpoint and method as admin
   uploadProductImages: async (files) => {
     const formData = new FormData();
     if (Array.isArray(files)) {
@@ -104,11 +208,9 @@ export const uploadApi = {
     } else {
       formData.append('images', files);
     }
-    // DO NOT set Content-Type for FormData - axios will set it automatically with boundary
-    // Setting it manually removes the boundary string and breaks the upload!
-    return api.post('/product/uploadImages', formData);
+    // Use the same approach as admin - direct axios call with full URL
+    return uploadImages('/api/product/uploadImages', formData);
   },
 };
 
 export default api;
-
