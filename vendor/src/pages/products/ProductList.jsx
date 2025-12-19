@@ -196,7 +196,14 @@ const ProductList = () => {
                           <div className="flex-shrink-0 h-12 w-12">
                             <img
                               className="h-12 w-12 rounded-lg object-cover"
-                              src={product.images?.[0] || product.image || '/placeholder-product.png'}
+                              src={
+                                // Handle multiple image formats
+                                (product.images?.[0]?.url) ||  // New format: {url: ...}
+                                (typeof product.images?.[0] === 'string' ? product.images[0] : null) ||  // Old format: string
+                                product.featuredImage ||
+                                product.image ||
+                                'https://via.placeholder.com/48?text=No+Image'
+                              }
                               alt={product.name}
                               onError={(e) => { e.target.src = 'https://via.placeholder.com/48?text=No+Image'; }}
                             />
@@ -213,20 +220,22 @@ const ProductList = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
-                          {formatCurrency(product.price)}
+                          {formatCurrency(product.pricing?.price || product.price || 0)}
                         </div>
-                        {product.comparePrice && product.comparePrice > product.price && (
+                        {(product.pricing?.regularPrice || product.oldPrice) && 
+                         (product.pricing?.regularPrice || product.oldPrice) > (product.pricing?.price || product.price) && (
                           <div className="text-sm text-gray-500 line-through">
-                            {formatCurrency(product.comparePrice)}
+                            {formatCurrency(product.pricing?.regularPrice || product.oldPrice)}
                           </div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`text-sm font-medium ${
-                          product.stock <= 0 ? 'text-red-600' : 
-                          product.stock <= 10 ? 'text-yellow-600' : 'text-green-600'
+                          (product.inventory?.stock || product.countInStock || product.stock || 0) <= 0 ? 'text-red-600' : 
+                          (product.inventory?.stock || product.countInStock || product.stock || 0) <= 10 ? 'text-yellow-600' : 'text-green-600'
                         }`}>
-                          {product.stock || 0} units
+                          {product.inventory?.endlessStock ? '∞ Unlimited' : 
+                           `${product.inventory?.stock || product.countInStock || product.stock || 0} units`}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

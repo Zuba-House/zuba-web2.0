@@ -54,5 +54,11 @@ router.post('/payouts/:id/approve', adminPayoutController.approvePayout);
 router.post('/payouts/:id/reject', adminPayoutController.rejectPayout);
 router.post('/payouts/:id/mark-paid', adminPayoutController.markPayoutAsPaid);
 
+// Vendor product management routes (approval/rejection)
+router.get('/products', adminVendorController.getVendorProducts);
+router.get('/products/:id', adminVendorController.getVendorProductById);
+router.put('/products/:id/approve', adminVendorController.approveVendorProduct);
+router.put('/products/:id/reject', adminVendorController.rejectVendorProduct);
+
 export default router;
 

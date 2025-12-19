@@ -252,16 +252,49 @@ const Sidebar = () => {
           </li>
 
           <li>
-            <Link to="/vendors"
-              onClick={() => {
-                context?.windowWidth < 992 && context?.setisSidebarOpen(false)
-                setSubmenuIndex(null)
-              }}
+            <Button
+              className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]"
+              onClick={() => isOpenSubMenu(7)}
             >
-              <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]">
-                <MdStore className="text-[18px] text-[#efb291]" /> <span>Vendors</span>
-              </Button>
-            </Link>
+              <MdStore className="text-[18px] text-[#efb291]" /> <span>Vendors</span>
+              <span className="ml-auto w-[30px] h-[30px] flex items-center justify-center">
+                <FaAngleDown
+                  className={`transition-all ${submenuIndex === 7 ? "rotate-180" : ""
+                    }`}
+                />
+              </span>
+            </Button>
+
+            <Collapse isOpened={submenuIndex === 7 ? true : false}>
+              <ul className="w-full">
+                <li className="w-full">
+                  <Link to="/vendors"
+                    onClick={() => {
+                      context?.windowWidth < 992 && context?.setisSidebarOpen(false)
+                      setSubmenuIndex(null)
+                    }}
+                  >
+                    <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>{" "}
+                      Vendor Management
+                    </Button>
+                  </Link>
+                </li>
+                <li className="w-full">
+                  <Link to="/vendor-products"
+                    onClick={() => {
+                      context?.windowWidth < 992 && context?.setisSidebarOpen(false)
+                      setSubmenuIndex(null)
+                    }}
+                  >
+                    <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <span className="block w-[5px] h-[5px] rounded-full bg-[#efb291]"></span>
+                      🔔 Product Approvals
+                    </Button>
+                  </Link>
+                </li>
+              </ul>
+            </Collapse>
           </li>
 
 

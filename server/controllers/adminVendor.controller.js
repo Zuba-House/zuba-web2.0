@@ -448,3 +448,253 @@ export const updateWithdrawalAccess = async (req, res) => {
   }
 };
 
+// ============================================
+// VENDOR PRODUCT MANAGEMENT (Approval System)
+// ============================================
+
+/**
+ * GET /api/admin/vendors/products
+ * Get all vendor products with filters (for approval management)
+ */
+export const getVendorProducts = async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 20, 
+      approvalStatus, 
+      vendorId, 
+      search,
+      status
+    } = req.query;
+    
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Filter for vendor products only
+    const filter = {
+      productOwnerType: 'VENDOR'
+    };
+
+    // Filter by approval status
+    if (approvalStatus) {
+      filter.approvalStatus = approvalStatus;
+    }
+
+    // Filter by specific vendor
+    if (vendorId) {
+      filter.vendor = vendorId;
+    }
+
+    // Filter by product status
+    if (status) {
+      filter.status = status;
+    }
+
+    // Search by name or SKU
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const [products, total] = await Promise.all([
+      ProductModel.find(filter)
+        .populate('vendor', 'storeName email storeSlug')
+        .populate('category', 'name slug')
+        .select('name sku images featuredImage pricing inventory status approvalStatus vendorShopName createdAt updatedAt')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      ProductModel.countDocuments(filter)
+    ]);
+
+    // Get counts by approval status
+    const [pendingCount, approvedCount, rejectedCount] = await Promise.all([
+      ProductModel.countDocuments({ productOwnerType: 'VENDOR', approvalStatus: 'PENDING_REVIEW' }),
+      ProductModel.countDocuments({ productOwnerType: 'VENDOR', approvalStatus: 'APPROVED' }),
+      ProductModel.countDocuments({ productOwnerType: 'VENDOR', approvalStatus: 'REJECTED' })
+    ]);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      data: {
+        products,
+        total,
+        page: Number(page),
+        pages: Math.ceil(total / limit),
+        counts: {
+          pending: pendingCount,
+          approved: approvedCount,
+          rejected: rejectedCount
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get vendor products error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+/**
+ * GET /api/admin/vendors/products/:id
+ * Get single vendor product details
+ */
+export const getVendorProductById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const product = await ProductModel.findById(id)
+      .populate('vendor', 'storeName email storeSlug phone')
+      .populate('category', 'name slug')
+      .lean();
+
+    if (!product) {
+      return res.status(404).json({
+        error: true,
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      data: product
+    });
+  } catch (error) {
+    console.error('Get vendor product by ID error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+/**
+ * PUT /api/admin/vendors/products/:id/approve
+ * Approve a vendor product
+ */
+export const approveVendorProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+
+    const product = await ProductModel.findById(id);
+
+    if (!product) {
+      return res.status(404).json({
+        error: true,
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    if (product.productOwnerType !== 'VENDOR') {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'This product is not a vendor product'
+      });
+    }
+
+    // Update approval status
+    product.approvalStatus = 'APPROVED';
+    product.status = 'published'; // Auto-publish on approval
+    product.publishedAt = new Date();
+    
+    if (notes) {
+      product.adminNotes = (product.adminNotes ? product.adminNotes + '\n' : '') + 
+        `[${new Date().toISOString()}] Approved: ${notes}`;
+    }
+
+    await product.save();
+
+    console.log(`✅ Product approved: ${product.name} (ID: ${id})`);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message: 'Product approved and published successfully',
+      data: product
+    });
+  } catch (error) {
+    console.error('Approve vendor product error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+/**
+ * PUT /api/admin/vendors/products/:id/reject
+ * Reject a vendor product
+ */
+export const rejectVendorProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason, notes } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Rejection reason is required'
+      });
+    }
+
+    const product = await ProductModel.findById(id);
+
+    if (!product) {
+      return res.status(404).json({
+        error: true,
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    if (product.productOwnerType !== 'VENDOR') {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'This product is not a vendor product'
+      });
+    }
+
+    // Update approval status
+    product.approvalStatus = 'REJECTED';
+    product.status = 'draft'; // Move back to draft
+    
+    // Add rejection reason to admin notes
+    product.adminNotes = (product.adminNotes ? product.adminNotes + '\n' : '') + 
+      `[${new Date().toISOString()}] Rejected - Reason: ${reason}` +
+      (notes ? `\nNotes: ${notes}` : '');
+
+    await product.save();
+
+    console.log(`❌ Product rejected: ${product.name} (ID: ${id}) - Reason: ${reason}`);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message: 'Product rejected',
+      data: product
+    });
+  } catch (error) {
+    console.error('Reject vendor product error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
