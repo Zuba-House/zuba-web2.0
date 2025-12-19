@@ -1,4 +1,9 @@
 import ProductModel from '../models/product.model.js';
+import VendorModel from '../models/vendor.model.js';
+import { 
+  sendAdminProductSubmission, 
+  sendVendorProductSubmitted 
+} from '../utils/vendorEmails.js';
 
 /**
  * GET /api/vendor/products
@@ -67,22 +72,50 @@ export const create = async (req, res) => {
     const vendorId = req.vendorId;
     const data = req.body;
 
+    // Get vendor details for emails
+    const vendor = await VendorModel.findById(vendorId);
+    if (!vendor) {
+      return res.status(404).json({
+        error: true,
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
     // Ensure vendor fields are set
     const productData = {
       ...data,
       vendor: vendorId,
       vendorId: vendorId, // Keep both for backward compatibility
+      vendorShopName: vendor.storeName || '',
       productOwnerType: 'VENDOR',
-      approvalStatus: 'PENDING_REVIEW' // Requires admin approval
+      approvalStatus: 'PENDING_REVIEW', // Requires admin approval
+      status: 'draft' // Start as draft until approved
     };
 
     const product = new ProductModel(productData);
     await product.save();
 
+    // Populate category for email
+    await product.populate('category', 'name slug');
+
+    console.log(`📦 New product submitted by vendor ${vendor.storeName}: ${product.name}`);
+
+    // Send email notifications (non-blocking)
+    // 1. Email to vendor confirming submission
+    sendVendorProductSubmitted(vendor, product).catch(err => {
+      console.error('Failed to send vendor product submitted email:', err);
+    });
+
+    // 2. Email to admin about new submission
+    sendAdminProductSubmission(vendor, product).catch(err => {
+      console.error('Failed to send admin product submission email:', err);
+    });
+
     return res.status(201).json({
       error: false,
       success: true,
-      message: 'Product created successfully. Waiting for approval.',
+      message: 'Product submitted successfully! It will be reviewed within 24-48 hours.',
       data: product
     });
   } catch (error) {

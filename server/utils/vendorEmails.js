@@ -574,6 +574,204 @@ export const sendVendorStatusChange = async (vendor, newStatus, reason = '') => 
   }
 };
 
+/**
+ * Send admin notification when vendor submits a product
+ */
+export const sendAdminProductSubmission = async (vendor, product) => {
+  try {
+    const adminUrl = process.env.ADMIN_URL || 'https://zuba-admin.vercel.app';
+    const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_FROM || 'support@zubahouse.com';
+    
+    const productImage = product.images?.[0]?.url || product.images?.[0] || product.featuredImage || '';
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #0b2735; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { padding: 30px; background: #f9f9f9; }
+          .product-card { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #eee; }
+          .product-image { width: 100px; height: 100px; object-fit: cover; border-radius: 8px; }
+          .vendor-badge { background: #efb291; color: #0b2735; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+          .button { display: inline-block; background: #27ae60; color: white; padding: 14px 35px; text-decoration: none; border-radius: 5px; font-weight: bold; }
+          .stats { display: flex; gap: 20px; margin: 15px 0; }
+          .stat { text-align: center; }
+          .stat-value { font-size: 18px; font-weight: bold; color: #0b2735; }
+          .stat-label { font-size: 12px; color: #666; }
+          .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; }
+          .urgent { background: #fff3cd; border-left: 4px solid #ffc107; padding: 10px 15px; margin: 15px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📦 New Product Submission</h1>
+            <p style="margin: 5px 0; opacity: 0.9;">Requires your review</p>
+          </div>
+          <div class="content">
+            <div class="urgent">
+              <strong>⏰ Action Required:</strong> A vendor has submitted a new product for approval.
+            </div>
+            
+            <div class="product-card">
+              <table width="100%">
+                <tr>
+                  <td width="120" valign="top">
+                    ${productImage ? `<img src="${productImage}" alt="${product.name}" class="product-image">` : '<div style="width:100px;height:100px;background:#eee;border-radius:8px;display:flex;align-items:center;justify-content:center;">No Image</div>'}
+                  </td>
+                  <td valign="top" style="padding-left: 15px;">
+                    <h2 style="margin: 0 0 10px 0;">${product.name || 'Untitled Product'}</h2>
+                    <p style="margin: 5px 0;"><span class="vendor-badge">🏪 ${vendor.storeName || 'Unknown Vendor'}</span></p>
+                    <p style="margin: 5px 0; color: #666;">SKU: ${product.sku || 'N/A'}</p>
+                  </td>
+                </tr>
+              </table>
+              
+              <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
+              
+              <div class="stats">
+                <div class="stat">
+                  <div class="stat-value">$${(product.pricing?.price || product.price || 0).toFixed(2)}</div>
+                  <div class="stat-label">Price</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-value">${product.inventory?.stock || product.countInStock || 0}</div>
+                  <div class="stat-label">Stock</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-value">${product.category?.name || 'N/A'}</div>
+                  <div class="stat-label">Category</div>
+                </div>
+              </div>
+            </div>
+            
+            <center>
+              <a href="${adminUrl}/vendor-products" class="button">Review Products</a>
+            </center>
+            
+            <p style="margin-top: 25px; color: #666; font-size: 13px;">
+              <strong>Vendor Contact:</strong> ${vendor.email || 'N/A'}<br>
+              <strong>Submitted:</strong> ${new Date().toLocaleString()}
+            </p>
+          </div>
+          <div class="footer">
+            <p>© ${new Date().getFullYear()} Zuba House Admin. This is an automated notification.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    await sendEmailFun({
+      sendTo: adminEmail,
+      subject: `📦 New Product Pending Review: ${product.name || 'Product'} from ${vendor.storeName || 'Vendor'}`,
+      html
+    });
+
+    console.log('✅ Admin product submission notification sent to:', adminEmail);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send admin product submission email:', error);
+    return false;
+  }
+};
+
+/**
+ * Send vendor notification that product is under review
+ */
+export const sendVendorProductSubmitted = async (vendor, product) => {
+  try {
+    const vendorUrl = getVendorUrl();
+    
+    const productImage = product.images?.[0]?.url || product.images?.[0] || product.featuredImage || '';
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #3498db; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { padding: 30px; background: #f9f9f9; }
+          .product-card { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #eee; }
+          .product-image { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; }
+          .status-badge { background: #fff3cd; color: #856404; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; display: inline-block; }
+          .timeline { margin: 20px 0; padding-left: 20px; border-left: 3px solid #3498db; }
+          .timeline-item { margin: 15px 0; }
+          .timeline-done { color: #27ae60; }
+          .timeline-current { color: #3498db; font-weight: bold; }
+          .timeline-pending { color: #999; }
+          .button { display: inline-block; background: #0b2735; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; }
+          .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📤 Product Submitted!</h1>
+            <p style="margin: 5px 0; opacity: 0.9;">Under Review</p>
+          </div>
+          <div class="content">
+            <p>Hi <strong>${vendor.storeName || 'Vendor'}</strong>,</p>
+            <p>Your product has been submitted and is now <span class="status-badge">⏳ Pending Review</span></p>
+            
+            <div class="product-card">
+              <table width="100%">
+                <tr>
+                  <td width="90" valign="top">
+                    ${productImage ? `<img src="${productImage}" alt="${product.name}" class="product-image">` : ''}
+                  </td>
+                  <td valign="top" style="padding-left: 15px;">
+                    <h3 style="margin: 0;">${product.name || 'Your Product'}</h3>
+                    <p style="margin: 5px 0; color: #666;">SKU: ${product.sku || 'N/A'}</p>
+                    <p style="margin: 5px 0; font-weight: bold; color: #27ae60;">$${(product.pricing?.price || product.price || 0).toFixed(2)}</p>
+                  </td>
+                </tr>
+              </table>
+            </div>
+            
+            <h4>What happens next?</h4>
+            <div class="timeline">
+              <div class="timeline-item timeline-done">✅ Product submitted</div>
+              <div class="timeline-item timeline-current">⏳ Admin review (usually within 24-48 hours)</div>
+              <div class="timeline-item timeline-pending">📧 You'll receive an email notification</div>
+              <div class="timeline-item timeline-pending">🎉 Product goes live on the marketplace</div>
+            </div>
+            
+            <center>
+              <a href="${vendorUrl}/products" class="button">View My Products</a>
+            </center>
+            
+            <p style="margin-top: 20px; color: #666; font-size: 13px;">
+              If you need to make changes, you can edit your product from your dashboard.
+            </p>
+          </div>
+          <div class="footer">
+            <p>© ${new Date().getFullYear()} Zuba House. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    await sendEmailFun({
+      sendTo: vendor.email,
+      subject: `📤 Product Submitted for Review: ${product.name || 'Your Product'}`,
+      html
+    });
+
+    console.log('✅ Vendor product submitted email sent to:', vendor.email);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send vendor product submitted email:', error);
+    return false;
+  }
+};
+
 export default {
   sendVendorWelcome,
   sendVendorNewOrder,
@@ -582,6 +780,8 @@ export default {
   sendVendorWithdrawalPaid,
   sendVendorProductApproved,
   sendVendorProductRejected,
-  sendVendorStatusChange
+  sendVendorStatusChange,
+  sendAdminProductSubmission,
+  sendVendorProductSubmitted
 };
 

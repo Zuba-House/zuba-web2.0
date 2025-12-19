@@ -64,6 +64,7 @@ const ProductList = () => {
   };
 
   const getStatusBadge = (status, approvalStatus) => {
+    // Priority: Show approval status first
     if (approvalStatus === 'PENDING_REVIEW') {
       return (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
@@ -78,13 +79,18 @@ const ProductList = () => {
         </span>
       );
     }
-    if (status === 'PUBLISHED' && approvalStatus === 'APPROVED') {
+    if (approvalStatus === 'APPROVED') {
+      // Check if also published
+      const isPublished = status?.toLowerCase() === 'published';
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          <CheckCircle className="w-3 h-3 mr-1" /> Published
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          isPublished ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+        }`}>
+          <CheckCircle className="w-3 h-3 mr-1" /> {isPublished ? 'Live' : 'Approved'}
         </span>
       );
     }
+    // Default: Draft or unknown
     return (
       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
         <AlertTriangle className="w-3 h-3 mr-1" /> Draft

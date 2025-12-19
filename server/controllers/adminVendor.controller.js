@@ -2,7 +2,12 @@ import VendorModel from '../models/vendor.model.js';
 import UserModel from '../models/user.model.js';
 import ProductModel from '../models/product.model.js';
 import OrderModel from '../models/order.model.js';
-import { sendVendorWelcome, sendVendorStatusChange } from '../utils/vendorEmails.js';
+import { 
+  sendVendorWelcome, 
+  sendVendorStatusChange,
+  sendVendorProductApproved,
+  sendVendorProductRejected
+} from '../utils/vendorEmails.js';
 
 /**
  * GET /api/admin/vendors
@@ -606,7 +611,7 @@ export const approveVendorProduct = async (req, res) => {
     const id = productId;
     const { notes } = req.body;
 
-    const product = await ProductModel.findById(id);
+    const product = await ProductModel.findById(id).populate('vendor', 'storeName email');
 
     if (!product) {
       return res.status(404).json({
@@ -616,7 +621,8 @@ export const approveVendorProduct = async (req, res) => {
       });
     }
 
-    if (product.productOwnerType !== 'VENDOR') {
+    // Check if it's a vendor product (has vendor field)
+    if (!product.vendor && product.productOwnerType !== 'VENDOR') {
       return res.status(400).json({
         error: true,
         success: false,
@@ -624,9 +630,9 @@ export const approveVendorProduct = async (req, res) => {
       });
     }
 
-    // Update approval status
+    // Update approval status and set to PUBLISHED/ACTIVE
     product.approvalStatus = 'APPROVED';
-    product.status = 'published'; // Auto-publish on approval
+    product.status = 'published'; // Set to published/active
     product.publishedAt = new Date();
     
     if (notes) {
@@ -638,10 +644,25 @@ export const approveVendorProduct = async (req, res) => {
 
     console.log(`✅ Product approved: ${product.name} (ID: ${id})`);
 
+    // Send email notification to vendor (non-blocking)
+    if (product.vendor?.email) {
+      sendVendorProductApproved(product.vendor, product).catch(err => {
+        console.error('Failed to send product approved email:', err);
+      });
+    } else {
+      // Try to find vendor by vendorId
+      const vendor = await VendorModel.findById(product.vendorId || product.vendor);
+      if (vendor?.email) {
+        sendVendorProductApproved(vendor, product).catch(err => {
+          console.error('Failed to send product approved email:', err);
+        });
+      }
+    }
+
     return res.status(200).json({
       error: false,
       success: true,
-      message: 'Product approved and published successfully',
+      message: 'Product approved and published successfully! Vendor has been notified.',
       data: product
     });
   } catch (error) {
@@ -672,7 +693,7 @@ export const rejectVendorProduct = async (req, res) => {
       });
     }
 
-    const product = await ProductModel.findById(id);
+    const product = await ProductModel.findById(id).populate('vendor', 'storeName email');
 
     if (!product) {
       return res.status(404).json({
@@ -682,7 +703,8 @@ export const rejectVendorProduct = async (req, res) => {
       });
     }
 
-    if (product.productOwnerType !== 'VENDOR') {
+    // Check if it's a vendor product
+    if (!product.vendor && product.productOwnerType !== 'VENDOR') {
       return res.status(400).json({
         error: true,
         success: false,
@@ -703,10 +725,25 @@ export const rejectVendorProduct = async (req, res) => {
 
     console.log(`❌ Product rejected: ${product.name} (ID: ${id}) - Reason: ${reason}`);
 
+    // Send email notification to vendor (non-blocking)
+    if (product.vendor?.email) {
+      sendVendorProductRejected(product.vendor, product, reason).catch(err => {
+        console.error('Failed to send product rejected email:', err);
+      });
+    } else {
+      // Try to find vendor by vendorId
+      const vendor = await VendorModel.findById(product.vendorId || product.vendor);
+      if (vendor?.email) {
+        sendVendorProductRejected(vendor, product, reason).catch(err => {
+          console.error('Failed to send product rejected email:', err);
+        });
+      }
+    }
+
     return res.status(200).json({
       error: false,
       success: true,
-      message: 'Product rejected',
+      message: 'Product rejected. Vendor has been notified.',
       data: product
     });
   } catch (error) {
