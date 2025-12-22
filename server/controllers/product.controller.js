@@ -658,11 +658,24 @@ export async function getAllProductsByCatId(request, response) {
         const perPage = parseInt(request.query.perPage) || 10000;
 
         // Build query - support both single category and multiple categories
+        // Only show published and approved products to public users
         const query = {
-            $or: [
-                { catId: categoryId },
-                { category: categoryId },
-                { categories: { $in: [categoryId] } } // Use $in for array field
+            $and: [
+                {
+                    $or: [
+                        { catId: categoryId },
+                        { category: categoryId },
+                        { categories: { $in: [categoryId] } } // Use $in for array field
+                    ]
+                },
+                { status: 'published' },
+                { 
+                    $or: [
+                        { approvalStatus: 'APPROVED' },
+                        { approvalStatus: { $exists: false } },
+                        { productOwnerType: { $ne: 'VENDOR' } }
+                    ]
+                }
             ]
         };
 
@@ -766,11 +779,21 @@ export async function getAllProductsBySubCatId(request, response) {
         const page = parseInt(request.query.page) || 1;
         const perPage = parseInt(request.query.perPage) || 10000;
 
+        // Only show published and approved products
+        const query = {
+            subCatId: request.params.id,
+            status: 'published',
+            $or: [
+                { approvalStatus: 'APPROVED' },
+                { approvalStatus: { $exists: false } },
+                { productOwnerType: { $ne: 'VENDOR' } }
+            ]
+        };
 
-        const totalPosts = await ProductModel.countDocuments();
+        const totalPosts = await ProductModel.countDocuments(query);
         const totalPages = Math.ceil(totalPosts / perPage);
 
-        if (page > totalPages) {
+        if (page > totalPages && totalPages > 0) {
             return response.status(404).json(
                 {
                     message: "Page not found",
@@ -780,9 +803,7 @@ export async function getAllProductsBySubCatId(request, response) {
             );
         }
 
-        const products = await ProductModel.find({
-            subCatId: request.params.id
-        }).populate("category")
+        const products = await ProductModel.find(query).populate("category")
             .skip((page - 1) * perPage)
             .limit(perPage)
             .exec();
@@ -1150,9 +1171,15 @@ export async function getProductsCount(request, response) {
 //get all features products
 export async function getAllFeaturedProducts(request, response) {
     try {
-
+        // Only show published and approved featured products
         const products = await ProductModel.find({
-            isFeatured: true
+            isFeatured: true,
+            status: 'published',
+            $or: [
+                { approvalStatus: 'APPROVED' },
+                { approvalStatus: { $exists: false } },
+                { productOwnerType: { $ne: 'VENDOR' } }
+            ]
         }).populate("category");
 
         if (!products) {
@@ -1181,9 +1208,15 @@ export async function getAllFeaturedProducts(request, response) {
 //get all features products have banners
 export async function getAllProductsBanners(request, response) {
     try {
-
+        // Only show published and approved products for banners
         const products = await ProductModel.find({
-            isDisplayOnHomeBanner: true
+            isDisplayOnHomeBanner: true,
+            status: 'published',
+            $or: [
+                { approvalStatus: 'APPROVED' },
+                { approvalStatus: { $exists: false } },
+                { productOwnerType: { $ne: 'VENDOR' } }
+            ]
         }).populate("category");
 
         if (!products) {
@@ -1359,11 +1392,27 @@ export async function getProduct(request, response) {
         // Fetch product with all fields including variations and attributes
         // Variations and attributes are embedded documents, so they're automatically included
         const product = await ProductModel.findById(request.params.id)
-            .populate("category");
+            .populate("category")
+            .populate("vendor", "storeName storeSlug");
 
         if (!product) {
             return response.status(404).json({
                 message: "The product is not found",
+                error: true,
+                success: false
+            })
+        }
+
+        // Check if product is available for public viewing
+        // Vendor products must be approved AND published
+        const isVendorProduct = product.productOwnerType === 'VENDOR';
+        const isApproved = product.approvalStatus === 'APPROVED' || !product.approvalStatus;
+        const isPublished = product.status === 'published';
+        
+        if (isVendorProduct && (!isApproved || !isPublished)) {
+            // Product is not available for public viewing
+            return response.status(404).json({
+                message: "This product is not available",
                 error: true,
                 success: false
             })
@@ -2458,8 +2507,20 @@ export async function filters(request, response) {
         }
     }
 
-    // Always filter by published status
+    // Always filter by published status and approved vendor products
     filters.status = 'published';
+    
+    // For vendor products, require approval
+    if (!filters.$and) {
+        filters.$and = [];
+    }
+    filters.$and.push({
+        $or: [
+            { approvalStatus: 'APPROVED' },
+            { approvalStatus: { $exists: false } },
+            { productOwnerType: { $ne: 'VENDOR' } }
+        ]
+    });
 
     try {
         const products = await ProductModel.find(filters).populate("category").populate("categories").skip((page - 1) * limit).limit(parseInt(limit));

@@ -51,19 +51,31 @@ export const sendOTP = async (req, res) => {
     const existingUser = await UserModel.findOne({ email: normalizedEmail });
     
     if (existingUser) {
-      // Check if already has vendor account
+      // Check if already has an active vendor account
       if (existingUser.vendor || existingUser.vendorId) {
         const vendor = await VendorModel.findById(existingUser.vendor || existingUser.vendorId);
         if (vendor) {
+          // Active vendor exists
           return res.status(400).json({
             error: true,
             success: false,
-            message: 'This email already has a vendor account. Please login instead.'
+            message: 'This email already has a vendor account. Please login instead.',
+            data: { 
+              hasVendorAccount: true,
+              vendorStatus: vendor.status,
+              storeName: vendor.storeName
+            }
           });
+        } else {
+          // Orphan reference - clear it and let them continue
+          console.log('🧹 Clearing orphan vendor reference during OTP for:', normalizedEmail);
+          existingUser.vendor = null;
+          existingUser.vendorId = null;
+          await existingUser.save();
         }
       }
       
-      // User exists but no vendor account
+      // User exists but no active vendor account
       if (existingUser.verify_email) {
         // Email already verified, they can proceed to registration
         return res.status(200).json({
@@ -343,13 +355,28 @@ export const applyToBecomeVendor = async (req, res) => {
     let user = existingUser;
     
     if (user) {
-      // User exists - check if already has vendor account
+      // User exists - check if already has an ACTIVE vendor account
       if (user.vendor || user.vendorId) {
-        return res.status(400).json({
-          error: true,
-          success: false,
-          message: 'This email already has a vendor account'
-        });
+        // Verify the vendor record actually exists
+        const existingVendorRef = await VendorModel.findById(user.vendor || user.vendorId);
+        
+        if (existingVendorRef) {
+          // Vendor exists - cannot create another one
+          return res.status(400).json({
+            error: true,
+            success: false,
+            message: 'This email already has a vendor account. Please login instead.',
+            data: { 
+              hasVendorAccount: true,
+              vendorStatus: existingVendorRef.status 
+            }
+          });
+        } else {
+          // Orphan reference - clear it so they can re-register
+          console.log('🧹 Clearing orphan vendor reference for:', normalizedEmail);
+          user.vendor = null;
+          user.vendorId = null;
+        }
       }
       
       // Update existing user to become vendor
@@ -414,10 +441,45 @@ export const applyToBecomeVendor = async (req, res) => {
     // Check if vendor already exists for this user
     const existingVendorByUser = await VendorModel.findOne({ ownerUser: user._id });
     if (existingVendorByUser) {
+      // Link the vendor to the user if not already linked
+      if (!user.vendor && !user.vendorId) {
+        user.vendor = existingVendorByUser._id;
+        user.vendorId = existingVendorByUser._id;
+        await user.save();
+      }
       return res.status(400).json({
         error: true,
         success: false,
-        message: 'You already have a vendor account'
+        message: 'You already have a vendor account. Please login to access your vendor dashboard.',
+        data: { 
+          hasVendorAccount: true,
+          vendorStatus: existingVendorByUser.status,
+          storeName: existingVendorByUser.storeName
+        }
+      });
+    }
+    
+    // Also check by email in vendor collection (in case ownerUser is different)
+    const existingVendorByEmail = await VendorModel.findOne({ email: normalizedEmail });
+    if (existingVendorByEmail) {
+      // Vendor exists with this email but different owner - update the owner
+      console.log('🔧 Found vendor by email, updating owner reference');
+      existingVendorByEmail.ownerUser = user._id;
+      await existingVendorByEmail.save();
+      
+      user.vendor = existingVendorByEmail._id;
+      user.vendorId = existingVendorByEmail._id;
+      await user.save();
+      
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'You already have a vendor account. Please login to access your vendor dashboard.',
+        data: { 
+          hasVendorAccount: true,
+          vendorStatus: existingVendorByEmail.status,
+          storeName: existingVendorByEmail.storeName
+        }
       });
     }
 

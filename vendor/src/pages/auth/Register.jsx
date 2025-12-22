@@ -60,8 +60,19 @@ const Register = () => {
         toast.error(response.data?.message || 'Failed to send verification code');
       }
     } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Failed to send verification code';
-      toast.error(errorMsg);
+      const errorData = error.response?.data;
+      const errorMsg = errorData?.message || 'Failed to send verification code';
+      
+      // Check if user already has a vendor account
+      if (errorData?.data?.hasVendorAccount) {
+        toast.error(`${errorMsg}`);
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
+      } else {
+        toast.error(errorMsg);
+      }
       console.error('Send OTP error:', error);
     } finally {
       setOtpLoading(false);
@@ -190,6 +201,12 @@ const Register = () => {
         toast.error('Please verify your email first');
         setEmailVerified(false);
         setStep(1);
+      } else if (errorData?.data?.hasVendorAccount) {
+        toast.error(errorData?.message || 'You already have a vendor account. Please login instead.');
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
       } else {
         toast.error(errorData?.message || 'Registration failed. Please try again.');
       }

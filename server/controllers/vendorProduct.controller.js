@@ -221,24 +221,18 @@ export const update = async (req, res) => {
 
 /**
  * DELETE /api/vendor/products/:id
- * Soft delete product (vendor-scoped)
+ * Permanently delete product (vendor-scoped)
  */
 export const remove = async (req, res) => {
   try {
     const vendorId = req.vendorId;
     const productId = req.params.id;
 
-    // Soft delete: set status to draft and approval to rejected
-    const product = await ProductModel.findOneAndUpdate(
-      { _id: productId, vendor: vendorId },
-      {
-        $set: {
-          status: 'DRAFT',
-          approvalStatus: 'REJECTED'
-        }
-      },
-      { new: true }
-    );
+    // Find the product first to verify ownership
+    const product = await ProductModel.findOne({
+      _id: productId,
+      vendor: vendorId
+    });
 
     if (!product) {
       return res.status(404).json({
@@ -248,10 +242,15 @@ export const remove = async (req, res) => {
       });
     }
 
+    // Permanently delete the product
+    await ProductModel.findByIdAndDelete(productId);
+
+    console.log(`🗑️ Product permanently deleted by vendor: ${product.name} (ID: ${productId})`);
+
     return res.status(200).json({
       error: false,
       success: true,
-      message: 'Product removed successfully'
+      message: 'Product deleted permanently'
     });
   } catch (error) {
     console.error('vendorProduct.remove error:', error);
