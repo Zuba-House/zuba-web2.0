@@ -128,7 +128,7 @@ const PromoPopup = memo(() => {
       </div>
     </div>
   );
-};
+});
 
 export default PromoPopup;
 

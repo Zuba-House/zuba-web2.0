@@ -88,7 +88,7 @@ const PromoBanner = memo(() => {
       </div>
     </div>
   );
-};
+});
 
 export default PromoBanner;
 

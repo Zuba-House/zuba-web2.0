@@ -56,7 +56,7 @@ const FloatingSaleBadge = memo(() => {
       )}
     </div>
   );
-};
+});
 
 export default FloatingSaleBadge;
 
