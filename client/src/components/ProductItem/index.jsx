@@ -466,7 +466,7 @@ const ProductItem = (props) => {
             return (
               <span className="sale-badge flex items-center absolute top-[10px] left-[10px] z-50 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg px-2 py-1 text-[10px] lg:text-[11px] font-[700] shadow-lg">
                 🔥 {discountPercent}% OFF
-              </span>
+          </span>
             );
           }
           return null;
