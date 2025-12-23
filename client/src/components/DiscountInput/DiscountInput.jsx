@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import './DiscountInput.css';
 
+// Get API URL from environment
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://zuba-api.onrender.com';
+
 /**
  * Discount Input Component
  * Handles promo code and gift card input
@@ -10,7 +13,7 @@ const DiscountInput = ({
   cartTotal = 0, 
   shippingCost = 0,
   onDiscountsCalculated,
-  apiUrl = '/api'
+  apiUrl = `${API_BASE_URL}/api`
 }) => {
   const [promoCode, setPromoCode] = useState('');
   const [giftCardCode, setGiftCardCode] = useState('');
@@ -29,12 +32,17 @@ const DiscountInput = ({
     setError('');
 
     try {
+      // Get auth token if available
+      const token = localStorage.getItem('accessToken');
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      };
+
       // Try the combined discount endpoint first
       let response = await fetch(`${apiUrl}/discounts/calculate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify({
           cartItems,
           cartTotal,
@@ -67,9 +75,7 @@ const DiscountInput = ({
             try {
               const couponResponse = await fetch(`${apiUrl}/coupons/apply`, {
                 method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
+                headers,
                 body: JSON.stringify({
                   code: promoCode.trim(),
                   cartItems,
@@ -114,9 +120,7 @@ const DiscountInput = ({
             try {
               const giftCardResponse = await fetch(`${apiUrl}/gift-cards/apply`, {
                 method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
+                headers,
                 body: JSON.stringify({
                   code: giftCardCode.trim(),
                   cartTotal: cartTotal - discounts.couponDiscount

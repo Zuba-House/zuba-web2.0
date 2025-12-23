@@ -6,6 +6,12 @@ import AdsBannerSlider from "../../components/AdsBannerSlider";
 import AdsBannerSliderV2 from "../../components/AdsBannerSliderV2";
 import SalesSection from "../../components/SalesSection";
 
+// New Creative Components
+import GiftsSection from "../../components/GiftsSection";
+import PersonalizedRecommendations from "../../components/PersonalizedRecommendations";
+import FlashDeals from "../../components/FlashDeals";
+import DailyDiscover from "../../components/DailyDiscover";
+
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 import ProductsSlider from "../../components/ProductsSlider";
@@ -205,6 +211,11 @@ const Home = () => {
         <SalesSection />
       </section>
 
+      {/* ⚡ Flash Deals with Countdown Timer */}
+      <section className="container py-4">
+        <FlashDeals />
+      </section>
+
       <section className="bg-white py-3 lg:py-8">
         <div className="container">
           <div className="flex items-center justify-between flex-col lg:flex-row">
@@ -323,6 +334,12 @@ const Home = () => {
 
         </div>
       </section>
+
+      {/* 🎁 Perfect Gift Guide Section */}
+      <section className="container py-4">
+        <GiftsSection />
+      </section>
+
       <section className="py-2 lg:py-0 pt-0 bg-white">
         <div className="container">
           <h2 className="text-[20px] font-[600]">Featured Products</h2>
@@ -345,7 +362,15 @@ const Home = () => {
         </div>
       </section>
 
+      {/* 🧠 AI-Powered Personalized Recommendations */}
+      <section className="container py-4">
+        <PersonalizedRecommendations />
+      </section>
 
+      {/* 🔍 Daily Discover - Random Picks */}
+      <section className="container py-4">
+        <DailyDiscover />
+      </section>
 
       {
         randomCatProducts?.length !== 0 && randomCatProducts?.map((productRow, index) => {
