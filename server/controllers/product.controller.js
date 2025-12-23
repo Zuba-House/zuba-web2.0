@@ -1208,96 +1208,107 @@ export async function getAllFeaturedProducts(request, response) {
 /**
  * Get all products currently on sale
  * GET /api/product/getSaleProducts
+ * Works with both legacy (oldPrice/price) and new (pricing.regularPrice/salePrice) structures
  */
 export async function getSaleProducts(request, response) {
     try {
         const page = parseInt(request.query.page) || 1;
         const limit = parseInt(request.query.limit) || 12;
         const skip = (page - 1) * limit;
-        const now = new Date();
 
-        // Find products on sale - check both simple and variable products
-        const query = {
-            status: 'published',
-            $or: [
-                { approvalStatus: 'APPROVED' },
-                { approvalStatus: { $exists: false } },
-                { productOwnerType: { $ne: 'VENDOR' } }
-            ],
-            $and: [
-                {
-                    $or: [
-                        // Simple products on sale
-                        {
-                            productType: 'simple',
-                            'pricing.onSale': true,
-                            'pricing.salePrice': { $gt: 0 },
-                            $or: [
-                                { 'pricing.saleStartDate': null },
-                                { 'pricing.saleStartDate': { $lte: now } }
-                            ],
-                            $or: [
-                                { 'pricing.saleEndDate': null },
-                                { 'pricing.saleEndDate': { $gte: now } }
-                            ]
-                        },
-                        // Variable products with sale variations
-                        {
-                            productType: 'variable',
-                            'variations.salePrice': { $gt: 0 }
-                        },
-                        // Legacy sale support
-                        {
-                            oldPrice: { $gt: 0 },
-                            price: { $gt: 0 },
-                            $expr: { $lt: ['$price', '$oldPrice'] }
-                        },
-                        // Discount field
-                        {
-                            discount: { $gt: 0 }
-                        }
-                    ]
-                }
-            ]
+        // First, get all published products
+        const baseQuery = {
+            status: 'published'
         };
 
-        const totalProducts = await ProductModel.countDocuments(query);
-        const totalPages = Math.ceil(totalProducts / limit);
-
-        const products = await ProductModel.find(query)
+        // Fetch more products than needed to filter
+        let products = await ProductModel.find(baseQuery)
             .populate("category")
-            .sort({ 'pricing.saleEndDate': 1, createdAt: -1 }) // Show ending soon first
-            .skip(skip)
-            .limit(limit);
+            .sort({ createdAt: -1 })
+            .limit(100);
 
-        // Calculate discount percentages for each product
-        const productsWithDiscount = products.map(product => {
-            const productObj = product.toObject();
-            let discountPercentage = 0;
+        console.log(`📦 getSaleProducts: Found ${products.length} published products to check`);
 
-            if (product.productType === 'simple' && product.pricing) {
-                const regular = product.pricing.regularPrice || product.oldPrice || 0;
-                const sale = product.pricing.salePrice || product.price || 0;
-                if (regular > 0 && sale > 0 && sale < regular) {
-                    discountPercentage = Math.round(((regular - sale) / regular) * 100);
+        // Filter products that are actually on sale and calculate discounts
+        const saleProducts = products
+            .map(product => {
+                const productObj = product.toObject();
+                let discountPercentage = 0;
+                let regularPrice = 0;
+                let salePrice = 0;
+                let isOnSale = false;
+
+                // Method 1: Check pricing object (new structure)
+                if (product.pricing?.onSale === true && product.pricing?.salePrice > 0) {
+                    regularPrice = product.pricing.regularPrice || 0;
+                    salePrice = product.pricing.salePrice || 0;
+                    isOnSale = true;
                 }
-            } else if (product.oldPrice && product.price && product.price < product.oldPrice) {
-                discountPercentage = Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100);
-            } else if (product.discount) {
-                discountPercentage = product.discount;
-            }
+                // Method 2: Check pricing with regularPrice > salePrice
+                else if (product.pricing?.regularPrice > 0 && product.pricing?.salePrice > 0) {
+                    if (product.pricing.salePrice < product.pricing.regularPrice) {
+                        regularPrice = product.pricing.regularPrice;
+                        salePrice = product.pricing.salePrice;
+                        isOnSale = true;
+                    }
+                }
+                // Method 3: Check oldPrice and price (legacy structure)
+                else if (product.oldPrice > 0 && product.price > 0) {
+                    if (product.price < product.oldPrice) {
+                        regularPrice = product.oldPrice;
+                        salePrice = product.price;
+                        isOnSale = true;
+                    }
+                }
+                // Method 4: Check discount field
+                else if (product.discount && product.discount > 0) {
+                    discountPercentage = product.discount;
+                    isOnSale = true;
+                }
+                // Method 5: Check variable product variations
+                else if (product.productType === 'variable' && product.variations?.length > 0) {
+                    const saleVariation = product.variations.find(v => 
+                        v.salePrice > 0 && v.regularPrice > 0 && v.salePrice < v.regularPrice
+                    );
+                    if (saleVariation) {
+                        regularPrice = saleVariation.regularPrice;
+                        salePrice = saleVariation.salePrice;
+                        isOnSale = true;
+                    }
+                }
 
-            return {
-                ...productObj,
-                discountPercentage,
-                isOnSale: true
-            };
-        });
+                // Calculate discount percentage if not already set
+                if (discountPercentage === 0 && regularPrice > 0 && salePrice > 0 && salePrice < regularPrice) {
+                    discountPercentage = Math.round(((regularPrice - salePrice) / regularPrice) * 100);
+                }
+
+                // Only include if actually on sale
+                if (!isOnSale) {
+                    return null;
+                }
+
+                return {
+                    ...productObj,
+                    discountPercentage,
+                    isOnSale: true,
+                    // Ensure price fields are populated for display
+                    oldPrice: regularPrice || productObj.oldPrice,
+                    price: salePrice || productObj.price
+                };
+            })
+            .filter(Boolean);
+
+        console.log(`🔥 getSaleProducts: ${saleProducts.length} products are on sale`);
+
+        // Apply pagination
+        const paginatedProducts = saleProducts.slice(skip, skip + limit);
+        const totalProducts = saleProducts.length;
+        const totalPages = Math.ceil(totalProducts / limit);
 
         return response.status(200).json({
             error: false,
             success: true,
-            products: productsWithDiscount,
+            products: paginatedProducts,
             totalProducts,
             totalPages,
             currentPage: page,

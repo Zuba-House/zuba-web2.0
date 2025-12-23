@@ -258,9 +258,9 @@ const Sales = () => {
                         </div>
                       )}
                       {viewMode === 'grid' ? (
-                        <ProductItem product={product} />
+                        <ProductItem item={product} />
                       ) : (
-                        <ProductItemListView product={product} />
+                        <ProductItemListView item={product} />
                       )}
                     </div>
                   ))}

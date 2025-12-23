@@ -196,7 +196,7 @@ const SalesSection = () => {
                           <span>{product.discountPercentage}% OFF</span>
                         </div>
                       )}
-                      <ProductItem product={product} />
+                      <ProductItem item={product} />
                     </div>
                   </SwiperSlide>
                 ))}

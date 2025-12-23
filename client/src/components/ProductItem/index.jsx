@@ -254,34 +254,44 @@ const ProductItem = (props) => {
           }, 0);
       }
     }
-    // For simple products
-    return item?.countInStock || item?.stock || item?.inventory?.stock || 0;
+    // For simple products - check various stock fields
+    if (item?.countInStock !== undefined && item?.countInStock !== null) return item.countInStock;
+    if (item?.stock !== undefined && item?.stock !== null) return item.stock;
+    if (item?.inventory?.stock !== undefined && item?.inventory?.stock !== null) return item.inventory.stock;
+    // If no stock info is available, assume in stock (return positive number)
+    return 1;
   };
 
   const isOutOfStock = () => {
     // Check for endless stock first
-    if (item?.inventory?.endlessStock) return false; // Endless stock is always in stock
+    if (item?.inventory?.endlessStock) return false;
+    
+    // Check stockStatus field directly - most reliable indicator
+    const stockStatus = item?.stockStatus || item?.inventory?.stockStatus;
+    if (stockStatus === 'out_of_stock') return true;
+    if (stockStatus === 'in_stock') return false;
     
     // For variable products, check if ANY variation is in stock
     if (item?.productType === 'variable' || item?.type === 'variable') {
       if (item?.variations && Array.isArray(item.variations) && item.variations.length > 0) {
-        // Product is out of stock only if ALL variations are out of stock
         const hasInStockVariation = item.variations.some(v => {
           if (!v || v.isActive === false) return false;
-          // Endless stock is always in stock
           if (v.endlessStock) return true;
-          const stock = Number(v.stock || 0);
-          const stockStatus = v.stockStatus || (stock > 0 ? 'in_stock' : 'out_of_stock');
-          return stockStatus === 'in_stock' && stock > 0;
+          const vStock = Number(v.stock || 0);
+          const vStockStatus = v.stockStatus || (vStock > 0 ? 'in_stock' : 'out_of_stock');
+          return vStockStatus === 'in_stock' || vStock > 0;
         });
-        return !hasInStockVariation; // Out of stock if NO variations are in stock
+        return !hasInStockVariation;
       }
-      // If no variations, consider it out of stock
-      return true;
+      // If no variations but is variable type, default to in-stock
+      return false;
     }
-    // For simple products, check total stock (null means endless/unlimited)
+    
+    // For simple products, check total stock
     const stock = getProductStock();
-    return stock !== null && stock <= 0;
+    // Only show out of stock if explicitly set to 0 or negative
+    // If stock info is missing, assume in stock
+    return stock <= 0;
   };
 
   const isLowStock = () => {
@@ -343,17 +353,17 @@ const ProductItem = (props) => {
                 const singleImageUrl = getImageUrl(item?.image);
                 if (singleImageUrl) return singleImageUrl;
                 
-                // Last resort: placeholder
-                return 'https://via.placeholder.com/400x400?text=No+Image';
+                // Last resort: data URI placeholder
+                return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgdmlld0JveD0iMCAwIDQwMCA0MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI0MDAiIGZpbGw9IiNGM0Y0RjYiLz48cGF0aCBkPSJNMTYwIDI0MEwxOTAgMjAwTDIxMCAyMzBMMjUwIDE4MEwyODAgMjQwSDE2MFoiIGZpbGw9IiNEMUQ1REIiLz48Y2lyY2xlIGN4PSIxNzAiIGN5PSIxNjAiIHI9IjI1IiBmaWxsPSIjRDFENURCIi8+PHRleHQgeD0iMjAwIiB5PSIzMDAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNiIgZmlsbD0iIzlDQTNBRiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
               })()}
               className="product-image"
               alt={item?.name || 'Product image'}
               loading="lazy"
               onError={(e) => {
                 // Prevent infinite loop
-                if (e.target.src && !e.target.src.includes('placeholder')) {
+                if (e.target.src && !e.target.src.includes('data:image')) {
                   e.target.onerror = null;
-                  e.target.src = 'https://via.placeholder.com/400x400?text=No+Image';
+                  e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgdmlld0JveD0iMCAwIDQwMCA0MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI0MDAiIGZpbGw9IiNGM0Y0RjYiLz48cGF0aCBkPSJNMTYwIDI0MEwxOTAgMjAwTDIxMCAyMzBMMjUwIDE4MEwyODAgMjQwSDE2MFoiIGZpbGw9IiNEMUQ1REIiLz48Y2lyY2xlIGN4PSIxNzAiIGN5PSIxNjAiIHI9IjI1IiBmaWxsPSIjRDFENURCIi8+PHRleHQgeD0iMjAwIiB5PSIzMDAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNiIgZmlsbD0iIzlDQTNBRiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
                 }
               }}
             />

@@ -34,6 +34,9 @@ import { transporter } from './config/emailService.js';
 import analyticsRouter from './route/analytics.route.js';
 import { analyticsMiddleware } from './middlewares/analytics.js';
 import seoRouter from './route/seo.route.js';
+import couponRouter from './route/coupon.route.js';
+import giftCardRouter from './route/giftCard.route.js';
+import discountRouter from './route/discount.route.js';
 
 // Validate environment variables at startup
 try {
@@ -372,6 +375,11 @@ app.use("/api/banners", bannerRouter);
 
 // SEO Routes - Sitemap, robots.txt, product feeds
 app.use("/api/seo", seoRouter);
+
+// Coupon & Gift Card Routes
+app.use("/api/coupons", couponRouter);
+app.use("/api/gift-cards", giftCardRouter);
+app.use("/api/discounts", discountRouter);
 
 // Serve robots.txt at root level (fallback - frontend proxies to /api/seo/robots.txt)
 app.get("/robots.txt", (req, res) => {

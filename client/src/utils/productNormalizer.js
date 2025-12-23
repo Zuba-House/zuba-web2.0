@@ -99,20 +99,30 @@ export const normalizeProduct = (product) => {
 
   // Normalize stock
   const getStock = () => {
-    // New structure
-    if (product.inventory) {
-      return product.inventory.stock || 0;
+    // Check multiple possible locations for stock
+    if (product.inventory?.stock !== undefined) {
+      return product.inventory.stock;
     }
-    // Old structure
-    return product.countInStock || 0;
+    if (product.countInStock !== undefined) {
+      return product.countInStock;
+    }
+    if (product.stock !== undefined) {
+      return product.stock;
+    }
+    // Default to 1 if no stock info (assume in stock)
+    return 1;
   };
 
   const getStockStatus = () => {
-    // New structure
-    if (product.inventory) {
-      return product.inventory.stockStatus || 'in_stock';
+    // Check inventory stockStatus
+    if (product.inventory?.stockStatus) {
+      return product.inventory.stockStatus;
     }
-    // Old structure - infer from stock
+    // Check top-level stockStatus
+    if (product.stockStatus) {
+      return product.stockStatus;
+    }
+    // Infer from stock count
     const stock = getStock();
     return stock > 0 ? 'in_stock' : 'out_of_stock';
   };
