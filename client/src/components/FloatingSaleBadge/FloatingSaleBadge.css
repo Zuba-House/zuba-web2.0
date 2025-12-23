@@ -1,81 +1,44 @@
 .floating-sale-badge {
   position: fixed;
-  bottom: 100px;
-  right: 20px;
-  z-index: 999;
-  animation: slideInRight 0.5s ease;
-}
-
-@keyframes slideInRight {
-  from {
-    transform: translateX(100px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+  bottom: 90px;
+  right: 16px;
+  z-index: 998;
 }
 
 .sale-badge-content {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 50%, #d44444 100%);
+  gap: 8px;
+  background: #efb291;
   color: #fff;
   text-decoration: none;
-  padding: 12px 20px;
-  border-radius: 50px;
-  box-shadow: 0 8px 30px rgba(238, 90, 90, 0.4);
+  padding: 10px 16px;
+  border-radius: 24px;
+  box-shadow: 0 4px 12px rgba(239, 178, 145, 0.3);
   position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
-}
-
-.sale-badge-content::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 200%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.2),
-    transparent
-  );
-  animation: shine 2s infinite;
-}
-
-@keyframes shine {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(50%); }
 }
 
 .sale-badge-content:hover {
-  transform: scale(1.05);
-  box-shadow: 0 12px 40px rgba(238, 90, 90, 0.5);
+  background: #e5a67d;
 }
 
 .minimize-btn {
   position: absolute;
-  top: -8px;
-  right: -8px;
-  width: 24px;
-  height: 24px;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
   background: #fff;
-  color: #d44444;
+  color: #efb291;
   border: none;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 10px;
   opacity: 0;
-  transition: opacity 0.3s ease;
-  z-index: 5;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
 .sale-badge-content:hover .minimize-btn {
@@ -83,89 +46,78 @@
 }
 
 .badge-icon {
-  width: 40px;
-  height: 40px;
+  width: 28px;
+  height: 28px;
   background: rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
+  font-size: 12px;
 }
 
 .badge-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
 .badge-title {
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .badge-subtitle {
-  font-size: 12px;
+  font-size: 10px;
   opacity: 0.9;
 }
 
 .badge-cta {
   background: #fff;
-  color: #d44444;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 700;
+  color: #efb291;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
   white-space: nowrap;
 }
 
-/* Minimized state */
 .floating-sale-badge.minimized {
-  bottom: 100px;
+  bottom: 90px;
 }
 
 .minimized-badge {
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: linear-gradient(135deg, #ff6b6b, #d44444);
+  gap: 4px;
+  background: #efb291;
   color: #fff;
   border: none;
-  padding: 12px 16px;
-  border-radius: 50px;
+  padding: 10px 14px;
+  border-radius: 20px;
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(238, 90, 90, 0.4);
-  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(239, 178, 145, 0.3);
   font-weight: 600;
+  font-size: 12px;
 }
 
 .minimized-badge:hover {
-  transform: scale(1.1);
+  background: #e5a67d;
 }
 
-/* Mobile responsiveness */
 @media (max-width: 768px) {
   .floating-sale-badge {
-    bottom: 80px;
+    bottom: 75px;
     right: 10px;
   }
 
   .sale-badge-content {
-    padding: 10px 14px;
-    gap: 8px;
+    padding: 8px 12px;
   }
 
   .badge-icon {
-    width: 32px;
-    height: 32px;
-    font-size: 14px;
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
   }
 
   .badge-text {
@@ -173,8 +125,7 @@
   }
 
   .badge-cta {
-    padding: 5px 10px;
-    font-size: 11px;
+    padding: 3px 8px;
+    font-size: 9px;
   }
 }
-

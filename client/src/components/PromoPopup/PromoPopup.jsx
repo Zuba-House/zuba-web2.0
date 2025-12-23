@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { Link } from 'react-router-dom';
-import { FaTimes, FaGift, FaPercent, FaCopy, FaCheck } from 'react-icons/fa';
-import { MdLocalOffer } from 'react-icons/md';
+import { FaTimes, FaCopy, FaCheck } from 'react-icons/fa';
 import './PromoPopup.css';
 
-const PromoPopup = () => {
+const PromoPopup = memo(() => {
   const [isVisible, setIsVisible] = useState(false);
   const [copied, setCopied] = useState(false);
   const [currentPromo, setCurrentPromo] = useState(null);
@@ -76,7 +75,7 @@ const PromoPopup = () => {
 
         <div className="popup-content">
           <div className="popup-icon">
-            {currentPromo.type === 'shipping' ? <FaGift /> : <MdLocalOffer />}
+            🎁
           </div>
 
           <div className="popup-header">
@@ -132,4 +131,5 @@ const PromoPopup = () => {
 };
 
 export default PromoPopup;
+
 

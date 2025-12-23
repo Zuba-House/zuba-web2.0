@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { Link } from 'react-router-dom';
-import { FaTimes, FaPercent, FaGift } from 'react-icons/fa';
+import { FaTimes } from 'react-icons/fa';
 import './PromoBanner.css';
 
-const PromoBanner = () => {
+const PromoBanner = memo(() => {
   const [isVisible, setIsVisible] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
 

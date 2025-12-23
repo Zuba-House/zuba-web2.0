@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState, memo, useMemo } from "react";
 import "../ProductItem/style.css";
 import { Link, useNavigate } from "react-router-dom";
 import Rating from "@mui/material/Rating";
@@ -613,4 +613,8 @@ const ProductItem = (props) => {
   );
 };
 
-export default ProductItem;
+// Memoize to prevent unnecessary re-renders
+export default memo(ProductItem, (prevProps, nextProps) => {
+  // Only re-render if the product ID changes
+  return prevProps?.item?._id === nextProps?.item?._id;
+});

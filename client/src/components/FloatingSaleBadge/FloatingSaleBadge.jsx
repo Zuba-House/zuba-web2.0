@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { Link } from 'react-router-dom';
-import { FaPercent, FaTimes } from 'react-icons/fa';
+import { FaTimes } from 'react-icons/fa';
 import './FloatingSaleBadge.css';
 
-const FloatingSaleBadge = () => {
+const FloatingSaleBadge = memo(() => {
   const [isVisible, setIsVisible] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
 
@@ -33,8 +33,7 @@ const FloatingSaleBadge = () => {
     <div className={`floating-sale-badge ${isMinimized ? 'minimized' : ''}`}>
       {isMinimized ? (
         <button className="minimized-badge" onClick={handleExpand}>
-          <FaPercent />
-          <span>Sale</span>
+          🏷️ Sale
         </button>
       ) : (
         <Link to="/sales" className="sale-badge-content">
@@ -46,13 +45,13 @@ const FloatingSaleBadge = () => {
             <FaTimes />
           </button>
           <div className="badge-icon">
-            <FaPercent />
+            🏷️
           </div>
           <div className="badge-text">
-            <span className="badge-title">🔥 HOT SALE</span>
+            <span className="badge-title">Sale</span>
             <span className="badge-subtitle">Up to 50% OFF</span>
           </div>
-          <span className="badge-cta">Shop Now →</span>
+          <span className="badge-cta">Shop →</span>
         </Link>
       )}
     </div>
