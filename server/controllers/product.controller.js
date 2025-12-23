@@ -1205,6 +1205,179 @@ export async function getAllFeaturedProducts(request, response) {
 }
 
 
+/**
+ * Get all products currently on sale
+ * GET /api/product/getSaleProducts
+ */
+export async function getSaleProducts(request, response) {
+    try {
+        const page = parseInt(request.query.page) || 1;
+        const limit = parseInt(request.query.limit) || 12;
+        const skip = (page - 1) * limit;
+        const now = new Date();
+
+        // Find products on sale - check both simple and variable products
+        const query = {
+            status: 'published',
+            $or: [
+                { approvalStatus: 'APPROVED' },
+                { approvalStatus: { $exists: false } },
+                { productOwnerType: { $ne: 'VENDOR' } }
+            ],
+            $and: [
+                {
+                    $or: [
+                        // Simple products on sale
+                        {
+                            productType: 'simple',
+                            'pricing.onSale': true,
+                            'pricing.salePrice': { $gt: 0 },
+                            $or: [
+                                { 'pricing.saleStartDate': null },
+                                { 'pricing.saleStartDate': { $lte: now } }
+                            ],
+                            $or: [
+                                { 'pricing.saleEndDate': null },
+                                { 'pricing.saleEndDate': { $gte: now } }
+                            ]
+                        },
+                        // Variable products with sale variations
+                        {
+                            productType: 'variable',
+                            'variations.salePrice': { $gt: 0 }
+                        },
+                        // Legacy sale support
+                        {
+                            oldPrice: { $gt: 0 },
+                            price: { $gt: 0 },
+                            $expr: { $lt: ['$price', '$oldPrice'] }
+                        },
+                        // Discount field
+                        {
+                            discount: { $gt: 0 }
+                        }
+                    ]
+                }
+            ]
+        };
+
+        const totalProducts = await ProductModel.countDocuments(query);
+        const totalPages = Math.ceil(totalProducts / limit);
+
+        const products = await ProductModel.find(query)
+            .populate("category")
+            .sort({ 'pricing.saleEndDate': 1, createdAt: -1 }) // Show ending soon first
+            .skip(skip)
+            .limit(limit);
+
+        // Calculate discount percentages for each product
+        const productsWithDiscount = products.map(product => {
+            const productObj = product.toObject();
+            let discountPercentage = 0;
+
+            if (product.productType === 'simple' && product.pricing) {
+                const regular = product.pricing.regularPrice || product.oldPrice || 0;
+                const sale = product.pricing.salePrice || product.price || 0;
+                if (regular > 0 && sale > 0 && sale < regular) {
+                    discountPercentage = Math.round(((regular - sale) / regular) * 100);
+                }
+            } else if (product.oldPrice && product.price && product.price < product.oldPrice) {
+                discountPercentage = Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100);
+            } else if (product.discount) {
+                discountPercentage = product.discount;
+            }
+
+            return {
+                ...productObj,
+                discountPercentage,
+                isOnSale: true
+            };
+        });
+
+        return response.status(200).json({
+            error: false,
+            success: true,
+            products: productsWithDiscount,
+            totalProducts,
+            totalPages,
+            currentPage: page,
+            hasMore: page < totalPages
+        });
+
+    } catch (error) {
+        console.error('Get sale products error:', error);
+        return response.status(500).json({
+            message: error.message || error,
+            error: true,
+            success: false
+        });
+    }
+}
+
+/**
+ * Get active promotions/coupons for display
+ * GET /api/product/getActivePromotions
+ */
+export async function getActivePromotions(request, response) {
+    try {
+        const now = new Date();
+        
+        // Import CouponModel dynamically to avoid circular dependency
+        const CouponModel = (await import('../models/coupon.model.js')).default;
+        
+        // Get active coupons that can be publicly displayed
+        const coupons = await CouponModel.find({
+            isActive: true,
+            startDate: { $lte: now },
+            $or: [
+                { endDate: null },
+                { endDate: { $gte: now } }
+            ],
+            // Only show coupons without email restrictions (public coupons)
+            allowedEmails: { $size: 0 }
+        })
+        .select('code description discountType discountAmount minimumAmount freeShipping endDate')
+        .limit(10)
+        .sort({ discountAmount: -1 });
+
+        // Get count of products on sale
+        const saleProductsCount = await ProductModel.countDocuments({
+            status: 'published',
+            $or: [
+                { 'pricing.onSale': true },
+                { $expr: { $lt: ['$price', '$oldPrice'] } },
+                { discount: { $gt: 0 } }
+            ]
+        });
+
+        return response.status(200).json({
+            error: false,
+            success: true,
+            promotions: {
+                coupons: coupons.map(c => ({
+                    code: c.code,
+                    description: c.description,
+                    discountType: c.discountType,
+                    discountAmount: c.discountAmount,
+                    minimumAmount: c.minimumAmount,
+                    freeShipping: c.freeShipping,
+                    endsAt: c.endDate
+                })),
+                saleProductsCount,
+                hasActiveSale: saleProductsCount > 0
+            }
+        });
+
+    } catch (error) {
+        console.error('Get active promotions error:', error);
+        return response.status(500).json({
+            message: error.message || error,
+            error: true,
+            success: false
+        });
+    }
+}
+
 //get all features products have banners
 export async function getAllProductsBanners(request, response) {
     try {

@@ -1,0 +1,441 @@
+.sales-section {
+  padding: 2rem 0;
+  margin: 2rem 0;
+}
+
+/* Promotional Banner */
+.promo-banner-container {
+  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 50%, #ffb347 100%);
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(255, 107, 53, 0.3);
+}
+
+.promo-banner-container::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 100%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 60%);
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%, 100% { transform: rotate(0deg); opacity: 0.3; }
+  50% { transform: rotate(10deg); opacity: 0.5; }
+}
+
+.promo-banner {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  position: relative;
+  z-index: 1;
+  flex-wrap: wrap;
+}
+
+.promo-icon {
+  background: rgba(255, 255, 255, 0.2);
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: white;
+  flex-shrink: 0;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.promo-content {
+  flex: 1;
+  min-width: 200px;
+}
+
+.promo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 0.5rem;
+}
+
+.promo-code-display {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.promo-code-display .code {
+  background: white;
+  color: #ff6b35;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.promo-code-display .discount-amount {
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 800;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+}
+
+.promo-description {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.9rem;
+  margin: 0.5rem 0 0;
+}
+
+.promo-condition {
+  display: inline-block;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.8rem;
+  margin-right: 1rem;
+}
+
+.promo-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.free-shipping-badge {
+  background: #27ae60;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.promo-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.promo-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.promo-dot.active {
+  background: white;
+  transform: scale(1.2);
+}
+
+/* Sale Products Section */
+.sale-products-section {
+  background: linear-gradient(135deg, #fff5f0 0%, #fff0e6 100%);
+  border-radius: 20px;
+  padding: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.sale-products-section::before {
+  content: '🔥';
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  font-size: 150px;
+  opacity: 0.05;
+  transform: rotate(15deg);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.fire-icon {
+  background: linear-gradient(135deg, #ff6b35, #f7931e);
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: white;
+  animation: fireGlow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes fireGlow {
+  0% { box-shadow: 0 0 10px rgba(255, 107, 53, 0.5); }
+  100% { box-shadow: 0 0 20px rgba(255, 107, 53, 0.8); }
+}
+
+.title-content h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 0.25rem;
+}
+
+.title-content .subtitle {
+  font-size: 0.9rem;
+  color: #666;
+  margin: 0;
+}
+
+.view-all-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #ff6b35, #f7931e);
+  color: white;
+  border-radius: 25px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+}
+
+.view-all-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+  color: white;
+}
+
+.view-all-btn svg {
+  transition: transform 0.3s ease;
+}
+
+.view-all-btn:hover svg {
+  transform: translateX(4px);
+}
+
+/* Sale Product Cards */
+.sale-products-slider {
+  position: relative;
+}
+
+.sale-products-slider .swiper {
+  padding: 10px 5px;
+}
+
+.sale-products-slider .swiper-button-prev,
+.sale-products-slider .swiper-button-next {
+  background: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.sale-products-slider .swiper-button-prev::after,
+.sale-products-slider .swiper-button-next::after {
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+}
+
+.sale-products-slider .swiper-button-prev:hover,
+.sale-products-slider .swiper-button-next:hover {
+  background: #ff6b35;
+}
+
+.sale-products-slider .swiper-button-prev:hover::after,
+.sale-products-slider .swiper-button-next:hover::after {
+  color: white;
+}
+
+.sale-product-card {
+  position: relative;
+}
+
+.discount-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  color: white;
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  box-shadow: 0 2px 10px rgba(231, 76, 60, 0.4);
+  animation: badgePop 0.5s ease-out;
+}
+
+@keyframes badgePop {
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.discount-badge svg {
+  font-size: 0.65rem;
+}
+
+/* Loading State */
+.sales-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  gap: 1rem;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #ff6b35;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.sales-loading p {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .promo-banner-container {
+    padding: 1rem;
+  }
+
+  .promo-banner {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+
+  .promo-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 1.5rem;
+  }
+
+  .promo-code-display {
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .promo-code-display .discount-amount {
+    font-size: 1.25rem;
+  }
+
+  .free-shipping-badge {
+    margin-top: 0.5rem;
+  }
+
+  .sale-products-section {
+    padding: 1.5rem 1rem;
+    border-radius: 12px;
+  }
+
+  .section-header {
+    flex-direction: column;
+    text-align: center;
+    align-items: center;
+  }
+
+  .title-wrapper {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .title-content h2 {
+    font-size: 1.25rem;
+  }
+
+  .view-all-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0.75rem;
+  }
+
+  .sale-products-slider .swiper-button-prev,
+  .sale-products-slider .swiper-button-next {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .sales-section {
+    padding: 1rem 0;
+    margin: 1rem 0;
+  }
+
+  .promo-code-display .code {
+    font-size: 1rem;
+    padding: 0.4rem 0.75rem;
+  }
+
+  .title-content h2 {
+    font-size: 1.1rem;
+  }
+
+  .title-content .subtitle {
+    font-size: 0.8rem;
+  }
+}
+

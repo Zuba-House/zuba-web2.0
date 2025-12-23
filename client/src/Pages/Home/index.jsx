@@ -1,9 +1,10 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, useMemo } from "react";
 import ResponsiveHeroBanner from "../../components/ResponsiveHeroBanner";
 import HomeCatSlider from "../../components/HomeCatSlider";
 import { LiaShippingFastSolid } from "react-icons/lia";
 import AdsBannerSlider from "../../components/AdsBannerSlider";
 import AdsBannerSliderV2 from "../../components/AdsBannerSliderV2";
+import SalesSection from "../../components/SalesSection";
 
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
@@ -54,7 +55,8 @@ const Home = () => {
       setAllProductsData(res?.products)
     })
 
-     fetchDataFromApi("/api/product/getAllProducts").then((res) => {
+    // Fetch only products configured for home banner display (optimized endpoint)
+    fetchDataFromApi("/api/product/getAllProductsBanners").then((res) => {
       setProductsBanners(res?.products)
     })
 
@@ -139,6 +141,16 @@ const Home = () => {
     setValue(newValue);
   };
 
+  // Check if there are any products configured for home banner display
+  const hasValidBannerProducts = useMemo(() => {
+    return productsBanners?.some(item => 
+      (item?.isDisplayOnHomeBanner === true || item?.isDisplayOnHomeBanner === "true") && 
+      item?.bannerimages && 
+      Array.isArray(item.bannerimages) && 
+      item.bannerimages.length > 0
+    ) || false;
+  }, [productsBanners]);
+
   const filterByCatId = (id) => {
     if (!id || id === 'undefined' || id === 'null') {
       console.error('Invalid category ID:', id);
@@ -188,6 +200,11 @@ const Home = () => {
       {/* NGOMA Products Section - Always at the top */}
       <NGOMAProducts />
 
+      {/* Sales & Promotions Section */}
+      <section className="container py-4">
+        <SalesSection />
+      </section>
+
       <section className="bg-white py-3 lg:py-8">
         <div className="container">
           <div className="flex items-center justify-between flex-col lg:flex-row">
@@ -236,21 +253,21 @@ const Home = () => {
 
       <section className="py-6 pt-0 bg-white">
         <div className="container flex flex-col lg:flex-row gap-5">
-          <div className="part1 w-full lg:w-[70%]">
+          {/* Product banner slider - only show if there are products with banners */}
+          {hasValidBannerProducts && (
+            <div className="part1 w-full lg:w-[70%]">
+              <HomeBannerV2 data={productsBanners} />
+            </div>
+          )}
 
-            {
-              productsBanners?.length > 0 && <HomeBannerV2 data={productsBanners} />
-            }
+          {/* Side banners - adjust width when product banner is not shown */}
+          {bannerV1Data?.length >= 2 && (
+            <div className={`part2 scrollableBox w-full ${hasValidBannerProducts ? 'lg:w-[30%]' : 'lg:w-full'} flex items-center gap-5 justify-between flex-row ${hasValidBannerProducts ? 'lg:flex-col' : 'lg:flex-row'}`}>
+              <BannerBoxV2 info={bannerV1Data[bannerV1Data?.length - 1]?.alignInfo} image={bannerV1Data[bannerV1Data?.length - 1]?.images[0]} item={bannerV1Data[bannerV1Data?.length - 1]} />
 
-
-          </div>
-
-          <div className="part2 scrollableBox w-full lg:w-[30%] flex items-center gap-5 justify-between flex-row lg:flex-col">
-            <BannerBoxV2 info={bannerV1Data[bannerV1Data?.length - 1]?.alignInfo} image={bannerV1Data[bannerV1Data?.length - 1]?.images[0]} item={bannerV1Data[bannerV1Data?.length - 1]} />
-
-            <BannerBoxV2 info={bannerV1Data[bannerV1Data?.length - 2]?.alignInfo} image={bannerV1Data[bannerV1Data?.length - 2]?.images[0]} item={bannerV1Data[bannerV1Data?.length - 2]} />
-          </div>
-
+              <BannerBoxV2 info={bannerV1Data[bannerV1Data?.length - 2]?.alignInfo} image={bannerV1Data[bannerV1Data?.length - 2]?.images[0]} item={bannerV1Data[bannerV1Data?.length - 2]} />
+            </div>
+          )}
         </div>
       </section>
 

@@ -17,9 +17,23 @@ const HomeBannerV2 = (props) => {
 
   const context = useContext(MyContext);
 
+  // Filter products that have banner display enabled and have banner images
+  const bannerProducts = props?.data?.filter(item => 
+    // More robust check - handle both boolean true and truthy string "true"
+    (item?.isDisplayOnHomeBanner === true || item?.isDisplayOnHomeBanner === "true") && 
+    item?.bannerimages && 
+    Array.isArray(item.bannerimages) && 
+    item.bannerimages.length > 0
+  ) || [];
+
+  // Don't render anything if no valid banner products
+  if (bannerProducts.length === 0) {
+    return null;
+  }
+
   return (
     <Swiper
-      loop={true}
+      loop={bannerProducts.length > 1}
       slidesPerView={1}
       spaceBetween={30}
       effect="fade"
@@ -40,10 +54,9 @@ const HomeBannerV2 = (props) => {
     >
 
       {
-        props?.data?.map((item, index) => {
-          if (item?.isDisplayOnHomeBanner === true && item?.bannerimages?.length !== 0) {
-            return (
-              <SwiperSlide key={index}>
+        bannerProducts.map((item, index) => {
+          return (
+            <SwiperSlide key={index}>
 
                 <div className="item w-full rounded-md overflow-hidden relative">
                   <img src={item?.bannerimages[0]} className="w-full" />
@@ -111,9 +124,7 @@ const HomeBannerV2 = (props) => {
                   </div>
                 </div>
               </SwiperSlide>
-            )
-          }
-
+            );
         })
       }
 

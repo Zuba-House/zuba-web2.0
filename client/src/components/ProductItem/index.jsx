@@ -434,11 +434,33 @@ const ProductItem = (props) => {
         }
 
 
-        {item?.isOnSale && item?.discount && (
-          <span className="discount flex items-center absolute top-[10px] left-[10px] z-50 bg-primary text-white rounded-lg p-1 text-[12px] font-[500]">
-            {item?.discount}%
-          </span>
-        )}
+        {/* Sale/Discount Badge */}
+        {(() => {
+          // Calculate discount percentage
+          let discountPercent = item?.discount || item?.discountPercentage || 0;
+          
+          // Calculate from oldPrice and price if not available
+          if (!discountPercent && item?.oldPrice && item?.price && item?.oldPrice > item?.price) {
+            discountPercent = Math.round(((item.oldPrice - item.price) / item.oldPrice) * 100);
+          }
+          
+          // Calculate from pricing object
+          if (!discountPercent && item?.pricing?.regularPrice && item?.pricing?.salePrice && item?.pricing?.regularPrice > item?.pricing?.salePrice) {
+            discountPercent = Math.round(((item.pricing.regularPrice - item.pricing.salePrice) / item.pricing.regularPrice) * 100);
+          }
+          
+          // Check if on sale
+          const isOnSale = item?.isOnSale || item?.pricing?.onSale || (item?.oldPrice && item?.price && item?.oldPrice > item?.price) || discountPercent > 0;
+          
+          if (isOnSale && discountPercent > 0) {
+            return (
+              <span className="sale-badge flex items-center absolute top-[10px] left-[10px] z-50 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg px-2 py-1 text-[10px] lg:text-[11px] font-[700] shadow-lg">
+                🔥 {discountPercent}% OFF
+              </span>
+            );
+          }
+          return null;
+        })()}
 
         <div className="actions absolute top-[-20px] right-[5px] z-50 flex items-center gap-2 flex-col w-[50px] transition-all duration-300 group-hover:top-[15px] opacity-0 group-hover:opacity-100">
 

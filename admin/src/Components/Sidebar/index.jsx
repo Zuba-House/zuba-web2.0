@@ -16,6 +16,8 @@ import { SiBloglovin } from "react-icons/si";
 import { fetchDataFromApi } from "../../utils/api";
 import { IoLogoBuffer } from "react-icons/io";
 import { IoAnalytics } from "react-icons/io5";
+import { RiCoupon3Line, RiGiftLine } from "react-icons/ri";
+import { MdLocalOffer } from "react-icons/md";
 
 
 
@@ -460,6 +462,52 @@ const Sidebar = () => {
             </Collapse>
           </li>
 
+
+          <li>
+            <Button
+              className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]"
+              onClick={() => isOpenSubMenu(8)}
+            >
+              <MdLocalOffer className="text-[18px] text-[#efb291]" /> <span>Promotions</span>
+              <span className="ml-auto w-[30px] h-[30px] flex items-center justify-center">
+                <FaAngleDown
+                  className={`transition-all ${submenuIndex === 8 ? "rotate-180" : ""
+                    }`}
+                />
+              </span>
+            </Button>
+
+            <Collapse isOpened={submenuIndex === 8 ? true : false}>
+              <ul className="w-full">
+                <li className="w-full">
+                  <Link to="/coupons"
+                    onClick={() => {
+                      context?.windowWidth < 992 && context?.setisSidebarOpen(false)
+                      setSubmenuIndex(null)
+                    }}
+                  >
+                    <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <RiCoupon3Line className="text-[14px] text-[#efb291]" />
+                      Coupons / Promo Codes
+                    </Button>
+                  </Link>
+                </li>
+                <li className="w-full">
+                  <Link to="/gift-cards"
+                    onClick={() => {
+                      context?.windowWidth < 992 && context?.setisSidebarOpen(false)
+                      setSubmenuIndex(null)
+                    }}
+                  >
+                    <Button className="!text-[rgba(255,255,255,0.75)] !capitalize !justify-start !w-full !text-[13px] !font-[500] !pl-9 flex gap-3">
+                      <RiGiftLine className="text-[14px] text-[#efb291]" />
+                      Gift Cards
+                    </Button>
+                  </Link>
+                </li>
+              </ul>
+            </Collapse>
+          </li>
 
           <li>
             <Link to="/logo/manage">

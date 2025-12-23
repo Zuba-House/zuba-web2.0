@@ -50,6 +50,7 @@ import { OrderSuccess } from "./Pages/Orders/success";
 import { OrderFailed } from "./Pages/Orders/failed";
 import SearchPage from "./Pages/Search";
 import BlogDetail from "./Pages/BlogDetail";
+import Sales from "./Pages/Sales";
 
 
 const MyContext = createContext();
@@ -788,6 +789,7 @@ function App() {
           <Header />
           <Routes>
             <Route path={"/"} exact={true} element={<Home />} />
+            <Route path={"/sales"} element={<Sales />} />
             <Route
               path={"/products"}
               element={<ProductListing />}
