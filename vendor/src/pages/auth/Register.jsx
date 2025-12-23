@@ -52,9 +52,25 @@ const Register = () => {
           toast.success('Email already verified! Continue with registration.');
           setTimeout(() => setStep(2), 500);
         } else {
-          // OTP sent successfully
+          // OTP sent or generated
           setOtpSent(true);
-          toast.success('Verification code sent to your email!');
+          
+          // Check if email was actually sent
+          if (response.data?.data?.emailSent) {
+            toast.success('Verification code sent to your email! Check your inbox (and spam folder).');
+          } else {
+            // Email service issue - show debug OTP if available (development only)
+            const debugOtp = response.data?.data?.debugOtp;
+            if (debugOtp) {
+              toast.success(`Development mode: Your code is ${debugOtp}`, { duration: 10000 });
+              console.log('🔐 Debug OTP:', debugOtp);
+            } else {
+              toast('Verification code generated. Check your email or contact support.', { 
+                icon: '⚠️',
+                duration: 5000 
+              });
+            }
+          }
         }
       } else {
         toast.error(response.data?.message || 'Failed to send verification code');

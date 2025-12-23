@@ -99,23 +99,43 @@ export const sendOTP = async (req, res) => {
       console.log(`⏰ Expires in: 10 minutes`);
       console.log(`================================================\n`);
 
+      // Check SendGrid configuration before attempting to send
+      const hasSendGridKey = !!process.env.SENDGRID_API_KEY;
+      const senderEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER || process.env.EMAIL;
+      
+      console.log(`📧 SendGrid Config: API_KEY=${hasSendGridKey ? 'SET' : 'NOT SET'}, FROM=${senderEmail || 'NOT SET'}`);
+
       // Try to send email
       let emailSent = false;
-      try {
-        emailSent = await sendOTPEmail(normalizedEmail, existingUser.name || 'Vendor', verifyCode);
-      } catch (emailError) {
-        console.error('❌ Email sending failed, but OTP is stored:', emailError.message);
+      let emailError = null;
+      
+      if (!hasSendGridKey) {
+        console.error('❌ SENDGRID_API_KEY not configured - cannot send email');
+        emailError = 'Email service not configured';
+      } else {
+        try {
+          emailSent = await sendOTPEmail(normalizedEmail, existingUser.name || 'Vendor', verifyCode);
+        } catch (err) {
+          console.error('❌ Email sending failed:', err.message);
+          emailError = err.message;
+        }
       }
+      
+      // Return response with OTP in development/testing mode
+      const isDevelopment = process.env.NODE_ENV !== 'production';
       
       return res.status(200).json({
         error: false,
         success: true,
         message: emailSent 
-          ? 'OTP sent to your email. Please check your inbox (and spam folder).'
-          : 'OTP generated. Please check your email or contact support.',
+          ? 'Verification code sent to your email. Please check your inbox (and spam folder).'
+          : `Verification code generated. ${emailError ? 'Email delivery issue - please contact support.' : 'Please check your email.'}`,
         data: { 
           email: normalizedEmail,
-          emailSent: emailSent
+          emailSent: emailSent,
+          // Include OTP in response for development/testing (REMOVE IN PRODUCTION!)
+          ...(isDevelopment && !emailSent ? { debugOtp: verifyCode } : {}),
+          ...(emailError ? { emailError: emailError } : {})
         }
       });
     }
@@ -135,24 +155,43 @@ export const sendOTP = async (req, res) => {
     console.log(`⏰ Expires in: 10 minutes`);
     console.log(`==========================================\n`);
 
+    // Check SendGrid configuration before attempting to send
+    const hasSendGridKey = !!process.env.SENDGRID_API_KEY;
+    const senderEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER || process.env.EMAIL;
+    
+    console.log(`📧 SendGrid Config: API_KEY=${hasSendGridKey ? 'SET' : 'NOT SET'}, FROM=${senderEmail || 'NOT SET'}`);
+
     // Try to send email
     let emailSent = false;
-    try {
-      emailSent = await sendOTPEmail(normalizedEmail, 'Vendor', verifyCode);
-    } catch (emailError) {
-      console.error('❌ Email sending failed, but OTP is stored:', emailError.message);
-      // Continue - OTP is stored and logged to console for testing
+    let emailError = null;
+    
+    if (!hasSendGridKey) {
+      console.error('❌ SENDGRID_API_KEY not configured - cannot send email');
+      emailError = 'Email service not configured';
+    } else {
+      try {
+        emailSent = await sendOTPEmail(normalizedEmail, 'Vendor', verifyCode);
+      } catch (err) {
+        console.error('❌ Email sending failed:', err.message);
+        emailError = err.message;
+      }
     }
 
+    // Return response with OTP in development/testing mode
+    const isDevelopment = process.env.NODE_ENV !== 'production';
+    
     return res.status(200).json({
       error: false,
       success: true,
       message: emailSent 
-        ? 'OTP sent to your email. Please check your inbox (and spam folder).'
-        : 'OTP generated. Please check your email or contact support.',
+        ? 'Verification code sent to your email. Please check your inbox (and spam folder).'
+        : `Verification code generated. ${emailError ? 'Email delivery issue - please contact support.' : 'Please check your email.'}`,
       data: { 
         email: normalizedEmail,
-        emailSent: emailSent
+        emailSent: emailSent,
+        // Include OTP in response for development/testing (REMOVE IN PRODUCTION!)
+        ...(isDevelopment && !emailSent ? { debugOtp: verifyCode } : {}),
+        ...(emailError ? { emailError: emailError } : {})
       }
     });
   } catch (error) {
