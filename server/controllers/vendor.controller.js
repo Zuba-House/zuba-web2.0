@@ -51,31 +51,48 @@ export const sendOTP = async (req, res) => {
     const existingUser = await UserModel.findOne({ email: normalizedEmail });
     
     if (existingUser) {
-      // Check if already has an active vendor account
+      // Check if already has an active vendor account - check BOTH user references AND vendor collection
+      let existingVendor = null;
+      
+      // Method 1: Check via user's vendor/vendorId field
       if (existingUser.vendor || existingUser.vendorId) {
-        const vendor = await VendorModel.findById(existingUser.vendor || existingUser.vendorId);
-        if (vendor) {
-          // Active vendor exists
-          return res.status(400).json({
-            error: true,
-            success: false,
-            message: 'This email already has a vendor account. Please login instead.',
-            data: { 
-              hasVendorAccount: true,
-              vendorStatus: vendor.status,
-              storeName: vendor.storeName
-            }
-          });
-        } else {
-          // Orphan reference - clear it and let them continue
-          console.log('🧹 Clearing orphan vendor reference during OTP for:', normalizedEmail);
+        existingVendor = await VendorModel.findById(existingUser.vendor || existingUser.vendorId);
+        if (!existingVendor) {
+          // Orphan reference - clear it
+          console.log('🧹 Clearing orphan vendor reference for:', normalizedEmail);
           existingUser.vendor = null;
           existingUser.vendorId = null;
           await existingUser.save();
         }
       }
       
-      // User exists but no active vendor account
+      // Method 2: Check vendor collection directly by ownerUser
+      if (!existingVendor) {
+        existingVendor = await VendorModel.findOne({ ownerUser: existingUser._id });
+        if (existingVendor) {
+          // Link vendor to user if not linked
+          console.log('🔗 Linking found vendor to user:', normalizedEmail);
+          existingUser.vendor = existingVendor._id;
+          existingUser.vendorId = existingVendor._id;
+          await existingUser.save();
+        }
+      }
+      
+      // If vendor exists, tell them to login
+      if (existingVendor) {
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: `You already have a vendor account "${existingVendor.storeName}". Please login instead.`,
+          data: { 
+            hasVendorAccount: true,
+            vendorStatus: existingVendor.status,
+            storeName: existingVendor.storeName
+          }
+        });
+      }
+      
+      // User exists but NO vendor account - check if email is verified
       if (existingUser.verify_email) {
         // Email already verified, they can proceed to registration
         return res.status(200).json({
@@ -121,26 +138,26 @@ export const sendOTP = async (req, res) => {
         }
       }
       
-      // Return response with OTP in development/testing mode
-      const isDevelopment = process.env.NODE_ENV !== 'production';
-      
-      return res.status(200).json({
-        error: false,
-        success: true,
-        message: emailSent 
-          ? 'Verification code sent to your email. Please check your inbox (and spam folder).'
-          : `Verification code generated. ${emailError ? 'Email delivery issue - please contact support.' : 'Please check your email.'}`,
-        data: { 
-          email: normalizedEmail,
-          emailSent: emailSent,
-          // Include OTP in response for development/testing (REMOVE IN PRODUCTION!)
-          ...(isDevelopment && !emailSent ? { debugOtp: verifyCode } : {}),
-          ...(emailError ? { emailError: emailError } : {})
-        }
-      });
-    }
+    // Return response - include OTP when email fails for local testing
+    const isLocal = !process.env.RENDER && !process.env.VERCEL;
+    
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message: emailSent 
+        ? 'Verification code sent to your email. Please check your inbox (and spam folder).'
+        : `Verification code generated.${isLocal ? ' Check your server console for the OTP code.' : ' Email delivery issue - please contact support.'}`,
+      data: { 
+        email: normalizedEmail,
+        emailSent: emailSent,
+        // Include OTP in response when email fails (for local testing)
+        ...(!emailSent ? { otp: verifyCode } : {}),
+        ...(emailError ? { emailError: emailError } : {})
+      }
+    });
+  }
 
-    // New user - store OTP in memory
+  // New user - store OTP in memory
     const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
     
     pendingOTPStore.set(normalizedEmail, {
@@ -177,20 +194,20 @@ export const sendOTP = async (req, res) => {
       }
     }
 
-    // Return response with OTP in development/testing mode
-    const isDevelopment = process.env.NODE_ENV !== 'production';
+    // Return response - include OTP when email fails for local testing
+    const isLocal = !process.env.RENDER && !process.env.VERCEL;
     
     return res.status(200).json({
       error: false,
       success: true,
       message: emailSent 
         ? 'Verification code sent to your email. Please check your inbox (and spam folder).'
-        : `Verification code generated. ${emailError ? 'Email delivery issue - please contact support.' : 'Please check your email.'}`,
+        : `Verification code generated.${isLocal ? ' Check your server console for the OTP code.' : ' Email delivery issue - please contact support.'}`,
       data: { 
         email: normalizedEmail,
         emailSent: emailSent,
-        // Include OTP in response for development/testing (REMOVE IN PRODUCTION!)
-        ...(isDevelopment && !emailSent ? { debugOtp: verifyCode } : {}),
+        // Include OTP in response when email fails (for local testing)
+        ...(!emailSent ? { otp: verifyCode } : {}),
         ...(emailError ? { emailError: emailError } : {})
       }
     });
@@ -394,29 +411,61 @@ export const applyToBecomeVendor = async (req, res) => {
     let user = existingUser;
     
     if (user) {
-      // User exists - check if already has an ACTIVE vendor account
+      console.log('📝 Processing existing user for vendor application:', normalizedEmail);
+      
+      // Check if already has an ACTIVE vendor account - check BOTH methods
+      let existingVendorAccount = null;
+      
+      // Method 1: Check via user's vendor/vendorId field
       if (user.vendor || user.vendorId) {
-        // Verify the vendor record actually exists
-        const existingVendorRef = await VendorModel.findById(user.vendor || user.vendorId);
-        
-        if (existingVendorRef) {
-          // Vendor exists - cannot create another one
-          return res.status(400).json({
-            error: true,
-            success: false,
-            message: 'This email already has a vendor account. Please login instead.',
-            data: { 
-              hasVendorAccount: true,
-              vendorStatus: existingVendorRef.status 
-            }
-          });
-        } else {
-          // Orphan reference - clear it so they can re-register
+        existingVendorAccount = await VendorModel.findById(user.vendor || user.vendorId);
+        if (!existingVendorAccount) {
+          // Orphan reference - clear it
           console.log('🧹 Clearing orphan vendor reference for:', normalizedEmail);
           user.vendor = null;
           user.vendorId = null;
         }
       }
+      
+      // Method 2: Check vendor collection directly by ownerUser
+      if (!existingVendorAccount) {
+        existingVendorAccount = await VendorModel.findOne({ ownerUser: user._id });
+        if (existingVendorAccount) {
+          // Link to user
+          console.log('🔗 Found unlinked vendor for user:', normalizedEmail);
+          user.vendor = existingVendorAccount._id;
+          user.vendorId = existingVendorAccount._id;
+          await user.save();
+        }
+      }
+      
+      // Method 3: Check by email in vendor collection
+      if (!existingVendorAccount) {
+        existingVendorAccount = await VendorModel.findOne({ email: normalizedEmail });
+        if (existingVendorAccount) {
+          console.log('🔗 Found vendor by email for user:', normalizedEmail);
+          user.vendor = existingVendorAccount._id;
+          user.vendorId = existingVendorAccount._id;
+          existingVendorAccount.ownerUser = user._id;
+          await Promise.all([user.save(), existingVendorAccount.save()]);
+        }
+      }
+      
+      // If vendor exists, tell them to login
+      if (existingVendorAccount) {
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: `You already have a vendor account "${existingVendorAccount.storeName}". Please login to access your dashboard.`,
+          data: { 
+            hasVendorAccount: true,
+            vendorStatus: existingVendorAccount.status,
+            storeName: existingVendorAccount.storeName
+          }
+        });
+      }
+      
+      console.log('✅ No existing vendor found - proceeding with application');
       
       // Update existing user to become vendor
       user.role = 'VENDOR';
@@ -477,28 +526,7 @@ export const applyToBecomeVendor = async (req, res) => {
       });
     }
 
-    // Check if vendor already exists for this user
-    const existingVendorByUser = await VendorModel.findOne({ ownerUser: user._id });
-    if (existingVendorByUser) {
-      // Link the vendor to the user if not already linked
-      if (!user.vendor && !user.vendorId) {
-        user.vendor = existingVendorByUser._id;
-        user.vendorId = existingVendorByUser._id;
-        await user.save();
-      }
-      return res.status(400).json({
-        error: true,
-        success: false,
-        message: 'You already have a vendor account. Please login to access your vendor dashboard.',
-        data: { 
-          hasVendorAccount: true,
-          vendorStatus: existingVendorByUser.status,
-          storeName: existingVendorByUser.storeName
-        }
-      });
-    }
-    
-    // Also check by email in vendor collection (in case ownerUser is different)
+    // Double-check no vendor exists (safety check - should be caught earlier)
     const existingVendorByEmail = await VendorModel.findOne({ email: normalizedEmail });
     if (existingVendorByEmail) {
       // Vendor exists with this email but different owner - update the owner
