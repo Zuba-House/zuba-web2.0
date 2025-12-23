@@ -3,6 +3,7 @@
   "framework": "vite",
   "buildCommand": "npm install && npm run build",
   "outputDirectory": "dist",
+  "public": true,
   "rewrites": [
     {
       "source": "/:path((?!manifest\\.json|favicon\\.ico|favicon\\.png|logo192\\.png|logo512\\.png|robots\\.txt|assets/).*)",
@@ -20,6 +21,23 @@
         {
           "key": "Cache-Control",
           "value": "public, max-age=86400"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    },
+    {
+      "source": "/(favicon\\.ico|favicon\\.png|logo192\\.png|logo512\\.png|robots\\.txt)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
         }
       ]
     },
@@ -51,4 +69,3 @@
     }
   ]
 }
-
