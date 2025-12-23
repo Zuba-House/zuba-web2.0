@@ -51,6 +51,9 @@ import { OrderFailed } from "./Pages/Orders/failed";
 import SearchPage from "./Pages/Search";
 import BlogDetail from "./Pages/BlogDetail";
 import Sales from "./Pages/Sales";
+import PromoPopup from "./components/PromoPopup/PromoPopup";
+import PromoBanner from "./components/PromoBanner/PromoBanner";
+import FloatingSaleBadge from "./components/FloatingSaleBadge/FloatingSaleBadge";
 
 
 const MyContext = createContext();
@@ -786,7 +789,10 @@ function App() {
     <>
       <BrowserRouter>
         <MyContext.Provider value={values}>
+          <PromoBanner />
           <Header />
+          <PromoPopup />
+          <FloatingSaleBadge />
           <Routes>
             <Route path={"/"} exact={true} element={<Home />} />
             <Route path={"/sales"} element={<Sales />} />

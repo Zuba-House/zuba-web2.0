@@ -7,6 +7,7 @@ import ProductItem from '../../components/ProductItem';
 import ProductItemListView from '../../components/ProductItemListView';
 import { MyContext } from '../../App';
 import { SEO } from '../../components/SEO';
+import { Helmet } from 'react-helmet-async';
 import './Sales.css';
 
 const Sales = () => {
@@ -109,11 +110,55 @@ const Sales = () => {
   return (
     <>
       <SEO 
-        title="Sales & Promotions - Hot Deals on African Fashion"
-        description="Shop our biggest sales and use exclusive promo codes for extra savings on African fashion, clothing, and accessories."
+        title="🔥 SALE - Up to 50% OFF African Fashion | Zuba House"
+        description="Huge savings on authentic African fashion! Shop dresses, jewelry, accessories & more. Use promo codes WELCOME10, FREESHIP for extra discounts. Free shipping over $75!"
         url="/sales"
-        keywords={['sales', 'discounts', 'promo codes', 'African fashion deals', 'coupon codes']}
+        keywords={[
+          'African fashion sale',
+          'African clothing discount',
+          'African dress sale',
+          'Ankara sale',
+          'African jewelry deals',
+          'promo code African fashion',
+          'Zuba House sale',
+          'African accessories discount',
+          'black Friday African fashion',
+          'holiday sale African clothing',
+          'cheap African fashion',
+          'African fashion coupon code'
+        ]}
       />
+      
+      {/* Structured Data for Google */}
+      <Helmet>
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "SaleEvent",
+            "name": "Zuba House Holiday Sale",
+            "description": "Up to 50% off on authentic African fashion, clothing, jewelry and accessories",
+            "url": "https://zubahouse.com/sales",
+            "startDate": "2024-12-01",
+            "endDate": "2025-01-31",
+            "offers": {
+              "@type": "AggregateOffer",
+              "priceCurrency": "USD",
+              "lowPrice": "10",
+              "highPrice": "500",
+              "offerCount": totalProducts || 100
+            },
+            "location": {
+              "@type": "VirtualLocation",
+              "url": "https://zubahouse.com/sales"
+            },
+            "organizer": {
+              "@type": "Organization",
+              "name": "Zuba House",
+              "url": "https://zubahouse.com"
+            }
+          })}
+        </script>
+      </Helmet>
 
       <div className="sales-page">
         {/* Hero Banner */}

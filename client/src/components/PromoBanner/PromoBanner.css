@@ -1,0 +1,157 @@
+.promo-banner {
+  position: relative;
+  background: linear-gradient(90deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  color: #fff;
+  padding: 10px 50px;
+  text-align: center;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.promo-banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(239, 178, 145, 0.1),
+    transparent
+  );
+  animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(50%); }
+}
+
+.promo-banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  position: relative;
+  z-index: 2;
+}
+
+.promo-text-container {
+  overflow: hidden;
+}
+
+.promo-text {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  animation: fadeInSlide 0.5s ease;
+}
+
+@keyframes fadeInSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.promo-cta {
+  background: linear-gradient(90deg, #efb291, #e5a67d);
+  color: #1a1a2e;
+  text-decoration: none;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.promo-cta:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(239, 178, 145, 0.4);
+}
+
+.promo-close {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.3s ease;
+  z-index: 5;
+}
+
+.promo-close:hover {
+  color: #fff;
+}
+
+.promo-dots {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+}
+
+.promo-dots .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.promo-dots .dot.active {
+  background: #efb291;
+  width: 18px;
+  border-radius: 3px;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .promo-banner {
+    padding: 12px 40px 12px 12px;
+  }
+
+  .promo-banner-content {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .promo-text {
+    font-size: 12px;
+    line-height: 1.3;
+  }
+
+  .promo-cta {
+    font-size: 11px;
+    padding: 5px 12px;
+  }
+
+  .promo-close {
+    right: 8px;
+  }
+
+  .promo-dots {
+    display: none;
+  }
+}
+
