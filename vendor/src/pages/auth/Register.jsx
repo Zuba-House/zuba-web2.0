@@ -44,7 +44,7 @@ const Register = () => {
         email: email.toLowerCase().trim()
       });
 
-      if (response.data?.error === false) {
+        if (response.data?.error === false) {
         if (response.data?.data?.emailVerified) {
           // Email already verified
           setEmailVerified(true);
@@ -59,11 +59,13 @@ const Register = () => {
           if (response.data?.data?.emailSent) {
             toast.success('Verification code sent to your email! Check your inbox (and spam folder).');
           } else {
-            // Email service issue - show debug OTP if available (development only)
-            const debugOtp = response.data?.data?.debugOtp;
-            if (debugOtp) {
-              toast.success(`Development mode: Your code is ${debugOtp}`, { duration: 10000 });
-              console.log('🔐 Debug OTP:', debugOtp);
+            // Email service issue - show OTP if available (local development)
+            const localOtp = response.data?.data?.otp || response.data?.data?.debugOtp;
+            if (localOtp) {
+              // Auto-fill the OTP for convenience
+              setOtp(localOtp);
+              toast.success(`📧 Email not configured locally. Your code: ${localOtp}`, { duration: 15000 });
+              console.log('🔐 Local OTP:', localOtp);
             } else {
               toast('Verification code generated. Check your email or contact support.', { 
                 icon: '⚠️',
