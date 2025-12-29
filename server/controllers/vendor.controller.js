@@ -467,9 +467,14 @@ export const applyToBecomeVendor = async (req, res) => {
           });
         }
         
-        // If vendor is PENDING or REJECTED, allow them to update/reapply
-        // We'll continue with the application process below
-        console.log('ℹ️ Found existing vendor with status:', existingVendorAccount.status, '- allowing reapplication');
+        // If vendor is PENDING or REJECTED, we'll update it later
+        // Make sure it's linked to the user
+        if (!user.vendor || !user.vendorId) {
+          user.vendor = existingVendorAccount._id;
+          user.vendorId = existingVendorAccount._id;
+          await user.save();
+        }
+        console.log('ℹ️ Found existing vendor with status:', existingVendorAccount.status, '- will update during application');
       } else {
         console.log('✅ No existing vendor found - proceeding with application');
       }
@@ -539,20 +544,60 @@ export const applyToBecomeVendor = async (req, res) => {
     if (existingVendorByEmail) {
       // Check if this vendor already belongs to this user
       if (existingVendorByEmail.ownerUser && existingVendorByEmail.ownerUser.toString() === user._id.toString()) {
-        // Vendor already belongs to this user - this is fine, just link it
-        console.log('🔗 Vendor already belongs to this user, linking:', normalizedEmail);
+        // Vendor already belongs to this user - check status
+        console.log('🔗 Vendor already belongs to this user, checking status:', existingVendorByEmail.status);
+        
+        // Only reject if vendor is ACTIVE or APPROVED
+        if (existingVendorByEmail.status === 'APPROVED' || existingVendorByEmail.status === 'ACTIVE') {
+          user.vendor = existingVendorByEmail._id;
+          user.vendorId = existingVendorByEmail._id;
+          await user.save();
+          
+          return res.status(400).json({
+            error: true,
+            success: false,
+            message: 'You already have an active vendor account. Please login to access your vendor dashboard.',
+            data: { 
+              hasVendorAccount: true,
+              vendorStatus: existingVendorByEmail.status,
+              storeName: existingVendorByEmail.storeName
+            }
+          });
+        }
+        
+        // If vendor is PENDING or REJECTED, update it instead of rejecting
+        console.log('🔄 Updating existing PENDING/REJECTED vendor for user:', normalizedEmail);
+        existingVendorByEmail.storeName = storeName.trim();
+        existingVendorByEmail.storeSlug = storeSlug.toLowerCase().trim();
+        existingVendorByEmail.description = description || '';
+        existingVendorByEmail.phone = phone || '';
+        existingVendorByEmail.whatsapp = whatsapp || '';
+        existingVendorByEmail.country = country || '';
+        existingVendorByEmail.city = city || '';
+        existingVendorByEmail.addressLine1 = addressLine1 || '';
+        existingVendorByEmail.addressLine2 = addressLine2 || '';
+        existingVendorByEmail.postalCode = postalCode || '';
+        existingVendorByEmail.categories = categories || [];
+        existingVendorByEmail.status = 'PENDING';
+        await existingVendorByEmail.save();
+        
         user.vendor = existingVendorByEmail._id;
         user.vendorId = existingVendorByEmail._id;
         await user.save();
         
-        return res.status(400).json({
-          error: true,
-          success: false,
-          message: 'You already have a vendor account. Please login to access your vendor dashboard.',
-          data: { 
-            hasVendorAccount: true,
-            vendorStatus: existingVendorByEmail.status,
-            storeName: existingVendorByEmail.storeName
+        // Clear pending OTP data
+        pendingOTPStore.delete(normalizedEmail);
+        
+        return res.status(201).json({
+          error: false,
+          success: true,
+          message: 'Vendor application updated successfully! Your application is under review. You will be notified once approved.',
+          data: {
+            vendorId: existingVendorByEmail._id,
+            storeName: existingVendorByEmail.storeName,
+            storeSlug: existingVendorByEmail.storeSlug,
+            status: existingVendorByEmail.status,
+            emailVerified: true
           }
         });
       }
@@ -573,18 +618,9 @@ export const applyToBecomeVendor = async (req, res) => {
         });
       }
       
-      // If vendor status is PENDING or REJECTED, allow new registration
-      // Update the existing vendor record to point to this user
-      console.log('🔧 Found inactive vendor by email, updating owner reference');
+      // If vendor status is PENDING or REJECTED and belongs to different user, update owner
+      console.log('🔧 Found inactive vendor by email with different owner, updating owner reference');
       existingVendorByEmail.ownerUser = user._id;
-      await existingVendorByEmail.save();
-      
-      user.vendor = existingVendorByEmail._id;
-      user.vendorId = existingVendorByEmail._id;
-      await user.save();
-      
-      // Continue with creating a new vendor (will update the existing one)
-      // Actually, we should update the existing one instead of creating new
       existingVendorByEmail.storeName = storeName.trim();
       existingVendorByEmail.storeSlug = storeSlug.toLowerCase().trim();
       existingVendorByEmail.description = description || '';
@@ -598,6 +634,10 @@ export const applyToBecomeVendor = async (req, res) => {
       existingVendorByEmail.categories = categories || [];
       existingVendorByEmail.status = 'PENDING';
       await existingVendorByEmail.save();
+      
+      user.vendor = existingVendorByEmail._id;
+      user.vendorId = existingVendorByEmail._id;
+      await user.save();
       
       // Clear pending OTP data
       pendingOTPStore.delete(normalizedEmail);
@@ -619,13 +659,52 @@ export const applyToBecomeVendor = async (req, res) => {
     // Check if user already has a vendor account (from earlier check)
     let vendor = null;
     
+    // First check via user's vendor reference
     if (user && (user.vendor || user.vendorId)) {
       vendor = await VendorModel.findById(user.vendor || user.vendorId);
     }
     
+    // Also check by ownerUser (in case vendor wasn't linked to user yet)
+    if (!vendor) {
+      vendor = await VendorModel.findOne({ ownerUser: user._id });
+      if (vendor) {
+        // Link it to user
+        user.vendor = vendor._id;
+        user.vendorId = vendor._id;
+        await user.save();
+      }
+    }
+    
+    // Also check by email (final fallback)
+    if (!vendor) {
+      vendor = await VendorModel.findOne({ email: normalizedEmail });
+      if (vendor) {
+        // Link it to user
+        vendor.ownerUser = user._id;
+        user.vendor = vendor._id;
+        user.vendorId = vendor._id;
+        await Promise.all([vendor.save(), user.save()]);
+      }
+    }
+    
     // If vendor exists but is PENDING or REJECTED, update it instead of creating new
-    if (vendor && (vendor.status === 'PENDING' || vendor.status === 'REJECTED')) {
-      console.log('🔄 Updating existing vendor application:', vendor._id);
+    if (vendor) {
+      if (vendor.status === 'APPROVED' || vendor.status === 'ACTIVE') {
+        // This shouldn't happen as we check earlier, but just in case
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'You already have an active vendor account. Please login to access your vendor dashboard.',
+          data: { 
+            hasVendorAccount: true,
+            vendorStatus: vendor.status,
+            storeName: vendor.storeName
+          }
+        });
+      }
+      
+      // Update existing PENDING or REJECTED vendor
+      console.log('🔄 Updating existing vendor application:', vendor._id, 'Status:', vendor.status);
       vendor.storeName = storeName.trim();
       vendor.storeSlug = storeSlug.toLowerCase().trim();
       vendor.description = description || '';
@@ -638,7 +717,32 @@ export const applyToBecomeVendor = async (req, res) => {
       vendor.postalCode = postalCode || '';
       vendor.categories = categories || [];
       vendor.status = 'PENDING'; // Reset to pending for re-review
+      vendor.ownerUser = user._id; // Ensure owner is set
+      vendor.email = normalizedEmail; // Ensure email is set
       await vendor.save();
+      
+      // Link vendor to user if not already linked
+      if (!user.vendor || !user.vendorId) {
+        user.vendor = vendor._id;
+        user.vendorId = vendor._id;
+        await user.save();
+      }
+      
+      // Clear pending OTP data
+      pendingOTPStore.delete(normalizedEmail);
+      
+      return res.status(201).json({
+        error: false,
+        success: true,
+        message: 'Vendor application updated successfully! Your application is under review. You will be notified once approved.',
+        data: {
+          vendorId: vendor._id,
+          storeName: vendor.storeName,
+          storeSlug: vendor.storeSlug,
+          status: vendor.status,
+          emailVerified: true
+        }
+      });
     } else {
       // Create new vendor profile
       try {
