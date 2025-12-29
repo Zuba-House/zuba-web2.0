@@ -37,6 +37,7 @@ import seoRouter from './route/seo.route.js';
 import couponRouter from './route/coupon.route.js';
 import giftCardRouter from './route/giftCard.route.js';
 import discountRouter from './route/discount.route.js';
+import { expireSales, activateScheduledSales } from './utils/expireSales.js';
 
 // Validate environment variables at startup
 try {
@@ -435,12 +436,35 @@ connectDB()
         app.listen(PORT, () => {
             console.log(`✅ Server is running on port ${PORT}`);
             console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+            
+            // Start scheduled sale management
+            startSaleScheduler();
         });
     })
     .catch((error) => {
         console.error('❌ Failed to start server:', error);
         process.exit(1);
     });
+
+// Scheduled job to expire and activate sales
+function startSaleScheduler() {
+    console.log('⏰ Starting sale scheduler...');
+    
+    // Run immediately on startup
+    expireSales().catch(err => console.error('Error in initial sale expiration:', err));
+    activateScheduledSales().catch(err => console.error('Error in initial sale activation:', err));
+    
+    // Run every hour (3600000 ms)
+    const interval = 60 * 60 * 1000; // 1 hour in milliseconds
+    
+    setInterval(() => {
+        console.log('⏰ Running scheduled sale expiration check...');
+        expireSales().catch(err => console.error('Error in scheduled sale expiration:', err));
+        activateScheduledSales().catch(err => console.error('Error in scheduled sale activation:', err));
+    }, interval);
+    
+    console.log(`✅ Sale scheduler started. Will run every ${interval / 1000 / 60} minutes`);
+}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {

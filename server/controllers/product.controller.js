@@ -311,23 +311,42 @@ export async function createProduct(request, response) {
 
         // Handle pricing - support both new structure and legacy
         let pricingData = {};
+        const now = new Date();
+        
         if (request.body.pricing && typeof request.body.pricing === 'object') {
+            const salePrice = request.body.pricing.salePrice || null;
+            const regularPrice = request.body.pricing.regularPrice || request.body.oldPrice || request.body.price || 0;
+            const saleStartDate = request.body.pricing.saleStartDate ? new Date(request.body.pricing.saleStartDate) : null;
+            const saleEndDate = request.body.pricing.saleEndDate ? new Date(request.body.pricing.saleEndDate) : null;
+            
+            // Check if sale is currently active based on dates
+            const saleActive = salePrice && salePrice < regularPrice && 
+                (!saleStartDate || saleStartDate <= now) && 
+                (!saleEndDate || saleEndDate >= now);
+            
             pricingData = {
-                regularPrice: request.body.pricing.regularPrice || request.body.oldPrice || request.body.price || 0,
-                salePrice: request.body.pricing.salePrice || null,
-                price: request.body.pricing.salePrice || request.body.pricing.regularPrice || request.body.price || request.body.oldPrice || 0,
+                regularPrice: regularPrice,
+                salePrice: salePrice,
+                price: saleActive ? salePrice : regularPrice,
                 currency: request.body.pricing.currency || request.body.currency || 'USD',
-                onSale: request.body.pricing.onSale || (request.body.pricing.salePrice && request.body.pricing.salePrice < request.body.pricing.regularPrice),
+                onSale: saleActive,
+                saleStartDate: saleStartDate,
+                saleEndDate: saleEndDate,
                 taxStatus: request.body.pricing.taxStatus || 'taxable',
                 taxClass: request.body.pricing.taxClass || 'standard'
             };
         } else {
+            const salePrice = request.body.oldPrice && request.body.price && request.body.price < request.body.oldPrice ? request.body.price : null;
+            const regularPrice = request.body.oldPrice || request.body.price || 0;
+            
             pricingData = {
-                regularPrice: request.body.oldPrice || request.body.price || 0,
-                salePrice: request.body.oldPrice && request.body.price && request.body.price < request.body.oldPrice ? request.body.price : null,
-                price: request.body.price || request.body.oldPrice || 0,
+                regularPrice: regularPrice,
+                salePrice: salePrice,
+                price: salePrice || regularPrice,
                 currency: request.body.currency || 'USD',
-                onSale: request.body.oldPrice && request.body.price && request.body.price < request.body.oldPrice,
+                onSale: salePrice !== null,
+                saleStartDate: null,
+                saleEndDate: null,
                 taxStatus: 'taxable',
                 taxClass: 'standard'
             };
@@ -1215,6 +1234,7 @@ export async function getSaleProducts(request, response) {
         const page = parseInt(request.query.page) || 1;
         const limit = parseInt(request.query.limit) || 12;
         const skip = (page - 1) * limit;
+        const now = new Date();
 
         // First, get all published products
         const baseQuery = {
@@ -1225,9 +1245,17 @@ export async function getSaleProducts(request, response) {
         let products = await ProductModel.find(baseQuery)
             .populate("category")
             .sort({ createdAt: -1 })
-            .limit(100);
+            .limit(500); // Increased limit to catch more sale products
 
         console.log(`📦 getSaleProducts: Found ${products.length} published products to check`);
+
+        // Helper function to check if sale is active based on dates
+        const isSaleActive = (saleStartDate, saleEndDate) => {
+            if (!saleStartDate && !saleEndDate) return true; // No date restrictions
+            if (saleStartDate && saleStartDate > now) return false; // Sale hasn't started
+            if (saleEndDate && saleEndDate < now) return false; // Sale has ended
+            return true; // Sale is active
+        };
 
         // Filter products that are actually on sale and calculate discounts
         const saleProducts = products
@@ -1237,22 +1265,40 @@ export async function getSaleProducts(request, response) {
                 let regularPrice = 0;
                 let salePrice = 0;
                 let isOnSale = false;
+                let saleStartDate = null;
+                let saleEndDate = null;
 
-                // Method 1: Check pricing object (new structure)
-                if (product.pricing?.onSale === true && product.pricing?.salePrice > 0) {
-                    regularPrice = product.pricing.regularPrice || 0;
-                    salePrice = product.pricing.salePrice || 0;
-                    isOnSale = true;
-                }
-                // Method 2: Check pricing with regularPrice > salePrice
-                else if (product.pricing?.regularPrice > 0 && product.pricing?.salePrice > 0) {
+                // Method 1: Check pricing object (new structure) with date validation
+                if (product.pricing?.salePrice > 0 && product.pricing?.regularPrice > 0) {
                     if (product.pricing.salePrice < product.pricing.regularPrice) {
-                        regularPrice = product.pricing.regularPrice;
-                        salePrice = product.pricing.salePrice;
+                        saleStartDate = product.pricing.saleStartDate;
+                        saleEndDate = product.pricing.saleEndDate;
+                        
+                        if (isSaleActive(saleStartDate, saleEndDate)) {
+                            regularPrice = product.pricing.regularPrice;
+                            salePrice = product.pricing.salePrice;
+                            isOnSale = true;
+                        }
+                    }
+                }
+                // Method 2: Check variable product variations with date validation
+                else if (product.productType === 'variable' && product.variations?.length > 0) {
+                    const saleVariation = product.variations.find(v => {
+                        if (v.salePrice > 0 && v.regularPrice > 0 && v.salePrice < v.regularPrice) {
+                            return isSaleActive(v.saleStartDate, v.saleEndDate);
+                        }
+                        return false;
+                    });
+                    
+                    if (saleVariation) {
+                        regularPrice = saleVariation.regularPrice;
+                        salePrice = saleVariation.salePrice;
+                        saleStartDate = saleVariation.saleStartDate;
+                        saleEndDate = saleVariation.saleEndDate;
                         isOnSale = true;
                     }
                 }
-                // Method 3: Check oldPrice and price (legacy structure)
+                // Method 3: Check oldPrice and price (legacy structure) - no date check for legacy
                 else if (product.oldPrice > 0 && product.price > 0) {
                     if (product.price < product.oldPrice) {
                         regularPrice = product.oldPrice;
@@ -1260,21 +1306,10 @@ export async function getSaleProducts(request, response) {
                         isOnSale = true;
                     }
                 }
-                // Method 4: Check discount field
+                // Method 4: Check discount field (legacy) - no date check for legacy
                 else if (product.discount && product.discount > 0) {
                     discountPercentage = product.discount;
                     isOnSale = true;
-                }
-                // Method 5: Check variable product variations
-                else if (product.productType === 'variable' && product.variations?.length > 0) {
-                    const saleVariation = product.variations.find(v => 
-                        v.salePrice > 0 && v.regularPrice > 0 && v.salePrice < v.regularPrice
-                    );
-                    if (saleVariation) {
-                        regularPrice = saleVariation.regularPrice;
-                        salePrice = saleVariation.salePrice;
-                        isOnSale = true;
-                    }
                 }
 
                 // Calculate discount percentage if not already set
@@ -1291,6 +1326,8 @@ export async function getSaleProducts(request, response) {
                     ...productObj,
                     discountPercentage,
                     isOnSale: true,
+                    saleStartDate,
+                    saleEndDate,
                     // Ensure price fields are populated for display
                     oldPrice: regularPrice || productObj.oldPrice,
                     price: salePrice || productObj.price
@@ -1298,7 +1335,10 @@ export async function getSaleProducts(request, response) {
             })
             .filter(Boolean);
 
-        console.log(`🔥 getSaleProducts: ${saleProducts.length} products are on sale`);
+        console.log(`🔥 getSaleProducts: ${saleProducts.length} products are currently on sale`);
+
+        // Sort by discount percentage (highest first) for better display
+        saleProducts.sort((a, b) => (b.discountPercentage || 0) - (a.discountPercentage || 0));
 
         // Apply pagination
         const paginatedProducts = saleProducts.slice(skip, skip + limit);
@@ -1870,12 +1910,25 @@ export async function updateProduct(request, response) {
 
         // Update pricing structure (new format)
         if (request.body.pricing || request.body.price !== undefined || request.body.oldPrice !== undefined) {
+            const now = new Date();
+            const regularPrice = request.body.pricing?.regularPrice || request.body.oldPrice || request.body.price || existingProduct.pricing?.regularPrice || 0;
+            const salePrice = request.body.pricing?.salePrice || (request.body.oldPrice && request.body.price && request.body.price < request.body.oldPrice ? request.body.price : null);
+            const saleStartDate = request.body.pricing?.saleStartDate ? new Date(request.body.pricing.saleStartDate) : (existingProduct.pricing?.saleStartDate || null);
+            const saleEndDate = request.body.pricing?.saleEndDate ? new Date(request.body.pricing.saleEndDate) : (existingProduct.pricing?.saleEndDate || null);
+            
+            // Check if sale is currently active based on dates
+            const saleActive = salePrice && salePrice < regularPrice && 
+                (!saleStartDate || saleStartDate <= now) && 
+                (!saleEndDate || saleEndDate >= now);
+            
             updateData.pricing = {
-                regularPrice: request.body.pricing?.regularPrice || request.body.oldPrice || request.body.price || existingProduct.pricing?.regularPrice || 0,
-                salePrice: request.body.pricing?.salePrice || (request.body.oldPrice && request.body.price && request.body.price < request.body.oldPrice ? request.body.price : null),
-                price: request.body.pricing?.price || request.body.price || request.body.pricing?.salePrice || request.body.pricing?.regularPrice || request.body.oldPrice || 0,
+                regularPrice: regularPrice,
+                salePrice: salePrice,
+                price: saleActive ? salePrice : regularPrice,
                 currency: request.body.pricing?.currency || request.body.currency || existingProduct.pricing?.currency || 'USD',
-                onSale: request.body.pricing?.onSale !== undefined ? request.body.pricing.onSale : (request.body.pricing?.salePrice && request.body.pricing.salePrice < request.body.pricing.regularPrice),
+                onSale: saleActive,
+                saleStartDate: saleStartDate,
+                saleEndDate: saleEndDate,
                 taxStatus: request.body.pricing?.taxStatus || existingProduct.pricing?.taxStatus || 'taxable',
                 taxClass: request.body.pricing?.taxClass || existingProduct.pricing?.taxClass || 'standard'
             };
@@ -2001,11 +2054,19 @@ export async function updateProduct(request, response) {
                     
                     // Calculate current price (sale price if active, otherwise regular price)
                     let currentPrice = regularPrice;
+                    const now = new Date();
+                    
+                    // Get existing variation to preserve sale dates if not provided
+                    const existingVariation = existingProduct.variations?.find(v => 
+                        v._id?.toString() === variation._id?.toString() || 
+                        v.id?.toString() === variation._id?.toString()
+                    );
+                    
+                    const saleStart = variation.saleStartDate ? new Date(variation.saleStartDate) : (existingVariation?.saleStartDate || null);
+                    const saleEnd = variation.saleEndDate ? new Date(variation.saleEndDate) : (existingVariation?.saleEndDate || null);
+                    
                     if (salePrice && regularPrice && salePrice < regularPrice) {
                         // Check if sale is active
-                        const now = new Date();
-                        const saleStart = variation.saleStartDate ? new Date(variation.saleStartDate) : null;
-                        const saleEnd = variation.saleEndDate ? new Date(variation.saleEndDate) : null;
                         const isSaleActive = (!saleStart || saleStart <= now) && (!saleEnd || saleEnd >= now);
                         
                         if (isSaleActive) {
@@ -2019,6 +2080,8 @@ export async function updateProduct(request, response) {
                         regularPrice: regularPrice || currentPrice,
                         price: currentPrice,
                         salePrice: salePrice || null,
+                        saleStartDate: saleStart,
+                        saleEndDate: saleEnd,
                     stock: variation.endlessStock ? 999999 : (variation.stock || 0),
                     stockStatus: variation.endlessStock ? 'in_stock' : (variation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock')),
                     manageStock: variation.manageStock !== false,
