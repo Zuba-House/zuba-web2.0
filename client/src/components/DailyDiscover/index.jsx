@@ -252,3 +252,7 @@ const DailyDiscover = () => {
 
 export default DailyDiscover;
 
+
+
+
+

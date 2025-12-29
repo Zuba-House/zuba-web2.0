@@ -9,30 +9,41 @@ const router = Router();
 router.use(auth);
 
 // Check if user is admin
-const requireAdmin = (req, res, next) => {
-  // Normalize role comparison (case-insensitive)
-  const userRole = (req.userRole || '').toUpperCase();
-  
-  console.log('🔐 Admin check:', {
-    userId: req.userId,
-    userRole: req.userRole,
-    normalizedRole: userRole,
-    isAdmin: userRole === 'ADMIN'
-  });
-  
-  if (userRole !== 'ADMIN') {
-    console.log('❌ Admin access denied for role:', req.userRole);
-    return res.status(403).json({
+const requireAdmin = async (req, res, next) => {
+  try {
+    // Get fresh user data from database to ensure role is current
+    const UserModel = (await import('../models/user.model.js')).default;
+    const user = await UserModel.findById(req.userId).select('role');
+    
+    const userRole = (user?.role || req.userRole || '').toUpperCase();
+    
+    console.log('🔐 Admin check:', {
+      userId: req.userId,
+      dbRole: user?.role,
+      reqRole: req.userRole,
+      normalizedRole: userRole,
+      isAdmin: userRole === 'ADMIN'
+    });
+    
+    if (userRole !== 'ADMIN') {
+      console.log('❌ Admin access denied for role:', userRole);
+      return res.status(403).json({
+        error: true,
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+    
+    req.userRole = userRole;
+    next();
+  } catch (error) {
+    console.error('Admin check error:', error);
+    return res.status(500).json({
       error: true,
       success: false,
-      message: 'Admin access only',
-      debug: {
-        userRole: req.userRole,
-        required: 'ADMIN'
-      }
+      message: 'Authorization check failed'
     });
   }
-  next();
 };
 
 router.use(requireAdmin);

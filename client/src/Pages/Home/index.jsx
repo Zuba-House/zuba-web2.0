@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState, useMemo } from "react";
+import React, { useContext, useEffect, useState, useMemo } from "react";
 import ResponsiveHeroBanner from "../../components/ResponsiveHeroBanner";
 import HomeCatSlider from "../../components/HomeCatSlider";
 import { LiaShippingFastSolid } from "react-icons/lia";
@@ -8,9 +8,9 @@ import SalesSection from "../../components/SalesSection";
 
 // New Creative Components
 import GiftsSection from "../../components/GiftsSection";
-import PersonalizedRecommendations from "../../components/PersonalizedRecommendations";
 import FlashDeals from "../../components/FlashDeals";
-import DailyDiscover from "../../components/DailyDiscover";
+// Lazy load DailyDiscover for better performance
+const DailyDiscover = React.lazy(() => import("../../components/DailyDiscover"));
 
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
@@ -54,34 +54,34 @@ const Home = () => {
 
     window.scrollTo(0, 0);
 
-    // fetchDataFromApi("/api/homeSlides").then((res) => {
-    //   setHomeSlidesData(res?.data)
-    // })
-    fetchDataFromApi("/api/product/getAllProducts?page=1&limit=12").then((res) => {
-      setAllProductsData(res?.products)
-    })
-
-    // Fetch only products configured for home banner display (optimized endpoint)
-    fetchDataFromApi("/api/product/getAllProductsBanners").then((res) => {
-      setProductsBanners(res?.products)
-    })
-
-    
-    fetchDataFromApi("/api/product/getAllFeaturedProducts").then((res) => {
-      setFeaturedProducts(res?.products)
-    })
-
-    fetchDataFromApi("/api/bannerV1").then((res) => {
-      setBannerV1Data(res?.data);
+    // Optimize: Load critical data first, then load below-the-fold content
+    // Priority 1: Critical above-the-fold content
+    Promise.all([
+      fetchDataFromApi("/api/product/getAllProducts?page=1&limit=12"),
+      fetchDataFromApi("/api/product/getAllProductsBanners"),
+      fetchDataFromApi("/api/bannerV1")
+    ]).then(([productsRes, bannersRes, bannerV1Res]) => {
+      if (productsRes?.products) setAllProductsData(productsRes.products);
+      if (bannersRes?.products) setProductsBanners(bannersRes.products);
+      if (bannerV1Res?.data) setBannerV1Data(bannerV1Res.data);
+    }).catch(error => {
+      console.error('Error loading critical content:', error);
     });
 
-    fetchDataFromApi("/api/bannerList2").then((res) => {
-      setBannerList2Data(res?.data);
-    });
-
-    fetchDataFromApi("/api/blog").then((res) => {
-      setBlogData(res?.blogs);
-    });
+    // Priority 2: Load below-the-fold content after a short delay
+    setTimeout(() => {
+      Promise.all([
+        fetchDataFromApi("/api/product/getAllFeaturedProducts"),
+        fetchDataFromApi("/api/bannerList2"),
+        fetchDataFromApi("/api/blog")
+      ]).then(([featuredRes, bannerList2Res, blogRes]) => {
+        if (featuredRes?.products) setFeaturedProducts(featuredRes.products);
+        if (bannerList2Res?.data) setBannerList2Data(bannerList2Res.data);
+        if (blogRes?.blogs) setBlogData(blogRes.blogs);
+      }).catch(error => {
+        console.error('Error loading secondary content:', error);
+      });
+    }, 300); // Small delay to prioritize critical content
   }, [])
 
 
@@ -362,14 +362,11 @@ const Home = () => {
         </div>
       </section>
 
-      {/* 🧠 AI-Powered Personalized Recommendations */}
+      {/* 🔍 Daily Discover - Random Picks - Lazy Loaded */}
       <section className="container py-4">
-        <PersonalizedRecommendations />
-      </section>
-
-      {/* 🔍 Daily Discover - Random Picks */}
-      <section className="container py-4">
-        <DailyDiscover />
+        <React.Suspense fallback={<div className="min-h-[400px] flex items-center justify-center"><ProductLoading /></div>}>
+          <DailyDiscover />
+        </React.Suspense>
       </section>
 
       {

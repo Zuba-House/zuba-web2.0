@@ -285,3 +285,7 @@ const FlashDeals = () => {
 
 export default FlashDeals;
 
+
+
+
+
