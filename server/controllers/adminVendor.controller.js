@@ -30,28 +30,81 @@ export const getAllVendors = async (req, res) => {
       ];
     }
 
-    const [vendors, total] = await Promise.all([
-      VendorModel.find(filter)
-        .populate('ownerUser', 'name email phone status verify_email')
-        .populate('categories', 'name slug')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit))
-        .lean(),
-      VendorModel.countDocuments(filter)
-    ]);
+    let vendors, total;
+    
+    try {
+      [vendors, total] = await Promise.all([
+        VendorModel.find(filter)
+          .populate({
+            path: 'ownerUser',
+            select: 'name email phone status verify_email',
+            options: { lean: true }
+          })
+          .populate({
+            path: 'categories',
+            select: 'name slug',
+            options: { lean: true, strictPopulate: false }
+          })
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(parseInt(limit))
+          .lean(),
+        VendorModel.countDocuments(filter)
+      ]);
+    } catch (populateError) {
+      console.error('❌ Populate error, trying without populate:', populateError);
+      // Fallback: fetch without populate if populate fails
+      [vendors, total] = await Promise.all([
+        VendorModel.find(filter)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(parseInt(limit))
+          .lean(),
+        VendorModel.countDocuments(filter)
+      ]);
+      
+      // Manually populate ownerUser
+      const userIds = vendors.filter(v => v.ownerUser).map(v => v.ownerUser);
+      const users = await UserModel.find({ _id: { $in: userIds } })
+        .select('name email phone status verify_email')
+        .lean();
+      const userMap = new Map(users.map(u => [u._id.toString(), u]));
+      
+      vendors = vendors.map(v => ({
+        ...v,
+        ownerUser: v.ownerUser ? userMap.get(v.ownerUser.toString()) || null : null
+      }));
+    }
 
     // Ensure all vendor fields have safe defaults to prevent frontend crashes
     // Convert all string fields to strings explicitly to prevent toLowerCase() errors
     const safeVendors = vendors.map(vendor => {
       // Ensure ownerUser is properly formatted
-      const ownerUser = vendor?.ownerUser ? {
-        _id: vendor.ownerUser._id || null,
-        name: String(vendor.ownerUser.name || 'N/A'),
-        email: String(vendor.ownerUser.email || ''),
-        phone: String(vendor.ownerUser.phone || ''),
-        ...vendor.ownerUser
-      } : { name: 'N/A', email: '', phone: '' };
+      let ownerUser = { name: 'N/A', email: '', phone: '' };
+      if (vendor?.ownerUser) {
+        if (typeof vendor.ownerUser === 'object' && vendor.ownerUser !== null) {
+          ownerUser = {
+            _id: vendor.ownerUser._id || null,
+            name: String(vendor.ownerUser.name || 'N/A'),
+            email: String(vendor.ownerUser.email || ''),
+            phone: String(vendor.ownerUser.phone || ''),
+            status: vendor.ownerUser.status || 'Active',
+            verify_email: vendor.ownerUser.verify_email || false
+          };
+        }
+      }
+
+      // Ensure categories are properly formatted
+      let categories = [];
+      if (Array.isArray(vendor?.categories)) {
+        categories = vendor.categories
+          .filter(cat => cat && typeof cat === 'object')
+          .map(cat => ({
+            _id: cat._id || null,
+            name: String(cat.name || ''),
+            slug: String(cat.slug || '')
+          }));
+      }
 
       return {
         ...vendor,
@@ -65,7 +118,7 @@ export const getAllVendors = async (req, res) => {
         totalEarnings: Number(vendor?.totalEarnings || 0),
         createdAt: vendor?.createdAt || new Date(),
         ownerUser: ownerUser,
-        categories: Array.isArray(vendor?.categories) ? vendor.categories : []
+        categories: categories
       };
     });
 
@@ -80,11 +133,16 @@ export const getAllVendors = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get all vendors error:', error);
+    console.error('❌ Get all vendors error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     return res.status(500).json({
       error: true,
       success: false,
-      message: error.message || 'Server error'
+      message: error.message || 'Server error',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
@@ -295,7 +353,13 @@ export const createVendor = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Create vendor error:', error);
+    console.error('❌ Create vendor error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code,
+      keyPattern: error.keyPattern
+    });
     
     // Handle duplicate key errors
     if (error.code === 11000) {
@@ -313,12 +377,30 @@ export const createVendor = async (req, res) => {
           message: 'A vendor with this email already exists.'
         });
       }
+      if (error.keyPattern?.ownerUser) {
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'User already has a vendor account.'
+        });
+      }
+    }
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors || {}).map(err => err.message);
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: messages.join(', ') || 'Validation error'
+      });
     }
 
     return res.status(500).json({
       error: true,
       success: false,
-      message: error.message || 'Failed to create vendor'
+      message: error.message || 'Failed to create vendor',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
