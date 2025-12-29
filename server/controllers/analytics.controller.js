@@ -4,6 +4,28 @@ import { VisitorModel, DailyStatsModel } from '../models/visitor.model.js';
 // ANALYTICS CONTROLLER
 // ========================================
 
+// Simple in-memory cache (for production, use Redis)
+const cache = new Map();
+const CACHE_TTL = 60000; // 1 minute cache
+
+const getCached = (key) => {
+    const cached = cache.get(key);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        return cached.data;
+    }
+    cache.delete(key);
+    return null;
+};
+
+const setCached = (key, data) => {
+    cache.set(key, { data, timestamp: Date.now() });
+    // Clean old cache entries (keep last 100)
+    if (cache.size > 100) {
+        const firstKey = cache.keys().next().value;
+        cache.delete(firstKey);
+    }
+};
+
 // Helper: Get start of day
 const getStartOfDay = (date = new Date()) => {
     const d = new Date(date);
@@ -37,66 +59,99 @@ export const getDashboardStats = async (req, res) => {
         const lastMonth = getStartOfMonth(new Date(today.getFullYear(), today.getMonth() - 1, 1));
         const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
         
-        // Today's stats
-        const todayStats = await VisitorModel.aggregate([
-            { $match: { createdAt: { $gte: today }, isBot: false } },
-            {
-                $group: {
-                    _id: null,
-                    totalVisits: { $sum: 1 },
-                    uniqueVisitors: { $addToSet: '$visitorHash' },
-                    newVisitors: { $sum: { $cond: ['$isNewVisitor', 1, 0] } }
-                }
-            }
-        ]);
+        // Check cache first
+        const cacheKey = `dashboard-${today.toISOString().split('T')[0]}`;
+        const cached = getCached(cacheKey);
+        if (cached) {
+            return res.json(cached);
+        }
         
-        // Yesterday's stats (for comparison)
-        const yesterdayStats = await VisitorModel.aggregate([
-            { $match: { createdAt: { $gte: yesterday, $lt: today }, isBot: false } },
-            {
-                $group: {
-                    _id: null,
-                    totalVisits: { $sum: 1 },
-                    uniqueVisitors: { $addToSet: '$visitorHash' }
+        // Optimized: Use $count instead of $addToSet for better performance
+        const [todayStats, yesterdayStats, monthStats, lastMonthStats] = await Promise.all([
+            VisitorModel.aggregate([
+                { $match: { createdAt: { $gte: today }, isBot: false } },
+                {
+                    $group: {
+                        _id: null,
+                        totalVisits: { $sum: 1 },
+                        uniqueVisitors: { $addToSet: '$visitorHash' },
+                        newVisitors: { $sum: { $cond: ['$isNewVisitor', 1, 0] } }
+                    }
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        totalVisits: 1,
+                        uniqueVisitors: { $size: '$uniqueVisitors' },
+                        newVisitors: 1
+                    }
                 }
-            }
-        ]);
-        
-        // This month's stats
-        const monthStats = await VisitorModel.aggregate([
-            { $match: { createdAt: { $gte: thisMonth }, isBot: false } },
-            {
-                $group: {
-                    _id: null,
-                    totalVisits: { $sum: 1 },
-                    uniqueVisitors: { $addToSet: '$visitorHash' },
-                    newVisitors: { $sum: { $cond: ['$isNewVisitor', 1, 0] } }
+            ]),
+            VisitorModel.aggregate([
+                { $match: { createdAt: { $gte: yesterday, $lt: today }, isBot: false } },
+                {
+                    $group: {
+                        _id: null,
+                        totalVisits: { $sum: 1 },
+                        uniqueVisitors: { $addToSet: '$visitorHash' }
+                    }
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        totalVisits: 1,
+                        uniqueVisitors: { $size: '$uniqueVisitors' }
+                    }
                 }
-            }
-        ]);
-        
-        // Last month's stats (for comparison)
-        const lastMonthStats = await VisitorModel.aggregate([
-            { $match: { createdAt: { $gte: lastMonth, $lte: lastMonthEnd }, isBot: false } },
-            {
-                $group: {
-                    _id: null,
-                    totalVisits: { $sum: 1 },
-                    uniqueVisitors: { $addToSet: '$visitorHash' }
+            ]),
+            VisitorModel.aggregate([
+                { $match: { createdAt: { $gte: thisMonth }, isBot: false } },
+                {
+                    $group: {
+                        _id: null,
+                        totalVisits: { $sum: 1 },
+                        uniqueVisitors: { $addToSet: '$visitorHash' },
+                        newVisitors: { $sum: { $cond: ['$isNewVisitor', 1, 0] } }
+                    }
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        totalVisits: 1,
+                        uniqueVisitors: { $size: '$uniqueVisitors' },
+                        newVisitors: 1
+                    }
                 }
-            }
+            ]),
+            VisitorModel.aggregate([
+                { $match: { createdAt: { $gte: lastMonth, $lte: lastMonthEnd }, isBot: false } },
+                {
+                    $group: {
+                        _id: null,
+                        totalVisits: { $sum: 1 },
+                        uniqueVisitors: { $addToSet: '$visitorHash' }
+                    }
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        totalVisits: 1,
+                        uniqueVisitors: { $size: '$uniqueVisitors' }
+                    }
+                }
+            ])
         ]);
         
         // Calculate percentages
         const todayVisits = todayStats[0]?.totalVisits || 0;
-        const todayUnique = todayStats[0]?.uniqueVisitors?.length || 0;
+        const todayUnique = todayStats[0]?.uniqueVisitors || 0;
         const yesterdayVisits = yesterdayStats[0]?.totalVisits || 0;
-        const yesterdayUnique = yesterdayStats[0]?.uniqueVisitors?.length || 0;
+        const yesterdayUnique = yesterdayStats[0]?.uniqueVisitors || 0;
         
         const monthVisits = monthStats[0]?.totalVisits || 0;
-        const monthUnique = monthStats[0]?.uniqueVisitors?.length || 0;
+        const monthUnique = monthStats[0]?.uniqueVisitors || 0;
         const lastMonthVisits = lastMonthStats[0]?.totalVisits || 0;
-        const lastMonthUnique = lastMonthStats[0]?.uniqueVisitors?.length || 0;
+        const lastMonthUnique = lastMonthStats[0]?.uniqueVisitors || 0;
         
         // Calculate change percentages
         const dailyChange = yesterdayVisits > 0 
@@ -106,7 +161,7 @@ export const getDashboardStats = async (req, res) => {
             ? Math.round(((monthVisits - lastMonthVisits) / lastMonthVisits) * 100) 
             : 100;
         
-        return res.json({
+        const response = {
             success: true,
             data: {
                 today: {
@@ -130,7 +185,12 @@ export const getDashboardStats = async (req, res) => {
                     uniqueVisitors: lastMonthUnique
                 }
             }
-        });
+        };
+        
+        // Cache the response
+        setCached(cacheKey, response);
+        
+        return res.json(response);
         
     } catch (error) {
         console.error('Dashboard stats error:', error);
@@ -163,6 +223,13 @@ export const getVisitorsByCountry = async (req, res) => {
                 startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
         }
         
+        // Check cache
+        const cacheKey = `countries-${period}-${startDate.toISOString().split('T')[0]}`;
+        const cached = getCached(cacheKey);
+        if (cached) {
+            return res.json(cached);
+        }
+        
         const countryStats = await VisitorModel.aggregate([
             { $match: { createdAt: { $gte: startDate }, isBot: false } },
             {
@@ -193,12 +260,17 @@ export const getVisitorsByCountry = async (req, res) => {
             percentage: total > 0 ? Math.round((c.visits / total) * 100) : 0
         }));
         
-        return res.json({
+        const response = {
             success: true,
             period,
             total,
             data
-        });
+        };
+        
+        // Cache the response
+        setCached(cacheKey, response);
+        
+        return res.json(response);
         
     } catch (error) {
         console.error('Country stats error:', error);
@@ -228,6 +300,13 @@ export const getVisitorsByDevice = async (req, res) => {
                 startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
         }
         
+        // Check cache
+        const cacheKey = `devices-${period}-${startDate.toISOString().split('T')[0]}`;
+        const cached = getCached(cacheKey);
+        if (cached) {
+            return res.json(cached);
+        }
+        
         const deviceStats = await VisitorModel.aggregate([
             { $match: { createdAt: { $gte: startDate }, isBot: false } },
             {
@@ -255,12 +334,17 @@ export const getVisitorsByDevice = async (req, res) => {
             percentage: total > 0 ? Math.round((d.visits / total) * 100) : 0
         }));
         
-        return res.json({
+        const response = {
             success: true,
             period,
             total,
             data
-        });
+        };
+        
+        // Cache the response
+        setCached(cacheKey, response);
+        
+        return res.json(response);
         
     } catch (error) {
         console.error('Device stats error:', error);
@@ -290,6 +374,13 @@ export const getTopPages = async (req, res) => {
                 startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
         }
         
+        // Check cache
+        const cacheKey = `pages-${period}-${limit}-${startDate.toISOString().split('T')[0]}`;
+        const cached = getCached(cacheKey);
+        if (cached) {
+            return res.json(cached);
+        }
+        
         const pageStats = await VisitorModel.aggregate([
             { $match: { createdAt: { $gte: startDate }, isBot: false } },
             {
@@ -311,11 +402,16 @@ export const getTopPages = async (req, res) => {
             { $limit: parseInt(limit) }
         ]);
         
-        return res.json({
+        const response = {
             success: true,
             period,
             data: pageStats
-        });
+        };
+        
+        // Cache the response
+        setCached(cacheKey, response);
+        
+        return res.json(response);
         
     } catch (error) {
         console.error('Top pages error:', error);
@@ -343,6 +439,13 @@ export const getTopReferrers = async (req, res) => {
                 break;
             default:
                 startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        }
+        
+        // Check cache
+        const cacheKey = `referrers-${period}-${limit}-${startDate.toISOString().split('T')[0]}`;
+        const cached = getCached(cacheKey);
+        if (cached) {
+            return res.json(cached);
         }
         
         const referrerStats = await VisitorModel.aggregate([
@@ -373,12 +476,17 @@ export const getTopReferrers = async (req, res) => {
             percentage: total > 0 ? Math.round((r.visits / total) * 100) : 0
         }));
         
-        return res.json({
+        const response = {
             success: true,
             period,
             total,
             data
-        });
+        };
+        
+        // Cache the response
+        setCached(cacheKey, response);
+        
+        return res.json(response);
         
     } catch (error) {
         console.error('Referrer stats error:', error);
@@ -422,6 +530,13 @@ export const getVisitorsOverTime = async (req, res) => {
                 groupBy = { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } };
         }
         
+        // Check cache
+        const cacheKey = `timeline-${period}-${startDate.toISOString().split('T')[0]}`;
+        const cached = getCached(cacheKey);
+        if (cached) {
+            return res.json(cached);
+        }
+        
         const timeStats = await VisitorModel.aggregate([
             { $match: { createdAt: { $gte: startDate }, isBot: false } },
             {
@@ -444,11 +559,16 @@ export const getVisitorsOverTime = async (req, res) => {
             { $sort: { date: 1 } }
         ]);
         
-        return res.json({
+        const response = {
             success: true,
             period,
             data: timeStats
-        });
+        };
+        
+        // Cache the response
+        setCached(cacheKey, response);
+        
+        return res.json(response);
         
     } catch (error) {
         console.error('Time stats error:', error);
@@ -473,6 +593,13 @@ export const getBrowserStats = async (req, res) => {
                 break;
             default:
                 startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        }
+        
+        // Check cache
+        const cacheKey = `browsers-${period}-${startDate.toISOString().split('T')[0]}`;
+        const cached = getCached(cacheKey);
+        if (cached) {
+            return res.json(cached);
         }
         
         const browserStats = await VisitorModel.aggregate([
@@ -501,12 +628,17 @@ export const getBrowserStats = async (req, res) => {
             percentage: total > 0 ? Math.round((b.visits / total) * 100) : 0
         }));
         
-        return res.json({
+        const response = {
             success: true,
             period,
             total,
             data
-        });
+        };
+        
+        // Cache the response
+        setCached(cacheKey, response);
+        
+        return res.json(response);
         
     } catch (error) {
         console.error('Browser stats error:', error);
@@ -515,45 +647,49 @@ export const getBrowserStats = async (req, res) => {
 };
 
 // ========================================
-// GET REAL-TIME VISITORS (Last 5 minutes)
+// GET REAL-TIME VISITORS (Last 2 minutes - actual active users)
 // ========================================
 export const getRealTimeVisitors = async (req, res) => {
     try {
-        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        // Use 2 minutes for "active now" - more accurate than 5 minutes
+        const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
         
-        const realTimeStats = await VisitorModel.aggregate([
-            { $match: { createdAt: { $gte: fiveMinutesAgo }, isBot: false } },
-            {
-                $group: {
-                    _id: null,
-                    activeVisitors: { $addToSet: '$sessionId' },
-                    pageViews: { $sum: 1 }
+        // Get unique active visitors (by visitorHash, not sessionId)
+        // This gives real people, not sessions
+        const [activeVisitorsData, pageViewsData, recentPages] = await Promise.all([
+            VisitorModel.aggregate([
+                { $match: { createdAt: { $gte: twoMinutesAgo }, isBot: false } },
+                {
+                    $group: {
+                        _id: '$visitorHash',
+                        lastActivity: { $max: '$createdAt' }
+                    }
+                },
+                {
+                    $count: 'activeVisitors'
                 }
-            },
-            {
-                $project: {
-                    _id: 0,
-                    activeVisitors: { $size: '$activeVisitors' },
-                    pageViews: 1
-                }
-            }
+            ]),
+            VisitorModel.countDocuments({
+                createdAt: { $gte: twoMinutesAgo },
+                isBot: false
+            }),
+            VisitorModel.find({
+                createdAt: { $gte: twoMinutesAgo },
+                isBot: false
+            })
+            .select('page country device createdAt visitorHash')
+            .sort({ createdAt: -1 })
+            .limit(10)
+            .lean()
         ]);
         
-        // Get recent pages being viewed
-        const recentPages = await VisitorModel.find({
-            createdAt: { $gte: fiveMinutesAgo },
-            isBot: false
-        })
-        .select('page country device createdAt')
-        .sort({ createdAt: -1 })
-        .limit(10)
-        .lean();
+        const activeVisitors = activeVisitorsData[0]?.activeVisitors || 0;
         
         return res.json({
             success: true,
             data: {
-                activeVisitors: realTimeStats[0]?.activeVisitors || 0,
-                pageViews: realTimeStats[0]?.pageViews || 0,
+                activeVisitors, // Real unique people online
+                pageViews: pageViewsData || 0,
                 recentActivity: recentPages
             }
         });

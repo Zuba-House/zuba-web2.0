@@ -77,15 +77,15 @@ const Analytics = () => {
     useEffect(() => {
         fetchAnalytics();
         
-        // Refresh real-time stats every 30 seconds
+        // Refresh real-time stats every 15 seconds (more frequent for accuracy)
         const interval = setInterval(async () => {
             try {
                 const realtime = await fetchDataFromApi('/api/analytics/realtime');
-                if (realtime?.success) setRealTimeStats(realtime.data);
+                if (realtime?.success) setRealTimeStats(realtime.data || { activeVisitors: 0, pageViews: 0 });
             } catch (e) {
                 console.error('Real-time refresh error:', e);
             }
-        }, 30000);
+        }, 15000);
         
         return () => clearInterval(interval);
     }, [period]);
@@ -129,8 +129,8 @@ const Analytics = () => {
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                         </span>
-                        <span className="text-green-700 font-semibold">{realTimeStats.activeVisitors}</span>
-                        <span className="text-green-600 text-sm">online now</span>
+                        <span className="text-green-700 font-semibold">{realTimeStats.activeVisitors || 0}</span>
+                        <span className="text-green-600 text-sm">people online</span>
                     </div>
                     
                     {/* Period selector */}
