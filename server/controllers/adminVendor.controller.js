@@ -90,6 +90,240 @@ export const getAllVendors = async (req, res) => {
 };
 
 /**
+ * POST /api/admin/vendors
+ * Create a new vendor (Admin only - bypasses email verification)
+ */
+export const createVendor = async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      password,
+      storeName,
+      storeSlug,
+      description,
+      phone,
+      whatsapp,
+      country,
+      city,
+      addressLine1,
+      addressLine2,
+      postalCode,
+      categories,
+      status = 'APPROVED' // Admin can set status directly
+    } = req.body;
+
+    // Validate required fields
+    if (!storeName || !storeSlug || !email || !name) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Name, email, store name, and store URL slug are required'
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check if user already exists
+    let user = await UserModel.findOne({ email: normalizedEmail });
+
+    if (user) {
+      // Check if user already has a vendor account
+      if (user.vendor || user.vendorId) {
+        const existingVendor = await VendorModel.findById(user.vendor || user.vendorId);
+        if (existingVendor) {
+          return res.status(400).json({
+            error: true,
+            success: false,
+            message: `User already has a vendor account: ${existingVendor.storeName}`,
+            data: {
+              hasVendorAccount: true,
+              vendorId: existingVendor._id,
+              storeName: existingVendor.storeName
+            }
+          });
+        }
+      }
+      
+      // Update existing user
+      user.name = name;
+      user.role = 'VENDOR';
+      user.status = 'Active';
+      user.verify_email = true; // Admin bypasses email verification
+      
+      if (password && password.length >= 6) {
+        const bcryptjs = await import('bcryptjs');
+        const salt = await bcryptjs.default.genSalt(10);
+        user.password = await bcryptjs.default.hash(password, salt);
+      }
+      
+      await user.save();
+    } else {
+      // Create new user
+      if (!password || password.length < 6) {
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'Password is required and must be at least 6 characters'
+        });
+      }
+
+      const bcryptjs = await import('bcryptjs');
+      const salt = await bcryptjs.default.genSalt(10);
+      const hashedPassword = await bcryptjs.default.hash(password, salt);
+
+      user = await UserModel.create({
+        name,
+        email: normalizedEmail,
+        password: hashedPassword,
+        role: 'VENDOR',
+        status: 'Active',
+        verify_email: true // Admin bypasses email verification
+      });
+    }
+
+    // Validate store slug format
+    const slugRegex = /^[a-z0-9-]+$/;
+    if (!slugRegex.test(storeSlug.toLowerCase())) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Store URL slug can only contain lowercase letters, numbers, and hyphens'
+      });
+    }
+
+    // Check if slug is already taken
+    const existingVendorBySlug = await VendorModel.findOne({ 
+      storeSlug: storeSlug.toLowerCase().trim() 
+    });
+    
+    if (existingVendorBySlug) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Store URL slug already taken. Please choose another.'
+      });
+    }
+
+    // Check if vendor with this email already exists
+    const existingVendorByEmail = await VendorModel.findOne({ email: normalizedEmail });
+    if (existingVendorByEmail) {
+      // Update existing vendor
+      existingVendorByEmail.ownerUser = user._id;
+      existingVendorByEmail.storeName = storeName.trim();
+      existingVendorByEmail.storeSlug = storeSlug.toLowerCase().trim();
+      existingVendorByEmail.description = description || '';
+      existingVendorByEmail.phone = phone || '';
+      existingVendorByEmail.whatsapp = whatsapp || '';
+      existingVendorByEmail.country = country || '';
+      existingVendorByEmail.city = city || '';
+      existingVendorByEmail.addressLine1 = addressLine1 || '';
+      existingVendorByEmail.addressLine2 = addressLine2 || '';
+      existingVendorByEmail.postalCode = postalCode || '';
+      existingVendorByEmail.categories = categories || [];
+      existingVendorByEmail.status = status;
+      await existingVendorByEmail.save();
+
+      user.vendor = existingVendorByEmail._id;
+      user.vendorId = existingVendorByEmail._id;
+      await user.save();
+
+      return res.status(200).json({
+        error: false,
+        success: true,
+        message: 'Vendor updated successfully!',
+        data: {
+          vendorId: existingVendorByEmail._id,
+          storeName: existingVendorByEmail.storeName,
+          storeSlug: existingVendorByEmail.storeSlug,
+          status: existingVendorByEmail.status
+        }
+      });
+    }
+
+    // Create new vendor
+    const vendor = await VendorModel.create({
+      ownerUser: user._id,
+      storeName: storeName.trim(),
+      storeSlug: storeSlug.toLowerCase().trim(),
+      description: description || '',
+      email: normalizedEmail,
+      phone: phone || '',
+      whatsapp: whatsapp || '',
+      country: country || '',
+      city: city || '',
+      addressLine1: addressLine1 || '',
+      addressLine2: addressLine2 || '',
+      postalCode: postalCode || '',
+      categories: categories || [],
+      status: status // Admin can set status directly
+    });
+
+    // Link vendor to user
+    user.vendor = vendor._id;
+    user.vendorId = vendor._id;
+    await user.save();
+
+    // Send welcome email if approved
+    if (status === 'APPROVED') {
+      try {
+        await sendVendorWelcome(vendor, user);
+      } catch (emailError) {
+        console.error('Failed to send welcome email:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
+
+    console.log('✅ Admin created vendor:', {
+      vendorId: vendor._id,
+      storeName: vendor.storeName,
+      email: normalizedEmail,
+      status: vendor.status
+    });
+
+    return res.status(201).json({
+      error: false,
+      success: true,
+      message: `Vendor created successfully and ${status === 'APPROVED' ? 'approved' : 'set to ' + status}!`,
+      data: {
+        vendorId: vendor._id,
+        storeName: vendor.storeName,
+        storeSlug: vendor.storeSlug,
+        status: vendor.status,
+        email: normalizedEmail
+      }
+    });
+
+  } catch (error) {
+    console.error('Create vendor error:', error);
+    
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      if (error.keyPattern?.storeSlug) {
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'Store URL slug already taken. Please choose another.'
+        });
+      }
+      if (error.keyPattern?.email) {
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'A vendor with this email already exists.'
+        });
+      }
+    }
+
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Failed to create vendor'
+    });
+  }
+};
+
+/**
  * GET /api/admin/vendors/:id
  * Get single vendor details
  */

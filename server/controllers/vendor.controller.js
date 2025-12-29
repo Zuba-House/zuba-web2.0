@@ -353,8 +353,17 @@ export const applyToBecomeVendor = async (req, res) => {
       categories
     } = req.body;
 
+    console.log('📝 Vendor application received:', {
+      email: email?.substring(0, 10) + '...',
+      storeName,
+      storeSlug,
+      hasName: !!name,
+      hasPassword: !!password
+    });
+
     // Validate required fields
     if (!storeName || !storeSlug || !email) {
+      console.log('❌ Missing required fields:', { storeName: !!storeName, storeSlug: !!storeSlug, email: !!email });
       return res.status(400).json({
         error: true,
         success: false,
@@ -372,11 +381,29 @@ export const applyToBecomeVendor = async (req, res) => {
     
     if (existingUser) {
       isEmailVerified = existingUser.verify_email === true;
+      console.log('📧 Email verification check (existing user):', {
+        email: normalizedEmail.substring(0, 10) + '...',
+        verify_email: existingUser.verify_email,
+        isEmailVerified
+      });
     } else if (pendingData) {
       isEmailVerified = pendingData.verified === true;
+      console.log('📧 Email verification check (pending data):', {
+        email: normalizedEmail.substring(0, 10) + '...',
+        verified: pendingData.verified,
+        isEmailVerified,
+        expires: new Date(pendingData.expires).toISOString()
+      });
+    } else {
+      console.log('❌ Email verification check failed - no user or pending data:', {
+        email: normalizedEmail.substring(0, 10) + '...',
+        hasUser: !!existingUser,
+        hasPendingData: !!pendingData
+      });
     }
 
     if (!isEmailVerified) {
+      console.log('❌ Email not verified, rejecting application');
       return res.status(400).json({
         error: true,
         success: false,
@@ -384,6 +411,8 @@ export const applyToBecomeVendor = async (req, res) => {
         data: { requiresEmailVerification: true }
       });
     }
+    
+    console.log('✅ Email verified, proceeding with vendor application');
 
     // Validate store slug format
     const slugRegex = /^[a-z0-9-]+$/;
@@ -819,7 +848,43 @@ export const applyToBecomeVendor = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Apply to become vendor error:', error);
+    console.error('❌ Apply to become vendor error:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      keyPattern: error.keyPattern,
+      body: {
+        email: req.body?.email?.substring(0, 10) + '...',
+        storeName: req.body?.storeName,
+        storeSlug: req.body?.storeSlug
+      }
+    });
+    
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      if (error.keyPattern?.storeSlug) {
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'Store URL slug already taken. Please choose another.'
+        });
+      }
+      if (error.keyPattern?.email) {
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'A vendor with this email already exists. Please login or use a different email.'
+        });
+      }
+      if (error.keyPattern?.ownerUser) {
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'You already have a vendor account. Please login to access your vendor dashboard.'
+        });
+      }
+    }
+    
     return res.status(500).json({
       error: true,
       success: false,

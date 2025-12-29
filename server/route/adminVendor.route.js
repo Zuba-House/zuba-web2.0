@@ -72,6 +72,7 @@ router.post('/payouts/:payoutId/mark-paid', adminPayoutController.markPayoutAsPa
 
 // Vendor management routes
 router.get('/', adminVendorController.getAllVendors);
+router.post('/', adminVendorController.createVendor); // Admin can create vendors
 router.get('/:id', adminVendorController.getVendorById);
 router.put('/:id', adminVendorController.updateVendor);
 router.put('/:id/status', adminVendorController.updateVendorStatus);

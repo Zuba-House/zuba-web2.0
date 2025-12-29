@@ -1,5 +1,5 @@
 import React, { useContext, useState, useEffect } from 'react';
-import { Button } from "@mui/material";
+import { Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from "@mui/material";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -10,9 +10,9 @@ import TableRow from "@mui/material/TableRow";
 import Checkbox from "@mui/material/Checkbox";
 import SearchBox from '../../Components/SearchBox';
 import { MyContext } from '../../App';
-import { fetchDataFromApi, deleteData, editData } from '../../utils/api';
+import { fetchDataFromApi, deleteData, editData, postData } from '../../utils/api';
 import CircularProgress from '@mui/material/CircularProgress';
-import { MdStore, MdEmail, MdPhone, MdCalendarToday } from "react-icons/md";
+import { MdStore, MdEmail, MdPhone, MdCalendarToday, MdAdd } from "react-icons/md";
 import { FaCheckCircle, FaTimesCircle, FaPauseCircle, FaClock } from "react-icons/fa";
 import { toast } from 'react-hot-toast';
 
@@ -67,6 +67,24 @@ export const Vendors = () => {
     const [selectedVendor, setSelectedVendor] = useState(null);
     const [showStatusModal, setShowStatusModal] = useState(false);
     const [newStatus, setNewStatus] = useState("");
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [createLoading, setCreateLoading] = useState(false);
+    const [createFormData, setCreateFormData] = useState({
+        name: '',
+        email: '',
+        password: '',
+        storeName: '',
+        storeSlug: '',
+        description: '',
+        phone: '',
+        whatsapp: '',
+        country: '',
+        city: '',
+        addressLine1: '',
+        addressLine2: '',
+        postalCode: '',
+        status: 'APPROVED'
+    });
 
     const context = useContext(MyContext);
 
@@ -205,11 +223,88 @@ export const Vendors = () => {
         setShowStatusModal(true);
     };
 
+    const handleCreateVendor = async () => {
+        // Validation
+        if (!createFormData.name || !createFormData.email || !createFormData.storeName || !createFormData.storeSlug) {
+            context.alertBox('error', 'Please fill in all required fields (Name, Email, Store Name, Store Slug)');
+            return;
+        }
+
+        if (!createFormData.password || createFormData.password.length < 6) {
+            context.alertBox('error', 'Password is required and must be at least 6 characters');
+            return;
+        }
+
+        setCreateLoading(true);
+        try {
+            const response = await postData('/api/admin/vendors', createFormData);
+            
+            if (response?.error === false) {
+                context.alertBox('success', response?.message || 'Vendor created successfully!');
+                setShowCreateModal(false);
+                setCreateFormData({
+                    name: '',
+                    email: '',
+                    password: '',
+                    storeName: '',
+                    storeSlug: '',
+                    description: '',
+                    phone: '',
+                    whatsapp: '',
+                    country: '',
+                    city: '',
+                    addressLine1: '',
+                    addressLine2: '',
+                    postalCode: '',
+                    status: 'APPROVED'
+                });
+                // Refresh vendor list
+                getVendors(page, rowsPerPage, statusFilter);
+            } else {
+                context.alertBox('error', response?.message || 'Failed to create vendor');
+            }
+        } catch (error) {
+            console.error('Create vendor error:', error);
+            context.alertBox('error', error?.response?.data?.message || 'Failed to create vendor');
+        } finally {
+            setCreateLoading(false);
+        }
+    };
+
+    const handleCreateFormChange = (e) => {
+        const { name, value } = e.target;
+        setCreateFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+
+        // Auto-generate store slug from store name
+        if (name === 'storeName') {
+            const slug = value
+                .toLowerCase()
+                .trim()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '');
+            setCreateFormData(prev => ({
+                ...prev,
+                storeSlug: slug
+            }));
+        }
+    };
+
     return (
         <div className="w-full">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-gray-800">Vendor Management</h1>
                 <div className="flex gap-2">
+                    <Button
+                        variant="contained"
+                        startIcon={<MdAdd />}
+                        onClick={() => setShowCreateModal(true)}
+                        style={{ backgroundColor: '#efb291', color: '#0b2735' }}
+                    >
+                        Create Vendor
+                    </Button>
                     <select
                         value={statusFilter}
                         onChange={(e) => {
@@ -387,6 +482,159 @@ export const Vendors = () => {
                     </div>
                 </div>
             )}
+
+            {/* Create Vendor Modal */}
+            <Dialog 
+                open={showCreateModal} 
+                onClose={() => setShowCreateModal(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>Create New Vendor</DialogTitle>
+                <DialogContent>
+                    <div className="space-y-4 mt-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <TextField
+                                fullWidth
+                                label="Vendor Name *"
+                                name="name"
+                                value={createFormData.name}
+                                onChange={handleCreateFormChange}
+                                required
+                            />
+                            <TextField
+                                fullWidth
+                                label="Email *"
+                                name="email"
+                                type="email"
+                                value={createFormData.email}
+                                onChange={handleCreateFormChange}
+                                required
+                            />
+                        </div>
+                        <TextField
+                            fullWidth
+                            label="Password *"
+                            name="password"
+                            type="password"
+                            value={createFormData.password}
+                            onChange={handleCreateFormChange}
+                            required
+                            helperText="Minimum 6 characters"
+                        />
+                        <div className="grid grid-cols-2 gap-4">
+                            <TextField
+                                fullWidth
+                                label="Store Name *"
+                                name="storeName"
+                                value={createFormData.storeName}
+                                onChange={handleCreateFormChange}
+                                required
+                            />
+                            <TextField
+                                fullWidth
+                                label="Store Slug *"
+                                name="storeSlug"
+                                value={createFormData.storeSlug}
+                                onChange={handleCreateFormChange}
+                                required
+                                helperText="URL-friendly identifier (auto-generated from store name)"
+                            />
+                        </div>
+                        <TextField
+                            fullWidth
+                            label="Description"
+                            name="description"
+                            value={createFormData.description}
+                            onChange={handleCreateFormChange}
+                            multiline
+                            rows={3}
+                        />
+                        <div className="grid grid-cols-2 gap-4">
+                            <TextField
+                                fullWidth
+                                label="Phone"
+                                name="phone"
+                                value={createFormData.phone}
+                                onChange={handleCreateFormChange}
+                            />
+                            <TextField
+                                fullWidth
+                                label="WhatsApp"
+                                name="whatsapp"
+                                value={createFormData.whatsapp}
+                                onChange={handleCreateFormChange}
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <TextField
+                                fullWidth
+                                label="Country"
+                                name="country"
+                                value={createFormData.country}
+                                onChange={handleCreateFormChange}
+                            />
+                            <TextField
+                                fullWidth
+                                label="City"
+                                name="city"
+                                value={createFormData.city}
+                                onChange={handleCreateFormChange}
+                            />
+                        </div>
+                        <TextField
+                            fullWidth
+                            label="Address Line 1"
+                            name="addressLine1"
+                            value={createFormData.addressLine1}
+                            onChange={handleCreateFormChange}
+                        />
+                        <TextField
+                            fullWidth
+                            label="Address Line 2"
+                            name="addressLine2"
+                            value={createFormData.addressLine2}
+                            onChange={handleCreateFormChange}
+                        />
+                        <TextField
+                            fullWidth
+                            label="Postal Code"
+                            name="postalCode"
+                            value={createFormData.postalCode}
+                            onChange={handleCreateFormChange}
+                        />
+                        <TextField
+                            fullWidth
+                            select
+                            label="Status"
+                            name="status"
+                            value={createFormData.status}
+                            onChange={handleCreateFormChange}
+                            SelectProps={{
+                                native: true,
+                            }}
+                        >
+                            <option value="PENDING">Pending</option>
+                            <option value="APPROVED">Approved</option>
+                            <option value="REJECTED">Rejected</option>
+                            <option value="SUSPENDED">Suspended</option>
+                        </TextField>
+                    </div>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setShowCreateModal(false)}>
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleCreateVendor}
+                        variant="contained"
+                        disabled={createLoading}
+                        style={{ backgroundColor: '#efb291', color: '#0b2735' }}
+                    >
+                        {createLoading ? 'Creating...' : 'Create Vendor'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </div>
     );
 };
