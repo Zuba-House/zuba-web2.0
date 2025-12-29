@@ -410,6 +410,33 @@ export async function createProduct(request, response) {
             };
         }
 
+        // Determine product ownership and approval status based on user role
+        const userRole = request.userRole || (request.user?.role || 'USER').toUpperCase();
+        const isAdmin = userRole === 'ADMIN';
+        const isVendor = userRole === 'VENDOR' || request.vendorId;
+        
+        // Set product ownership and approval status
+        let productOwnerType = 'PLATFORM';
+        let approvalStatus = 'APPROVED';
+        
+        if (isVendor && !isAdmin) {
+            // Vendor products need approval
+            productOwnerType = 'VENDOR';
+            approvalStatus = 'PENDING_REVIEW';
+        } else if (isAdmin) {
+            // Admin products are automatically approved
+            productOwnerType = 'PLATFORM';
+            approvalStatus = 'APPROVED';
+        }
+        
+        // Override if explicitly provided in request body
+        if (request.body.productOwnerType) {
+            productOwnerType = request.body.productOwnerType;
+        }
+        if (request.body.approvalStatus) {
+            approvalStatus = request.body.approvalStatus;
+        }
+
         // Build product data with backward compatibility
         let productData = {
             name: request.body.name,
@@ -438,6 +465,9 @@ export async function createProduct(request, response) {
             productType: request.body.productType || 'simple',
             status: request.body.status || 'draft',
             visibility: request.body.visibility || 'visible',
+            // Product ownership and approval
+            productOwnerType: productOwnerType,
+            approvalStatus: approvalStatus,
             // Images in new format
             images: imagesFormatted,
             // Pricing (new structure)
@@ -533,7 +563,10 @@ export async function createProduct(request, response) {
             seo: seoData,
             // SKU
             sku: request.body.sku || null,
-            barcode: request.body.barcode || null
+            barcode: request.body.barcode || null,
+            // Vendor information (if vendor product)
+            vendor: isVendor && !isAdmin ? request.vendorId : null,
+            vendorId: isVendor && !isAdmin ? request.vendorId : null
         };
 
         // NEW: Ensure attributes are populated for variable products
@@ -568,13 +601,45 @@ export async function createProduct(request, response) {
             });
         }
 
+        // Validate required fields before saving
+        if (!productData.name || !productData.name.trim()) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: "Product name is required"
+            });
+        }
+        
+        if (!productData.description || !productData.description.trim()) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: "Product description is required"
+            });
+        }
+        
+        if (!productData.category) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: "Product category is required"
+            });
+        }
+
         let product = new ProductModel(productData);
         product = await product.save();
 
-        console.log('Product created with images:', product.images?.length || 0, 'images');
+        console.log('Product created:', {
+            id: product._id,
+            name: product.name,
+            images: product.images?.length || 0,
+            productOwnerType: product.productOwnerType,
+            approvalStatus: product.approvalStatus,
+            createdBy: userRole
+        });
 
         if (!product) {
-            response.status(500).json({
+            return response.status(500).json({
                 error: true,
                 success: false,
                 message: "Product Not created"
