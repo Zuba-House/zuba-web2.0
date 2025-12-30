@@ -33,15 +33,6 @@ export async function registerUserController(request, response) {
             })
         }
 
-        // Check if email is an admin email (only admins can register)
-        if (!isAdminEmail(email)) {
-            return response.status(403).json({
-                message: "Access denied. Only admin emails can register.",
-                error: true,
-                success: false
-            })
-        }
-
         user = await UserModel.findOne({ email: email });
 
         if (user) {
@@ -148,15 +139,6 @@ export async function authWithGoogle(request, response) {
     const { name, email, password, avatar, mobile, role } = request.body;
 
     try {
-        // Check if email is an admin email (only admins can login via Google)
-        if (!isAdminEmail(email)) {
-            return response.status(403).json({
-                message: "Access denied. Only admin emails can login.",
-                error: true,
-                success: false
-            })
-        }
-
         const existingUser = await UserModel.findOne({ email: email });
 
         if (!existingUser) {
@@ -244,15 +226,6 @@ export async function authWithGoogle(request, response) {
 export async function loginUserController(request, response) {
     try {
         const { email, password } = request.body;
-
-        // Check if email is an admin email (only admins can login)
-        if (!isAdminEmail(email)) {
-            return response.status(403).json({
-                message: "Access denied. Only admin emails can login.",
-                error: true,
-                success: false
-            })
-        }
 
         const user = await UserModel.findOne({ email: email });
 
