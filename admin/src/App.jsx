@@ -26,6 +26,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { fetchDataFromApi } from "./utils/api";
 import { useEffect } from "react";
 import Profile from "./Pages/Profile";
+import { isAdmin } from "./config/adminEmails";
 import ProductDetails from "./Pages/Products/productDetails";
 import AddProductEnhanced from "./Pages/Products/AddProductEnhanced";
 import VariationsManager from "./Pages/Products/VariationsManager";
@@ -791,15 +792,45 @@ function App() {
       setIsLogin(true);
 
       fetchDataFromApi(`/api/user/user-details`).then((res) => {
-        setUserData(res.data);
+        const userData = res.data;
+        setUserData(userData);
+        
         if (res?.response?.data?.message === "You have not login") {
           localStorage.removeItem("accessToken");
           localStorage.removeItem("refreshToken");
           setIsLogin(false);
           alertBox("error", "Your session is closed please login again")
-
           //window.location.href = "/login"
+          return;
         }
+
+        // Check if user is admin (both role and email must match)
+        if (userData && !isAdmin(userData)) {
+          console.warn('❌ Non-admin user detected, logging out:', {
+            email: userData.email,
+            role: userData.role
+          });
+          
+          // Log out non-admin user
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
+          setIsLogin(false);
+          setUserData(null);
+          
+          alertBox("error", "Access denied. Only admin emails can access the admin panel.");
+          
+          // Redirect to login
+          setTimeout(() => {
+            window.location.href = "/login";
+          }, 2000);
+        }
+      }).catch((error) => {
+        console.error('Error fetching user details:', error);
+        // If there's an error, clear tokens and redirect to login
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        setIsLogin(false);
+        setUserData(null);
       })
 
     } else {

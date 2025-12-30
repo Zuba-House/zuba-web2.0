@@ -6,6 +6,7 @@ import sendEmailFun from '../config/sendEmail.js';
 import VerificationEmail from '../utils/verifyEmailTemplate.js';
 import generatedAccessToken from '../utils/generatedAccessToken.js';
 import genertedRefreshToken from '../utils/generatedRefreshToken.js';
+import { isAdminEmail } from '../config/adminEmails.js';
 
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
@@ -27,6 +28,15 @@ export async function registerUserController(request, response) {
         if (!name || !email || !password) {
             return response.status(400).json({
                 message: "provide email, name, password",
+                error: true,
+                success: false
+            })
+        }
+
+        // Check if email is an admin email (only admins can register)
+        if (!isAdminEmail(email)) {
+            return response.status(403).json({
+                message: "Access denied. Only admin emails can register.",
                 error: true,
                 success: false
             })
@@ -138,6 +148,15 @@ export async function authWithGoogle(request, response) {
     const { name, email, password, avatar, mobile, role } = request.body;
 
     try {
+        // Check if email is an admin email (only admins can login via Google)
+        if (!isAdminEmail(email)) {
+            return response.status(403).json({
+                message: "Access denied. Only admin emails can login.",
+                error: true,
+                success: false
+            })
+        }
+
         const existingUser = await UserModel.findOne({ email: email });
 
         if (!existingUser) {
@@ -225,6 +244,15 @@ export async function authWithGoogle(request, response) {
 export async function loginUserController(request, response) {
     try {
         const { email, password } = request.body;
+
+        // Check if email is an admin email (only admins can login)
+        if (!isAdminEmail(email)) {
+            return response.status(403).json({
+                message: "Access denied. Only admin emails can login.",
+                error: true,
+                success: false
+            })
+        }
 
         const user = await UserModel.findOne({ email: email });
 
@@ -325,6 +353,55 @@ export async function logoutController(request, response) {
             success: true
         })
     } catch (error) {
+        return response.status(500).json({
+            message: error.message || error,
+            error: true,
+            success: false
+        })
+    }
+}
+
+// Logout all non-admin users (Admin only endpoint)
+export async function logoutAllNonAdminUsers(request, response) {
+    try {
+        // This endpoint should only be accessible by admins
+        // The middleware will handle the check
+        
+        const { isAdminEmail } = await import('../config/adminEmails.js');
+        
+        // Get all users
+        const allUsers = await UserModel.find({}).select('email role');
+        
+        // Find non-admin users
+        const nonAdminUsers = allUsers.filter(user => {
+            const userRole = (user.role || '').toUpperCase();
+            const isAdmin = userRole === 'ADMIN' && isAdminEmail(user.email);
+            return !isAdmin;
+        });
+
+        // Clear refresh tokens for all non-admin users
+        const result = await UserModel.updateMany(
+            {
+                _id: { $in: nonAdminUsers.map(u => u._id) }
+            },
+            {
+                $set: { refresh_token: "" }
+            }
+        );
+
+        console.log(`✅ Logged out ${result.modifiedCount} non-admin users`);
+
+        return response.json({
+            message: `Successfully logged out ${result.modifiedCount} non-admin users`,
+            error: false,
+            success: true,
+            data: {
+                loggedOutCount: result.modifiedCount,
+                totalNonAdminUsers: nonAdminUsers.length
+            }
+        })
+    } catch (error) {
+        console.error('Logout all non-admin users error:', error);
         return response.status(500).json({
             message: error.message || error,
             error: true,

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import auth from "../middlewares/auth.js";
+import requireAdminEmail from "../middlewares/adminEmailCheck.js";
 import {
     getDashboardStats,
     getVisitorsByCountry,
@@ -24,38 +25,38 @@ const analyticsRouter = Router();
 analyticsRouter.post('/track', trackPageView);
 
 // ========================================
-// PROTECTED ROUTES (Admin only)
+// PROTECTED ROUTES (Admin only - requires admin email)
 // ========================================
 
 // Dashboard overview
-analyticsRouter.get('/dashboard', auth, getDashboardStats);
+analyticsRouter.get('/dashboard', auth, requireAdminEmail, getDashboardStats);
 
 // Visitors by country
-analyticsRouter.get('/countries', auth, getVisitorsByCountry);
+analyticsRouter.get('/countries', auth, requireAdminEmail, getVisitorsByCountry);
 
 // Visitors by device
-analyticsRouter.get('/devices', auth, getVisitorsByDevice);
+analyticsRouter.get('/devices', auth, requireAdminEmail, getVisitorsByDevice);
 
 // Top pages
-analyticsRouter.get('/pages', auth, getTopPages);
+analyticsRouter.get('/pages', auth, requireAdminEmail, getTopPages);
 
 // Top referrers
-analyticsRouter.get('/referrers', auth, getTopReferrers);
+analyticsRouter.get('/referrers', auth, requireAdminEmail, getTopReferrers);
 
 // Visitors over time (for charts)
-analyticsRouter.get('/timeline', auth, getVisitorsOverTime);
+analyticsRouter.get('/timeline', auth, requireAdminEmail, getVisitorsOverTime);
 
 // Browser stats
-analyticsRouter.get('/browsers', auth, getBrowserStats);
+analyticsRouter.get('/browsers', auth, requireAdminEmail, getBrowserStats);
 
 // Real-time visitors
-analyticsRouter.get('/realtime', auth, getRealTimeVisitors);
+analyticsRouter.get('/realtime', auth, requireAdminEmail, getRealTimeVisitors);
 
 // Product views
-analyticsRouter.get('/products', auth, getProductViews);
+analyticsRouter.get('/products', auth, requireAdminEmail, getProductViews);
 
 // Search queries
-analyticsRouter.get('/searches', auth, getSearchQueries);
+analyticsRouter.get('/searches', auth, requireAdminEmail, getSearchQueries);
 
 export default analyticsRouter;
 
