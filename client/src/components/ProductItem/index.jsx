@@ -16,6 +16,7 @@ import { IoMdHeart } from "react-icons/io";
 import { formatCurrency } from "../../utils/currency";
 import { normalizeProduct } from "../../utils/productNormalizer";
 import { getPriceRange, isVariableProduct } from '../../utils/productUtils';
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
 
 
@@ -331,13 +332,17 @@ const ProductItem = (props) => {
                 
                 // Try featuredImage first
                 const featuredUrl = getImageUrl(item?.featuredImage);
-                if (featuredUrl) return featuredUrl;
+                if (featuredUrl) {
+                  return getOptimizedImageUrl(featuredUrl, { width: 600, height: 600, quality: 'auto', format: 'auto' });
+                }
                 
                 // Try images array - check all images
                 if (item?.images && Array.isArray(item.images) && item.images.length > 0) {
                   for (let i = 0; i < item.images.length; i++) {
                     const imgUrl = getImageUrl(item.images[i]);
-                    if (imgUrl) return imgUrl;
+                    if (imgUrl) {
+                      return getOptimizedImageUrl(imgUrl, { width: 600, height: 600, quality: 'auto', format: 'auto' });
+                    }
                   }
                 }
                 
@@ -345,13 +350,17 @@ const ProductItem = (props) => {
                 if (item?.bannerimages && Array.isArray(item.bannerimages) && item.bannerimages.length > 0) {
                   for (let i = 0; i < item.bannerimages.length; i++) {
                     const imgUrl = getImageUrl(item.bannerimages[i]);
-                    if (imgUrl) return imgUrl;
+                    if (imgUrl) {
+                      return getOptimizedImageUrl(imgUrl, { width: 600, height: 600, quality: 'auto', format: 'auto' });
+                    }
                   }
                 }
                 
                 // Try image field (singular)
                 const singleImageUrl = getImageUrl(item?.image);
-                if (singleImageUrl) return singleImageUrl;
+                if (singleImageUrl) {
+                  return getOptimizedImageUrl(singleImageUrl, { width: 600, height: 600, quality: 'auto', format: 'auto' });
+                }
                 
                 // Last resort: data URI placeholder
                 return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgdmlld0JveD0iMCAwIDQwMCA0MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI0MDAiIGZpbGw9IiNGM0Y0RjYiLz48cGF0aCBkPSJNMTYwIDI0MEwxOTAgMjAwTDIxMCAyMzBMMjUwIDE4MEwyODAgMjQwSDE2MFoiIGZpbGw9IiNEMUQ1REIiLz48Y2lyY2xlIGN4PSIxNzAiIGN5PSIxNjAiIHI9IjI1IiBmaWxsPSIjRDFENURCIi8+PHRleHQgeD0iMjAwIiB5PSIzMDAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNiIgZmlsbD0iIzlDQTNBRiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';

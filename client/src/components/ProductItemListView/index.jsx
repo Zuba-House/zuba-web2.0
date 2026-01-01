@@ -14,6 +14,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { MdClose } from "react-icons/md";
 import { IoMdHeart } from "react-icons/io";
 import { formatCurrency } from "../../utils/currency";
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
 const ProductItem = (props) => {
 
@@ -222,13 +223,17 @@ const ProductItem = (props) => {
                 
                 // Try featuredImage first
                 const featuredUrl = getImageUrl(item?.featuredImage);
-                if (featuredUrl) return featuredUrl;
+                if (featuredUrl) {
+                  return getOptimizedImageUrl(featuredUrl, { width: 600, height: 600, quality: 'auto', format: 'auto' });
+                }
                 
                 // Try images array - check all images
                 if (item?.images && Array.isArray(item.images) && item.images.length > 0) {
                   for (let i = 0; i < item.images.length; i++) {
                     const imgUrl = getImageUrl(item.images[i]);
-                    if (imgUrl) return imgUrl;
+                    if (imgUrl) {
+                      return getOptimizedImageUrl(imgUrl, { width: 600, height: 600, quality: 'auto', format: 'auto' });
+                    }
                   }
                 }
                 
@@ -236,13 +241,17 @@ const ProductItem = (props) => {
                 if (item?.bannerimages && Array.isArray(item.bannerimages) && item.bannerimages.length > 0) {
                   for (let i = 0; i < item.bannerimages.length; i++) {
                     const imgUrl = getImageUrl(item.bannerimages[i]);
-                    if (imgUrl) return imgUrl;
+                    if (imgUrl) {
+                      return getOptimizedImageUrl(imgUrl, { width: 600, height: 600, quality: 'auto', format: 'auto' });
+                    }
                   }
                 }
                 
                 // Try image field (singular)
                 const singleImageUrl = getImageUrl(item?.image);
-                if (singleImageUrl) return singleImageUrl;
+                if (singleImageUrl) {
+                  return getOptimizedImageUrl(singleImageUrl, { width: 600, height: 600, quality: 'auto', format: 'auto' });
+                }
                 
                 // Last resort: placeholder
                 return 'https://via.placeholder.com/400x400?text=No+Image';
@@ -267,9 +276,10 @@ const ProductItem = (props) => {
                 
                 return secondImageUrl ? (
                   <img
-                    src={secondImageUrl}
+                    src={getOptimizedImageUrl(secondImageUrl, { width: 600, height: 600, quality: 'auto', format: 'auto' })}
                     className="w-full transition-all duration-700 absolute top-0 left-0 opacity-0 group-hover:opacity-100 group-hover:scale-105"
                     alt={props?.item?.name || 'Product image'}
+                    loading="lazy"
                     onError={(e) => {
                       e.target.style.display = 'none';
                     }}

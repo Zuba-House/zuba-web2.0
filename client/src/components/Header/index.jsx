@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Search from "../Search";
 import Badge from "@mui/material/Badge";
@@ -20,8 +20,8 @@ import { IoMdHeartEmpty } from "react-icons/io";
 import { IoIosLogOut } from "react-icons/io";
 import { fetchDataFromApi } from "../../utils/api";
 import { LuMapPin } from "react-icons/lu";
-import { useEffect } from "react";
 import { HiOutlineMenu } from "react-icons/hi";
+import { optimizeCloudinaryUrl, preloadImage } from "../../utils/imageOptimizer";
 
 
 const StyledBadge = styled(Badge)(({ theme }) => ({
@@ -38,6 +38,7 @@ const Header = () => {
   const open = Boolean(anchorEl);
 
   const [isOpenCatPanel, setIsOpenCatPanel] = useState(false);
+  const [logoUrl, setLogoUrl] = useState('/logo.jpg'); // Start with local logo for instant load
 
   const context = useContext(MyContext);
 
@@ -64,11 +65,47 @@ const Header = () => {
   ];
 
   useEffect(() => {
+    // Preload local logo immediately
+    preloadImage('/logo.jpg').catch(() => {
+      // Fallback to logo2.jpg if logo.jpg fails
+      preloadImage('/logo2.jpg').catch(() => {});
+    });
+
+    // Fetch Cloudinary logo in background and update if available
     fetchDataFromApi("/api/logo").then((res) => {
       if (res?.logo?.[0]?.logo) {
-        localStorage.setItem('logo', res?.logo?.[0]?.logo)
+        const cloudinaryLogo = res.logo[0].logo;
+        // Optimize Cloudinary URL for faster loading
+        const optimizedLogo = optimizeCloudinaryUrl(cloudinaryLogo, {
+          width: 400,
+          height: 200,
+          quality: 90,
+          format: 'auto'
+        });
+        
+        // Preload optimized logo, then update if successful
+        preloadImage(optimizedLogo)
+          .then(() => {
+            setLogoUrl(optimizedLogo);
+            localStorage.setItem('logo', optimizedLogo);
+          })
+          .catch(() => {
+            // If optimized fails, try original
+            preloadImage(cloudinaryLogo)
+              .then(() => {
+                setLogoUrl(cloudinaryLogo);
+                localStorage.setItem('logo', cloudinaryLogo);
+              })
+              .catch(() => {
+                // Keep local logo if Cloudinary fails
+                console.log('Using local logo as Cloudinary logo failed to load');
+              });
+          });
       }
-    })
+    }).catch(() => {
+      // Keep local logo if API fails
+      console.log('Using local logo as API call failed');
+    });
   }, []);
 
   useEffect(() => {
@@ -156,11 +193,21 @@ const Header = () => {
             <div className="col1 w-[40%] lg:w-[25%] flex items-center">
               <Link to={"/"} className="flex items-center">
                 <img 
-                  src={localStorage.getItem('logo') || '/logo.png'} 
+                  src={logoUrl} 
                   className="max-w-[140px] lg:max-w-[200px] max-h-[60px] lg:max-h-[80px] object-contain" 
                   alt="Zuba House Logo"
+                  fetchPriority="high"
+                  loading="eager"
                   onError={(e) => {
-                    e.target.src = '/logo.png';
+                    // Fallback chain: logo.jpg -> logo2.jpg -> logo.png
+                    if (e.target.src.includes('logo.jpg')) {
+                      e.target.src = '/logo2.jpg';
+                    } else if (e.target.src.includes('logo2.jpg')) {
+                      e.target.src = '/logo.png';
+                    } else {
+                      // Last resort: use a data URI placeholder
+                      e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjgwIiB2aWV3Qm94PSIwIDAgMjAwIDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iODAiIGZpbGw9IiMwYjI3MzUiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE4IiBmaWxsPSIjZTZlMmRiIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+WlVCQSBIb3VzZTwvdGV4dD48L3N2Zz4=';
+                    }
                   }}
                 />
               </Link>
