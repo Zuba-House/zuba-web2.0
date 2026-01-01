@@ -67,8 +67,8 @@ const Header = () => {
   useEffect(() => {
     // Preload local logo immediately
     preloadImage('/logo.jpg').catch(() => {
-      // Fallback to logo2.jpg if logo.jpg fails
-      preloadImage('/logo2.jpg').catch(() => {});
+      // Logo preload failed, will use error handler fallback
+      console.log('Logo preload failed, using error handler');
     });
 
     // Fetch Cloudinary logo in background and update if available
@@ -199,12 +199,10 @@ const Header = () => {
                   fetchPriority="high"
                   loading="eager"
                   onError={(e) => {
-                    // Fallback chain: logo.jpg -> logo2.jpg -> logo.png
+                    // Fallback chain: logo.jpg -> logo.png -> placeholder
                     if (e.target.src.includes('logo.jpg')) {
-                      e.target.src = '/logo2.jpg';
-                    } else if (e.target.src.includes('logo2.jpg')) {
                       e.target.src = '/logo.png';
-                    } else {
+                    } else if (e.target.src.includes('logo.png')) {
                       // Last resort: use a data URI placeholder
                       e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjgwIiB2aWV3Qm94PSIwIDAgMjAwIDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iODAiIGZpbGw9IiMwYjI3MzUiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE4IiBmaWxsPSIjZTZlMmRiIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+WlVCQSBIb3VzZTwvdGV4dD48L3N2Zz4=';
                     }
