@@ -20,6 +20,7 @@ import { MyContext } from "../../App.jsx";
 import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { firebaseApp } from "../../firebase";
 import { useEffect } from "react";
+import { isAdminEmail } from "../../config/adminEmails";
 const auth = getAuth(firebaseApp);
 const googleProvider = new GoogleAuthProvider();
 
@@ -39,8 +40,36 @@ const SignUp = () => {
     const history = useNavigate();
 
     useEffect(() => {
+        // Check if user is already logged in but not admin - auto logout
+        const token = localStorage.getItem('accessToken');
+        if (token) {
+            fetchDataFromApi("/api/user/user-details").then((res) => {
+                if (res?.data && res.data.email) {
+                    if (!isAdminEmail(res.data.email)) {
+                        // Non-admin user detected - force logout
+                        localStorage.removeItem("accessToken");
+                        localStorage.removeItem("refreshToken");
+                        localStorage.removeItem("userEmail");
+                        context.setIsLogin(false);
+                        context.alertBox("error", "Access denied. Only admin emails can access the admin panel.");
+                    }
+                }
+            }).catch(() => {
+                // If check fails, clear tokens anyway
+                localStorage.removeItem("accessToken");
+                localStorage.removeItem("refreshToken");
+                localStorage.removeItem("userEmail");
+                context.setIsLogin(false);
+            });
+        }
+
         fetchDataFromApi("/api/logo").then((res) => {
-            localStorage.setItem('logo', res?.logo[0]?.logo)
+            if (res?.logo && res.logo.length > 0 && res.logo[0]?.logo) {
+                localStorage.setItem('logo', res.logo[0].logo)
+            }
+        }).catch((error) => {
+            // Silently fail - logo is not critical
+            console.log('Logo fetch failed (non-critical):', error);
         })
     }, [])
 
@@ -67,17 +96,31 @@ const SignUp = () => {
 
         if (formFields.name === "") {
             context.alertBox("error", "Please enter full name");
+            setIsLoading(false);
             return false
         }
 
         if (formFields.email === "") {
             context.alertBox("error", "Please enter email id");
+            setIsLoading(false);
             return false
         }
 
+        // Check if email is admin email
+        if (!isAdminEmail(formFields.email)) {
+            // Clear any existing tokens
+            localStorage.removeItem("accessToken");
+            localStorage.removeItem("refreshToken");
+            localStorage.removeItem("userEmail");
+            context.setIsLogin(false);
+            context.alertBox("error", "Access denied. Only authorized admin emails can create accounts.");
+            setIsLoading(false);
+            return false;
+        }
 
         if (formFields.password === "") {
             context.alertBox("error", "Please enter password");
+            setIsLoading(false);
             return false
         }
 
@@ -128,6 +171,18 @@ const SignUp = () => {
                     role: "USER"
                 };
 
+                // Check if email is admin email
+                if (!isAdminEmail(fields.email)) {
+                    // Clear any existing tokens
+                    localStorage.removeItem("accessToken");
+                    localStorage.removeItem("refreshToken");
+                    localStorage.removeItem("userEmail");
+                    context.setIsLogin(false);
+                    setLoadingGoogle(false);
+                    setIsLoading(false);
+                    context.alertBox("error", "Access denied. Only authorized admin emails can create accounts.");
+                    return;
+                }
 
                 postData("/api/user/authWithGoogle", fields).then((res) => {
 
