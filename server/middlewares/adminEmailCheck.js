@@ -23,13 +23,16 @@ export const requireAdminEmail = async (req, res, next) => {
       console.log('❌ Admin email check failed:', {
         userId: req.userId,
         email: user.email,
-        role: user.role
+        role: user.role,
+        path: req.path,
+        method: req.method
       });
       
       return res.status(403).json({
         error: true,
         success: false,
-        message: 'Access denied. Admin email required.'
+        message: 'Access denied. Admin email required. Your email must be in the admin email list to perform this action.',
+        code: 'ADMIN_EMAIL_REQUIRED'
       });
     }
 

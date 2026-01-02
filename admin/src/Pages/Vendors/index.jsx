@@ -265,7 +265,15 @@ export const Vendors = () => {
             }
         } catch (error) {
             console.error('Create vendor error:', error);
-            context.alertBox('error', error?.response?.data?.message || 'Failed to create vendor');
+            const errorMessage = error?.response?.data?.message || 
+                                error?.message || 
+                                'Failed to create vendor. Please check that you are logged in as an admin and all fields are filled correctly.';
+            context.alertBox('error', errorMessage);
+            
+            // If it's an auth error, suggest checking admin email
+            if (error?.response?.status === 403 || errorMessage.includes('Admin email')) {
+                context.alertBox('error', 'Access denied. Make sure you are logged in with an authorized admin email.');
+            }
         } finally {
             setCreateLoading(false);
         }

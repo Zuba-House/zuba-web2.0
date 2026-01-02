@@ -153,6 +153,13 @@ export const getAllVendors = async (req, res) => {
  */
 export const createVendor = async (req, res) => {
   try {
+    // Log admin action
+    console.log('🔧 Admin creating vendor:', {
+      adminId: req.userId,
+      adminEmail: req.user?.email,
+      timestamp: new Date().toISOString()
+    });
+
     const {
       name,
       email,
@@ -181,6 +188,15 @@ export const createVendor = async (req, res) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+
+    // Note: Vendor email does NOT need to be an admin email
+    // Only the ADMIN creating the vendor needs to have an admin email
+    console.log('📝 Creating vendor account for:', {
+      vendorEmail: normalizedEmail.substring(0, 10) + '...',
+      storeName,
+      storeSlug,
+      createdBy: req.user?.email
+    });
 
     // Check if user already exists
     let user = await UserModel.findOne({ email: normalizedEmail });
@@ -332,23 +348,26 @@ export const createVendor = async (req, res) => {
       }
     }
 
-    console.log('✅ Admin created vendor:', {
+    console.log('✅ Admin successfully created vendor:', {
       vendorId: vendor._id,
       storeName: vendor.storeName,
       email: normalizedEmail,
-      status: vendor.status
+      status: vendor.status,
+      createdBy: req.user?.email,
+      createdAt: new Date().toISOString()
     });
 
     return res.status(201).json({
       error: false,
       success: true,
-      message: `Vendor created successfully and ${status === 'APPROVED' ? 'approved' : 'set to ' + status}!`,
+      message: `Vendor "${vendor.storeName}" created successfully and ${status === 'APPROVED' ? 'approved' : 'set to ' + status}!`,
       data: {
         vendorId: vendor._id,
         storeName: vendor.storeName,
         storeSlug: vendor.storeSlug,
+        email: normalizedEmail,
         status: vendor.status,
-        email: normalizedEmail
+        userId: user._id
       }
     });
 
@@ -358,7 +377,10 @@ export const createVendor = async (req, res) => {
       stack: error.stack,
       name: error.name,
       code: error.code,
-      keyPattern: error.keyPattern
+      keyPattern: error.keyPattern,
+      adminId: req.userId,
+      adminEmail: req.user?.email,
+      vendorEmail: req.body?.email
     });
     
     // Handle duplicate key errors
