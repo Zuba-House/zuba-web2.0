@@ -36,9 +36,14 @@ axios.interceptors.response.use(
             if (errorMessage === "Authentication token required" || 
                 errorMessage === "User not found") {
                 // These are permanent failures, don't try to refresh
+                const currentPath = window.location.pathname;
+                const isAuthPage = currentPath.includes('/login') || currentPath.includes('/sign-up') || currentPath.includes('/verify-account') || currentPath.includes('/forgot-password');
+                
                 localStorage.removeItem('accessToken');
                 localStorage.removeItem('refreshToken');
-                if (!window.location.pathname.includes('/login')) {
+                
+                // Only redirect if not already on auth pages
+                if (!isAuthPage && !currentPath.includes('/login')) {
                     window.location.href = '/login';
                 }
                 return Promise.reject(error);
@@ -65,11 +70,16 @@ axios.interceptors.response.use(
 
             if (!refreshToken) {
                 // No refresh token, redirect to login
+                const currentPath = window.location.pathname;
+                const isAuthPage = currentPath.includes('/login') || currentPath.includes('/sign-up') || currentPath.includes('/verify-account') || currentPath.includes('/forgot-password');
+                
                 processQueue(error, null);
                 isRefreshing = false;
                 localStorage.removeItem('accessToken');
                 localStorage.removeItem('refreshToken');
-                if (!window.location.pathname.includes('/login')) {
+                
+                // Only redirect if not already on auth pages
+                if (!isAuthPage && !currentPath.includes('/login')) {
                     window.location.href = '/login';
                 }
                 return Promise.reject(error);
@@ -106,11 +116,16 @@ axios.interceptors.response.use(
                 }
             } catch (refreshError) {
                 // Refresh failed, redirect to login
+                const currentPath = window.location.pathname;
+                const isAuthPage = currentPath.includes('/login') || currentPath.includes('/sign-up') || currentPath.includes('/verify-account') || currentPath.includes('/forgot-password');
+                
                 processQueue(refreshError, null);
                 isRefreshing = false;
                 localStorage.removeItem('accessToken');
                 localStorage.removeItem('refreshToken');
-                if (!window.location.pathname.includes('/login')) {
+                
+                // Only redirect if not already on auth pages
+                if (!isAuthPage && !currentPath.includes('/login')) {
                     window.location.href = '/login';
                 }
                 return Promise.reject(refreshError);
@@ -155,12 +170,22 @@ export const postData = async (url, formData) => {
 export const fetchDataFromApi = async (url) => {
     try {
         const token = localStorage.getItem('accessToken');
+        const currentPath = window.location.pathname;
+        
+        // Don't redirect if already on login/signup pages or if this is a public endpoint
+        const isPublicEndpoint = url.includes('/logo') || url.includes('/public');
+        const isAuthPage = currentPath.includes('/login') || currentPath.includes('/sign-up') || currentPath.includes('/verify-account') || currentPath.includes('/forgot-password');
         
         if (!token) {
-            // No token, redirect to login
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
-            window.location.href = '/login';
+            // No token - return error but don't redirect if on auth pages or public endpoints
+            if (!isAuthPage && !isPublicEndpoint) {
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
+                // Only redirect if not already on login page
+                if (!currentPath.includes('/login')) {
+                    window.location.href = '/login';
+                }
+            }
             return {
                 error: true,
                 success: false,
@@ -186,19 +211,24 @@ export const fetchDataFromApi = async (url) => {
             
             // If 401 and token refresh failed or no refresh token, redirect to login
             if (status === 401) {
+                const currentPath = window.location.pathname;
+                const isAuthPage = currentPath.includes('/login') || currentPath.includes('/sign-up') || currentPath.includes('/verify-account') || currentPath.includes('/forgot-password');
+                
                 // Check if it's a token expiration that couldn't be refreshed
                 if (errorData?.message === "Token expired" || 
                     errorData?.message === "Invalid token" ||
                     errorData?.message === "Authentication token required") {
                     
                     // If we get here, token refresh already failed or wasn't attempted
-                    // Clear tokens and redirect
+                    // Clear tokens
                     localStorage.removeItem('accessToken');
                     localStorage.removeItem('refreshToken');
                     
-                    // Only redirect if not already on login page
-                    if (!window.location.pathname.includes('/login')) {
-                        window.location.href = '/login';
+                    // Only redirect if not already on auth pages
+                    if (!isAuthPage) {
+                        if (!currentPath.includes('/login')) {
+                            window.location.href = '/login';
+                        }
                     }
                 }
                 

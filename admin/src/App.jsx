@@ -785,6 +785,12 @@ function App() {
 
 
   useEffect(() => {
+    // Prevent auth check on login/signup pages
+    const currentPath = window.location.pathname;
+    if (currentPath.includes('/login') || currentPath.includes('/sign-up') || currentPath.includes('/verify-account') || currentPath.includes('/forgot-password')) {
+      setIsLogin(false);
+      return;
+    }
 
     const token = localStorage.getItem('accessToken');
 
@@ -802,19 +808,22 @@ function App() {
           setIsLogin(false);
           setUserData(null);
           
-          // Show error message
-          if (errorMessage.includes("login") || errorMessage.includes("token") || errorMessage.includes("Unauthorized")) {
-            alertBox("error", "Your session has expired. Please login again.");
-          } else {
-            alertBox("error", errorMessage);
-          }
-          
-          // Redirect to login after a short delay
-          setTimeout(() => {
-            if (!window.location.pathname.includes('/login')) {
-              window.location.href = "/login";
+          // Don't show error or redirect if already on login page
+          if (!currentPath.includes('/login')) {
+            // Show error message
+            if (errorMessage.includes("login") || errorMessage.includes("token") || errorMessage.includes("Unauthorized")) {
+              alertBox("error", "Your session has expired. Please login again.");
+            } else {
+              alertBox("error", errorMessage);
             }
-          }, 1500);
+            
+            // Redirect to login after a short delay
+            setTimeout(() => {
+              if (!window.location.pathname.includes('/login')) {
+                window.location.href = "/login";
+              }
+            }, 1500);
+          }
           return;
         }
         
@@ -825,12 +834,15 @@ function App() {
           localStorage.removeItem("refreshToken");
           setIsLogin(false);
           setUserData(null);
-          alertBox("error", "Invalid response from server");
-          setTimeout(() => {
-            if (!window.location.pathname.includes('/login')) {
-              window.location.href = "/login";
-            }
-          }, 1500);
+          
+          if (!currentPath.includes('/login')) {
+            alertBox("error", "Invalid response from server");
+            setTimeout(() => {
+              if (!window.location.pathname.includes('/login')) {
+                window.location.href = "/login";
+              }
+            }, 1500);
+          }
           return;
         }
         
@@ -850,27 +862,31 @@ function App() {
           setIsLogin(false);
           setUserData(null);
           
-          alertBox("error", "Access denied. Only admin emails can access the admin panel.");
-          
-          // Redirect to login
-          setTimeout(() => {
-            if (!window.location.pathname.includes('/login')) {
-              window.location.href = "/login";
-            }
-          }, 2000);
+          if (!currentPath.includes('/login')) {
+            alertBox("error", "Access denied. Only admin emails can access the admin panel.");
+            
+            // Redirect to login
+            setTimeout(() => {
+              if (!window.location.pathname.includes('/login')) {
+                window.location.href = "/login";
+              }
+            }, 2000);
+          }
         }
       }).catch((error) => {
         console.error('Error fetching user details:', error);
-        // If there's an error, clear tokens and redirect to login
+        // If there's an error, clear tokens
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         setIsLogin(false);
         setUserData(null);
         
         // Only redirect if not already on login page
-        if (!window.location.pathname.includes('/login')) {
+        if (!currentPath.includes('/login')) {
           setTimeout(() => {
-            window.location.href = "/login";
+            if (!window.location.pathname.includes('/login')) {
+              window.location.href = "/login";
+            }
           }, 1000);
         }
       })
@@ -879,7 +895,7 @@ function App() {
       setIsLogin(false);
     }
 
-  }, [isLogin])
+  }, []) // Empty dependency array - only run once on mount
 
 
   useEffect(() => {

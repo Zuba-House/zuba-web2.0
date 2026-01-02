@@ -36,8 +36,14 @@ const Login = () => {
   const history = useNavigate();
 
   useEffect(() => {
+    // Fetch logo - this endpoint might not require auth, but handle errors gracefully
     fetchDataFromApi("/api/logo").then((res) => {
-      localStorage.setItem('logo', res?.logo[0]?.logo)
+      if (res?.logo && res.logo.length > 0 && res.logo[0]?.logo) {
+        localStorage.setItem('logo', res.logo[0].logo)
+      }
+    }).catch((error) => {
+      // Silently fail - logo is not critical for login
+      console.log('Logo fetch failed (non-critical):', error);
     })
   }, [])
 
