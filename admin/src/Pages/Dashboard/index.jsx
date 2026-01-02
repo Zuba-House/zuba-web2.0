@@ -72,15 +72,24 @@ const Dashboard = () => {
 
 
     fetchDataFromApi(`/api/order/order-list?page=${pageOrder}&limit=5`).then((res) => {
-      if (res?.error === false) {
-        setOrdersData(res?.data)
+      if (res?.error === false && res?.data) {
+        setOrdersData(res.data)
+      } else if (res?.error === true) {
+        console.error('Failed to fetch orders:', res?.message);
       }
-    })
+    }).catch((error) => {
+      console.error('Error fetching orders:', error);
+    });
+    
     fetchDataFromApi(`/api/order/order-list`).then((res) => {
       if (res?.error === false) {
         setTotalOrdersData(res)
+      } else if (res?.error === true) {
+        console.error('Failed to fetch total orders:', res?.message);
       }
-    })
+    }).catch((error) => {
+      console.error('Error fetching total orders:', error);
+    });
     fetchDataFromApi(`/api/order/count`).then((res) => {
       if (res?.error === false) {
         setOrdersCount(res?.count)
@@ -102,10 +111,14 @@ const Dashboard = () => {
       setOrdersData(filteredOrders)
     } else {
       fetchDataFromApi(`/api/order/order-list?page=${pageOrder}&limit=5`).then((res) => {
-        if (res?.error === false) {
+        if (res?.error === false && res?.data) {
           setOrders(res)
-          setOrdersData(res?.data)
+          setOrdersData(res.data)
+        } else if (res?.error === true) {
+          console.error('Failed to fetch orders:', res?.message);
         }
+      }).catch((error) => {
+        console.error('Error fetching orders:', error);
       })
     }
   }, [orderSearchQuery])

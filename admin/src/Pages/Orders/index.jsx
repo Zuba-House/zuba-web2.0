@@ -67,10 +67,14 @@ export const Orders = () => {
         context.alertBox("success", response?.message || "Order status updated successfully");
         // Refresh orders list immediately
         fetchDataFromApi(`/api/order/order-list?page=${pageOrder}&limit=5`).then((res) => {
-          if (res?.error === false) {
-            setOrdersData(res?.data)
+          if (res?.error === false && res?.data) {
+            setOrdersData(res.data)
             setOrderStatus(''); // Reset to trigger useEffect refresh
+          } else if (res?.error === true) {
+            console.error('Failed to fetch orders:', res?.message);
           }
+        }).catch((error) => {
+          console.error('Error fetching orders:', error);
         })
       } else {
         context.alertBox("error", response?.message || "Failed to update order status");
@@ -88,16 +92,31 @@ export const Orders = () => {
   useEffect(() => {
     context?.setProgress(50);
     fetchDataFromApi(`/api/order/order-list?page=${pageOrder}&limit=5`).then((res) => {
-      if (res?.error === false) {
-        setOrdersData(res?.data)
+      if (res?.error === false && res?.data) {
+        setOrdersData(res.data)
         context?.setProgress(100);
+      } else if (res?.error === true) {
+        // Handle error - token refresh should have been attempted
+        console.error('Failed to fetch orders:', res?.message);
+        context?.setProgress(100);
+        if (res?.message && !res?.message.includes('login')) {
+          context?.alertBox('error', res.message || 'Failed to load orders');
+        }
       }
-    })
+    }).catch((error) => {
+      console.error('Error fetching orders:', error);
+      context?.setProgress(100);
+    });
+    
     fetchDataFromApi(`/api/order/order-list`).then((res) => {
       if (res?.error === false) {
         setTotalOrdersData(res)
+      } else if (res?.error === true) {
+        console.error('Failed to fetch total orders:', res?.message);
       }
-    })
+    }).catch((error) => {
+      console.error('Error fetching total orders:', error);
+    });
   }, [orderStatus, pageOrder])
 
 
@@ -114,10 +133,14 @@ export const Orders = () => {
       setOrdersData(filteredOrders)
     } else {
       fetchDataFromApi(`/api/order/order-list?page=${pageOrder}&limit=5`).then((res) => {
-        if (res?.error === false) {
+        if (res?.error === false && res?.data) {
           setOrders(res)
-          setOrdersData(res?.data)
+          setOrdersData(res.data)
+        } else if (res?.error === true) {
+          console.error('Failed to fetch orders:', res?.message);
         }
+      }).catch((error) => {
+        console.error('Error fetching orders:', error);
       })
     }
 
@@ -128,17 +151,27 @@ export const Orders = () => {
           if (context?.userData?.role === "ADMIN") {
               deleteData(`/api/order/deleteOrder/${id}`).then((res) => {
                 fetchDataFromApi(`/api/order/order-list?page=${pageOrder}&limit=5`).then((res) => {
-                  if (res?.error === false) {
-                    setOrdersData(res?.data)
+                  if (res?.error === false && res?.data) {
+                    setOrdersData(res.data)
                     context?.setProgress(100);
                     context.alertBox("success", "Order Delete successfully!");
+                  } else if (res?.error === true) {
+                    console.error('Failed to fetch orders:', res?.message);
+                    context?.setProgress(100);
                   }
-                })
+                }).catch((error) => {
+                  console.error('Error fetching orders:', error);
+                  context?.setProgress(100);
+                });
 
                 fetchDataFromApi(`/api/order/order-list`).then((res) => {
                   if (res?.error === false) {
                     setTotalOrdersData(res)
+                  } else if (res?.error === true) {
+                    console.error('Failed to fetch total orders:', res?.message);
                   }
+                }).catch((error) => {
+                  console.error('Error fetching total orders:', error);
                 })
                 
               })

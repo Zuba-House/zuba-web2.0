@@ -792,18 +792,51 @@ function App() {
       setIsLogin(true);
 
       fetchDataFromApi(`/api/user/user-details`).then((res) => {
-        const userData = res.data;
-        setUserData(userData);
-        
-        if (res?.response?.data?.message === "You have not login") {
+        // Check if response indicates an error
+        if (res?.error === true || res?.success === false) {
+          const errorMessage = res?.message || "Authentication failed";
+          
+          // Clear tokens on any auth error
           localStorage.removeItem("accessToken");
           localStorage.removeItem("refreshToken");
           setIsLogin(false);
-          alertBox("error", "Your session is closed please login again")
-          //window.location.href = "/login"
+          setUserData(null);
+          
+          // Show error message
+          if (errorMessage.includes("login") || errorMessage.includes("token") || errorMessage.includes("Unauthorized")) {
+            alertBox("error", "Your session has expired. Please login again.");
+          } else {
+            alertBox("error", errorMessage);
+          }
+          
+          // Redirect to login after a short delay
+          setTimeout(() => {
+            if (!window.location.pathname.includes('/login')) {
+              window.location.href = "/login";
+            }
+          }, 1500);
           return;
         }
-
+        
+        // Check if response has data
+        if (!res?.data) {
+          console.error('Invalid response structure:', res);
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
+          setIsLogin(false);
+          setUserData(null);
+          alertBox("error", "Invalid response from server");
+          setTimeout(() => {
+            if (!window.location.pathname.includes('/login')) {
+              window.location.href = "/login";
+            }
+          }, 1500);
+          return;
+        }
+        
+        const userData = res.data;
+        setUserData(userData);
+        
         // Check if user is admin (both role and email must match)
         if (userData && !isAdmin(userData)) {
           console.warn('❌ Non-admin user detected, logging out:', {
@@ -821,7 +854,9 @@ function App() {
           
           // Redirect to login
           setTimeout(() => {
-            window.location.href = "/login";
+            if (!window.location.pathname.includes('/login')) {
+              window.location.href = "/login";
+            }
           }, 2000);
         }
       }).catch((error) => {
@@ -831,6 +866,13 @@ function App() {
         localStorage.removeItem("refreshToken");
         setIsLogin(false);
         setUserData(null);
+        
+        // Only redirect if not already on login page
+        if (!window.location.pathname.includes('/login')) {
+          setTimeout(() => {
+            window.location.href = "/login";
+          }, 1000);
+        }
       })
 
     } else {
