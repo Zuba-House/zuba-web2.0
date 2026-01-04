@@ -400,47 +400,6 @@ export const applyToBecomeVendor = async (req, res) => {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    // CHECK IF EMAIL IS VERIFIED
-    const existingUser = await UserModel.findOne({ email: normalizedEmail });
-    const pendingData = pendingOTPStore.get(normalizedEmail);
-
-    let isEmailVerified = false;
-    
-    if (existingUser) {
-      isEmailVerified = existingUser.verify_email === true;
-      console.log('📧 Email verification check (existing user):', {
-        email: normalizedEmail.substring(0, 10) + '...',
-        verify_email: existingUser.verify_email,
-        isEmailVerified
-      });
-    } else if (pendingData) {
-      isEmailVerified = pendingData.verified === true;
-      console.log('📧 Email verification check (pending data):', {
-        email: normalizedEmail.substring(0, 10) + '...',
-        verified: pendingData.verified,
-        isEmailVerified,
-        expires: new Date(pendingData.expires).toISOString()
-      });
-    } else {
-      console.log('❌ Email verification check failed - no user or pending data:', {
-        email: normalizedEmail.substring(0, 10) + '...',
-        hasUser: !!existingUser,
-        hasPendingData: !!pendingData
-      });
-    }
-
-    if (!isEmailVerified) {
-      console.log('❌ Email not verified, rejecting application');
-      return res.status(400).json({
-        error: true,
-        success: false,
-        message: 'Please verify your email first. Click "Send OTP" and enter the code sent to your email.',
-        data: { requiresEmailVerification: true }
-      });
-    }
-    
-    console.log('✅ Email verified, proceeding with vendor application');
-
     // Validate store slug format
     const slugRegex = /^[a-z0-9-]+$/;
     if (!slugRegex.test(storeSlug.toLowerCase())) {
@@ -465,22 +424,16 @@ export const applyToBecomeVendor = async (req, res) => {
 
     // CRITICAL: Check OTP verification FIRST (from pending store)
     const pendingData = pendingOTPStore.get(normalizedEmail);
+    const existingUser = await UserModel.findOne({ email: normalizedEmail });
     
-    if (!pendingData || !pendingData.verified) {
-      // Check if existing user is verified (backward compatibility)
-      const existingUserCheck = await UserModel.findOne({ email: normalizedEmail });
-      if (!existingUserCheck || !existingUserCheck.verify_email) {
-        return res.status(400).json({
-          error: true,
-          success: false,
-          message: 'Please verify your email with OTP first. Complete Step 2: Verify OTP.',
-          data: { requiresEmailVerification: true }
-        });
-      }
-    }
-
-    // Check if verification is still valid (within 30 minutes)
-    if (pendingData) {
+    // Check if email is verified
+    let isEmailVerified = false;
+    
+    if (pendingData && pendingData.verified) {
+      // New user flow - check pending OTP store
+      isEmailVerified = true;
+      
+      // Check if verification is still valid (within 30 minutes)
       const verificationAge = Date.now() - (pendingData.verifiedAt || 0);
       if (verificationAge > 30 * 60 * 1000) {
         pendingOTPStore.delete(normalizedEmail);
@@ -491,6 +444,21 @@ export const applyToBecomeVendor = async (req, res) => {
           data: { requiresEmailVerification: true }
         });
       }
+      
+      console.log('✅ Email verified via pending OTP store');
+    } else if (existingUser && existingUser.verify_email) {
+      // Existing user flow - check user's verify_email flag (backward compatibility)
+      isEmailVerified = true;
+      console.log('✅ Email verified via existing user record');
+    } else {
+      // Email not verified
+      console.log('❌ Email not verified, rejecting application');
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Please verify your email with OTP first. Complete Step 2: Verify OTP.',
+        data: { requiresEmailVerification: true }
+      });
     }
 
     console.log('✅ Email verification confirmed for:', normalizedEmail.substring(0, 10) + '...');
