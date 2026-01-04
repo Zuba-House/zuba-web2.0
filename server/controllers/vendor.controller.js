@@ -240,11 +240,71 @@ export const verifyOTP = async (req, res) => {
     const normalizedEmail = email.toLowerCase().trim();
     const trimmedOTP = otp.trim();
 
-    // Check if existing user
+    // Check pending OTP store FIRST (for new users)
+    const pendingData = pendingOTPStore.get(normalizedEmail);
+    
+    if (pendingData) {
+      // New user flow - verify OTP from pending store
+      if (Date.now() > pendingData.expires) {
+        pendingOTPStore.delete(normalizedEmail);
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'OTP expired. Please request a new one.'
+        });
+      }
+
+      if (pendingData.otp !== trimmedOTP) {
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'Invalid OTP code'
+        });
+      }
+
+      // Mark as verified in pending store (DO NOT CREATE USER YET)
+      pendingOTPStore.set(normalizedEmail, {
+        ...pendingData,
+        verified: true,
+        verifiedAt: Date.now()
+      });
+
+      console.log('✅ OTP verified for new user (pending store):', normalizedEmail.substring(0, 10) + '...');
+
+      return res.status(200).json({
+        error: false,
+        success: true,
+        message: 'Email verified successfully! You can proceed with registration.',
+        data: { email: normalizedEmail, verified: true }
+      });
+    }
+
+    // Check if existing user (for backward compatibility with old flow)
     const existingUser = await UserModel.findOne({ email: normalizedEmail });
     
     if (existingUser) {
-      // Verify OTP for existing user
+      // Check if they already have a vendor account
+      const existingVendor = await VendorModel.findOne({ 
+        $or: [
+          { ownerUser: existingUser._id },
+          { email: normalizedEmail }
+        ]
+      });
+
+      if (existingVendor) {
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: `You already have a vendor account "${existingVendor.storeName}". Please login instead.`,
+          data: { 
+            hasVendorAccount: true,
+            vendorStatus: existingVendor.status,
+            storeName: existingVendor.storeName
+          }
+        });
+      }
+
+      // User exists but no vendor - verify OTP if stored in user record
       const isCodeValid = existingUser.otp === trimmedOTP;
       const isNotExpired = existingUser.otpExpires && existingUser.otpExpires > Date.now();
 
@@ -252,7 +312,7 @@ export const verifyOTP = async (req, res) => {
         return res.status(400).json({
           error: true,
           success: false,
-          message: 'Invalid OTP code'
+          message: 'Invalid OTP code. Please request a new one.'
         });
       }
 
@@ -264,11 +324,13 @@ export const verifyOTP = async (req, res) => {
         });
       }
 
-      // Mark as verified
+      // Mark as verified (for existing user flow)
       existingUser.verify_email = true;
       existingUser.otp = null;
       existingUser.otpExpires = null;
       await existingUser.save();
+
+      console.log('✅ OTP verified for existing user:', normalizedEmail.substring(0, 10) + '...');
 
       return res.status(200).json({
         error: false,
@@ -278,46 +340,11 @@ export const verifyOTP = async (req, res) => {
       });
     }
 
-    // Check pending OTP store for new users
-    const pendingData = pendingOTPStore.get(normalizedEmail);
-    
-    if (!pendingData) {
-      return res.status(400).json({
-        error: true,
-        success: false,
-        message: 'No OTP found for this email. Please request a new one.'
-      });
-    }
-
-    if (Date.now() > pendingData.expires) {
-      pendingOTPStore.delete(normalizedEmail);
-      return res.status(400).json({
-        error: true,
-        success: false,
-        message: 'OTP expired. Please request a new one.'
-      });
-    }
-
-    if (pendingData.otp !== trimmedOTP) {
-      return res.status(400).json({
-        error: true,
-        success: false,
-        message: 'Invalid OTP code'
-      });
-    }
-
-    // Mark as verified in pending store
-    pendingOTPStore.set(normalizedEmail, {
-      ...pendingData,
-      verified: true,
-      verifiedAt: Date.now()
-    });
-
-    return res.status(200).json({
-      error: false,
-      success: true,
-      message: 'Email verified successfully! You can proceed with registration.',
-      data: { email: normalizedEmail, verified: true }
+    // No OTP found anywhere
+    return res.status(400).json({
+      error: true,
+      success: false,
+      message: 'No OTP found for this email. Please request a new one.'
     });
   } catch (error) {
     console.error('Verify OTP error:', error);
@@ -436,51 +463,52 @@ export const applyToBecomeVendor = async (req, res) => {
       });
     }
 
-    // Get or create user account
-    let user = existingUser;
+    // CRITICAL: Check OTP verification FIRST (from pending store)
+    const pendingData = pendingOTPStore.get(normalizedEmail);
+    
+    if (!pendingData || !pendingData.verified) {
+      // Check if existing user is verified (backward compatibility)
+      const existingUserCheck = await UserModel.findOne({ email: normalizedEmail });
+      if (!existingUserCheck || !existingUserCheck.verify_email) {
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'Please verify your email with OTP first. Complete Step 2: Verify OTP.',
+          data: { requiresEmailVerification: true }
+        });
+      }
+    }
+
+    // Check if verification is still valid (within 30 minutes)
+    if (pendingData) {
+      const verificationAge = Date.now() - (pendingData.verifiedAt || 0);
+      if (verificationAge > 30 * 60 * 1000) {
+        pendingOTPStore.delete(normalizedEmail);
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'Email verification expired. Please start over and verify your email again.',
+          data: { requiresEmailVerification: true }
+        });
+      }
+    }
+
+    console.log('✅ Email verification confirmed for:', normalizedEmail.substring(0, 10) + '...');
+
+    // Check if user already exists
+    let user = await UserModel.findOne({ email: normalizedEmail });
     
     if (user) {
       console.log('📝 Processing existing user for vendor application:', normalizedEmail);
       
-      // Check if already has an ACTIVE vendor account - check BOTH methods
-      let existingVendorAccount = null;
+      // Check if already has a vendor account
+      let existingVendorAccount = await VendorModel.findOne({ 
+        $or: [
+          { ownerUser: user._id },
+          { email: normalizedEmail }
+        ]
+      });
       
-      // Method 1: Check via user's vendor/vendorId field
-      if (user.vendor || user.vendorId) {
-        existingVendorAccount = await VendorModel.findById(user.vendor || user.vendorId);
-        if (!existingVendorAccount) {
-          // Orphan reference - clear it
-          console.log('🧹 Clearing orphan vendor reference for:', normalizedEmail);
-          user.vendor = null;
-          user.vendorId = null;
-        }
-      }
-      
-      // Method 2: Check vendor collection directly by ownerUser
-      if (!existingVendorAccount) {
-        existingVendorAccount = await VendorModel.findOne({ ownerUser: user._id });
-        if (existingVendorAccount) {
-          // Link to user
-          console.log('🔗 Found unlinked vendor for user:', normalizedEmail);
-          user.vendor = existingVendorAccount._id;
-          user.vendorId = existingVendorAccount._id;
-          await user.save();
-        }
-      }
-      
-      // Method 3: Check by email in vendor collection
-      if (!existingVendorAccount) {
-        existingVendorAccount = await VendorModel.findOne({ email: normalizedEmail });
-        if (existingVendorAccount) {
-          console.log('🔗 Found vendor by email for user:', normalizedEmail);
-          user.vendor = existingVendorAccount._id;
-          user.vendorId = existingVendorAccount._id;
-          existingVendorAccount.ownerUser = user._id;
-          await Promise.all([user.save(), existingVendorAccount.save()]);
-        }
-      }
-      
-      // If vendor exists, check the status
       if (existingVendorAccount) {
         // Only reject if vendor is ACTIVE or APPROVED
         if (existingVendorAccount.status === 'APPROVED' || existingVendorAccount.status === 'ACTIVE') {
@@ -496,39 +524,33 @@ export const applyToBecomeVendor = async (req, res) => {
           });
         }
         
-        // If vendor is PENDING or REJECTED, we'll update it later
-        // Make sure it's linked to the user
-        if (!user.vendor || !user.vendorId) {
-          user.vendor = existingVendorAccount._id;
-          user.vendorId = existingVendorAccount._id;
-          await user.save();
-        }
+        // If vendor is PENDING or REJECTED, we'll update it
         console.log('ℹ️ Found existing vendor with status:', existingVendorAccount.status, '- will update during application');
-      } else {
-        console.log('✅ No existing vendor found - proceeding with application');
       }
       
-      // Update existing user to become vendor
-      user.role = 'VENDOR';
-      user.verify_email = true; // Ensure email is marked as verified
-      user.status = 'Active'; // Ensure account is active
+      // Update existing user to become vendor (if not already)
+      if (user.role !== 'VENDOR') {
+        user.role = 'VENDOR';
+      }
+      user.verify_email = true;
+      user.status = 'Active';
       
       // Update name if provided
       if (name) {
         user.name = name;
       }
       
-      // Update password if provided (for existing users who want to set/change password)
+      // Update password if provided
       if (password && password.length >= 6) {
         const salt = await bcryptjs.genSalt(10);
         user.password = await bcryptjs.hash(password, salt);
-        console.log('✅ Password updated for existing user:', normalizedEmail);
+        console.log('✅ Password updated for existing user');
       }
       
       await user.save();
-      console.log('✅ Existing user updated to VENDOR:', normalizedEmail);
+      console.log('✅ Existing user updated to VENDOR');
     } else {
-      // Create new user account
+      // Create new user account (ONLY if OTP was verified)
       if (!password || password.length < 6) {
         return res.status(400).json({
           error: true,
@@ -556,6 +578,8 @@ export const applyToBecomeVendor = async (req, res) => {
         status: 'Active',
         verify_email: true // Already verified via OTP
       });
+      
+      console.log('✅ New user created for vendor application');
     }
 
     // Validate user._id exists before creating vendor
@@ -852,8 +876,11 @@ export const applyToBecomeVendor = async (req, res) => {
     user.vendorId = vendor._id;
     await user.save();
 
-    // Clear pending OTP data
-    pendingOTPStore.delete(normalizedEmail);
+    // Clear pending OTP data (clean up after successful registration)
+    if (pendingData) {
+      pendingOTPStore.delete(normalizedEmail);
+      console.log('🧹 OTP data cleaned up after successful registration');
+    }
 
     // Generate tokens for auto-login after registration
     const generatedAccessToken = (await import('../utils/generatedAccessToken.js')).default;
