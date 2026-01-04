@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
   FaUser,
   FaMapMarkerAlt,
@@ -13,31 +13,60 @@ import {
   FaCheckCircle,
   FaExclamationTriangle,
   FaPalette,
-  FaLaptopCode,
-  FaSearch
+  FaGraduationCap,
+  FaBriefcase,
+  FaTools,
+  FaVideo,
+  FaClock,
+  FaCheck,
+  FaInfoCircle
 } from "react-icons/fa";
+import axios from "axios";
 
 const ApplyForm = () => {
   const { positionId } = useParams();
-  const navigate = useNavigate();
+  const apiUrl = import.meta.env.VITE_API_URL;
+  
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     location: "",
     phone: "",
     portfolio: "",
-    resume: null,
+    education: "",
+    fieldOfStudy: "",
+    currentStatus: "",
+    yearsOfExperience: "",
+    designTools: [],
+    videoExperience: "",
+    workAvailability: "",
+    contractConfirmation: "",
+    technicalReadiness: "",
     whyInterested: "",
+    additionalInfo: "",
     position: ""
   });
+  
+  const [resume, setResume] = useState(null);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState({});
   const [resumeFileName, setResumeFileName] = useState("");
+  const [applicationId, setApplicationId] = useState("");
+
+  const designToolsOptions = [
+    "Adobe Photoshop",
+    "Adobe Illustrator",
+    "Adobe InDesign",
+    "Adobe After Effects",
+    "Adobe Premiere Pro",
+    "Figma",
+    "Canva",
+    "Other"
+  ];
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    // Set position based on positionId
     const positions = {
       1: "Professional Graphic Designer"
     };
@@ -56,11 +85,28 @@ const ApplyForm = () => {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    const { name, value, type, checked } = e.target;
+    
+    if (type === "checkbox") {
+      if (name === "designTools") {
+        setFormData(prev => {
+          const tools = [...prev.designTools];
+          if (checked) {
+            tools.push(value);
+          } else {
+            const index = tools.indexOf(value);
+            if (index > -1) tools.splice(index, 1);
+          }
+          return { ...prev, designTools: tools };
+        });
+      }
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+    
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
@@ -73,7 +119,6 @@ const ApplyForm = () => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
       if (file.type !== "application/pdf") {
         setErrors(prev => ({
           ...prev,
@@ -81,7 +126,6 @@ const ApplyForm = () => {
         }));
         return;
       }
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         setErrors(prev => ({
           ...prev,
@@ -89,10 +133,7 @@ const ApplyForm = () => {
         }));
         return;
       }
-      setFormData(prev => ({
-        ...prev,
-        resume: file
-      }));
+      setResume(file);
       setResumeFileName(file.name);
       if (errors.resume) {
         setErrors(prev => ({
@@ -106,34 +147,28 @@ const ApplyForm = () => {
   const validateForm = () => {
     const newErrors = {};
     
-    if (!formData.name.trim()) {
-      newErrors.name = "Name is required";
-    }
-    
+    if (!formData.name.trim()) newErrors.name = "Name is required";
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Please enter a valid email address";
     }
-    
-    if (!formData.location.trim()) {
-      newErrors.location = "Location is required";
-    }
-    
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Phone number is required";
-    }
-    
+    if (!formData.location.trim()) newErrors.location = "Location is required";
+    if (!formData.phone.trim()) newErrors.phone = "Phone number is required";
     if (!formData.portfolio.trim()) {
       newErrors.portfolio = "Portfolio link is required";
     } else if (!/^https?:\/\/.+/.test(formData.portfolio)) {
       newErrors.portfolio = "Please enter a valid URL (starting with http:// or https://)";
     }
-    
-    if (!formData.resume) {
-      newErrors.resume = "Resume (PDF) is required";
-    }
-    
+    if (!formData.education) newErrors.education = "Education level is required";
+    if (!formData.currentStatus) newErrors.currentStatus = "Current status is required";
+    if (!formData.yearsOfExperience) newErrors.yearsOfExperience = "Years of experience is required";
+    if (formData.designTools.length === 0) newErrors.designTools = "Please select at least one design tool";
+    if (!formData.videoExperience) newErrors.videoExperience = "Please specify video design experience";
+    if (!formData.workAvailability) newErrors.workAvailability = "Please specify work availability";
+    if (!formData.contractConfirmation) newErrors.contractConfirmation = "Please confirm contract requirement";
+    if (!formData.technicalReadiness) newErrors.technicalReadiness = "Please confirm technical readiness";
+    if (!formData.resume) newErrors.resume = "Resume (PDF) is required";
     if (!formData.whyInterested.trim()) {
       newErrors.whyInterested = "Please tell us why you're interested in applying at Zuba House";
     } else if (formData.whyInterested.trim().length < 50) {
@@ -154,49 +189,49 @@ const ApplyForm = () => {
     setLoading(true);
 
     try {
-      // Create email body
-      const emailBody = `
-Job Application - ${formData.position}
+      const submitData = new FormData();
+      submitData.append("name", formData.name);
+      submitData.append("email", formData.email);
+      submitData.append("location", formData.location);
+      submitData.append("phone", formData.phone);
+      submitData.append("portfolio", formData.portfolio);
+      submitData.append("education", formData.education);
+      if (formData.fieldOfStudy) submitData.append("fieldOfStudy", formData.fieldOfStudy);
+      submitData.append("currentStatus", formData.currentStatus);
+      submitData.append("yearsOfExperience", formData.yearsOfExperience);
+      submitData.append("designTools", JSON.stringify(formData.designTools));
+      submitData.append("videoExperience", formData.videoExperience);
+      submitData.append("workAvailability", formData.workAvailability);
+      submitData.append("contractConfirmation", formData.contractConfirmation);
+      submitData.append("technicalReadiness", formData.technicalReadiness);
+      submitData.append("whyInterested", formData.whyInterested);
+      if (formData.additionalInfo) submitData.append("additionalInfo", formData.additionalInfo);
+      submitData.append("position", formData.position);
+      submitData.append("resume", resume);
 
-Applicant Information:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Name: ${formData.name}
-Email: ${formData.email}
-Location: ${formData.location}
-Phone/WhatsApp: ${formData.phone}
-Portfolio Link: ${formData.portfolio}
+      const response = await axios.post(
+        `${apiUrl}/api/job-application/submit`,
+        submitData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
 
-Why Interested in Zuba House:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${formData.whyInterested}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Application Date: ${new Date().toLocaleString()}
-Position Applied For: ${formData.position}
-Application ID: APP-${Date.now()}
-
-Note: Resume PDF should be attached separately if sending via email client.
-      `.trim();
-
-      // Create mailto link with CC
-      const subject = encodeURIComponent(`Job Application: ${formData.position} - ${formData.name}`);
-      const body = encodeURIComponent(emailBody);
-      const mailtoLink = `mailto:info@zubahouse.com?cc=it.deboss019@gmail.com&subject=${subject}&body=${body}`;
-
-      // Open email client
-      window.location.href = mailtoLink;
-
-      // For better UX, we'll also try to use EmailJS if available
-      // But mailto is the primary method as it's more reliable
-      
-      setTimeout(() => {
-        setLoading(false);
+      if (response.data.success) {
+        setApplicationId(response.data.applicationId);
         setSubmitted(true);
-      }, 1000);
+      } else {
+        setErrors({ submit: response.data.error || "Failed to submit application" });
+      }
     } catch (error) {
-      console.error("Error submitting form:", error);
+      console.error("Error submitting application:", error);
+      setErrors({
+        submit: error.response?.data?.error || error.message || "An error occurred. Please try again."
+      });
+    } finally {
       setLoading(false);
-      setErrors({ submit: "An error occurred. Please try again or send your application directly to info@zubahouse.com" });
     }
   };
 
@@ -219,26 +254,31 @@ Note: Resume PDF should be attached separately if sending via email client.
           </motion.div>
 
           <h2 className="text-3xl lg:text-4xl font-bold text-[#0b2735] mb-4">
-            Application Submitted!
+            Application Submitted Successfully!
           </h2>
 
           <p className="text-gray-600 mb-6 leading-relaxed">
-            Thank you for your interest in joining Zuba House! Your application has been prepared and your email client should open shortly.
+            Thank you for your interest in joining Zuba House! Your application has been received and will be reviewed by our team.
           </p>
 
-          <div className="bg-[#efb291] bg-opacity-10 border border-[#efb291] rounded-lg p-6 mb-6 text-left">
+          {applicationId && (
+            <div className="bg-[#efb291] bg-opacity-10 border border-[#efb291] rounded-lg p-4 mb-6">
+              <p className="text-sm text-gray-700">
+                <strong className="text-[#0b2735]">Application ID:</strong> <span className="text-[#efb291] font-mono">{applicationId}</span>
+              </p>
+            </div>
+          )}
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 text-left">
             <p className="text-sm text-gray-700 mb-2">
-              <strong className="text-[#0b2735]">Important - Next Steps:</strong>
+              <strong className="text-[#0b2735]">What's Next?</strong>
             </p>
             <ul className="text-sm text-gray-600 space-y-2 list-disc list-inside">
-              <li><strong>Attach your resume PDF</strong> to the email before sending</li>
-              <li>Review all the information in the email body</li>
-              <li>Send the email to complete your application</li>
-              <li>We'll review your application and get back to you soon</li>
+              <li>We'll review your application and portfolio</li>
+              <li>If selected, we'll contact you via email or phone</li>
+              <li>Applications are reviewed on a rolling basis</li>
+              <li>You'll hear from us soon!</li>
             </ul>
-            <p className="text-xs text-gray-500 mt-3 italic">
-              Note: If your email client didn't open automatically, please send your application directly to info@zubahouse.com with CC to it.deboss019@gmail.com
-            </p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -321,7 +361,7 @@ Note: Resume PDF should be attached separately if sending via email client.
                 className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] transition-all ${
                   errors.name ? "border-red-500" : "border-gray-300"
                 }`}
-                placeholder="Enter your full name"
+                placeholder="Enter your full legal name"
               />
               {errors.name && (
                 <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
@@ -381,7 +421,7 @@ Note: Resume PDF should be attached separately if sending via email client.
               )}
             </div>
 
-            {/* Phone/WhatsApp */}
+            {/* Phone */}
             <div>
               <label htmlFor="phone" className="block text-sm font-semibold text-[#0b2735] mb-2">
                 <FaPhone className="inline mr-2 text-[#efb291]" />
@@ -396,7 +436,7 @@ Note: Resume PDF should be attached separately if sending via email client.
                 className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] transition-all ${
                   errors.phone ? "border-red-500" : "border-gray-300"
                 }`}
-                placeholder="+250 788 123 456"
+                placeholder="+250 7XX XXX XXX"
               />
               {errors.phone && (
                 <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
@@ -406,7 +446,115 @@ Note: Resume PDF should be attached separately if sending via email client.
               )}
             </div>
 
-            {/* Portfolio Link */}
+            {/* Education */}
+            <div>
+              <label htmlFor="education" className="block text-sm font-semibold text-[#0b2735] mb-2">
+                <FaGraduationCap className="inline mr-2 text-[#efb291]" />
+                Highest Level of Education <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="education"
+                name="education"
+                value={formData.education}
+                onChange={handleChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] transition-all ${
+                  errors.education ? "border-red-500" : "border-gray-300"
+                }`}
+              >
+                <option value="">(Select one)</option>
+                <option value="High School">High School</option>
+                <option value="Diploma">Diploma</option>
+                <option value="Bachelor's Degree">Bachelor's Degree</option>
+                <option value="Master's Degree">Master's Degree</option>
+                <option value="Currently a Student">Currently a Student</option>
+                <option value="Other">Other (please specify)</option>
+              </select>
+              {errors.education && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <FaExclamationTriangle className="text-xs" />
+                  {errors.education}
+                </p>
+              )}
+            </div>
+
+            {/* Field of Study */}
+            {formData.education && formData.education !== "High School" && (
+              <div>
+                <label htmlFor="fieldOfStudy" className="block text-sm font-semibold text-[#0b2735] mb-2">
+                  Field of Study (if applicable)
+                </label>
+                <input
+                  type="text"
+                  id="fieldOfStudy"
+                  name="fieldOfStudy"
+                  value={formData.fieldOfStudy}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] transition-all"
+                  placeholder="e.g., Graphic Design, Visual Arts, Multimedia, Computer Science"
+                />
+              </div>
+            )}
+
+            {/* Current Status */}
+            <div>
+              <label htmlFor="currentStatus" className="block text-sm font-semibold text-[#0b2735] mb-2">
+                <FaBriefcase className="inline mr-2 text-[#efb291]" />
+                Current Status <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="currentStatus"
+                name="currentStatus"
+                value={formData.currentStatus}
+                onChange={handleChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] transition-all ${
+                  errors.currentStatus ? "border-red-500" : "border-gray-300"
+                }`}
+              >
+                <option value="">(Select one)</option>
+                <option value="Employed (Full-time)">Employed (Full-time)</option>
+                <option value="Employed (Part-time / Freelance)">Employed (Part-time / Freelance)</option>
+                <option value="Self-employed / Freelancer">Self-employed / Freelancer</option>
+                <option value="Student">Student</option>
+                <option value="Unemployed">Unemployed</option>
+              </select>
+              {errors.currentStatus && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <FaExclamationTriangle className="text-xs" />
+                  {errors.currentStatus}
+                </p>
+              )}
+            </div>
+
+            {/* Years of Experience */}
+            <div>
+              <label htmlFor="yearsOfExperience" className="block text-sm font-semibold text-[#0b2735] mb-2">
+                <FaBriefcase className="inline mr-2 text-[#efb291]" />
+                Years of Professional Design Experience <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="yearsOfExperience"
+                name="yearsOfExperience"
+                value={formData.yearsOfExperience}
+                onChange={handleChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] transition-all ${
+                  errors.yearsOfExperience ? "border-red-500" : "border-gray-300"
+                }`}
+              >
+                <option value="">(Select one)</option>
+                <option value="Less than 1 year">Less than 1 year</option>
+                <option value="1–2 years">1–2 years</option>
+                <option value="2–4 years">2–4 years</option>
+                <option value="5+ years">5+ years</option>
+              </select>
+              {errors.yearsOfExperience && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <FaExclamationTriangle className="text-xs" />
+                  {errors.yearsOfExperience}
+                </p>
+              )}
+            </div>
+
+            {/* Portfolio */}
             <div>
               <label htmlFor="portfolio" className="block text-sm font-semibold text-[#0b2735] mb-2">
                 <FaLink className="inline mr-2 text-[#efb291]" />
@@ -423,10 +571,212 @@ Note: Resume PDF should be attached separately if sending via email client.
                 }`}
                 placeholder="https://yourportfolio.com"
               />
+              <p className="mt-1 text-xs text-gray-500">(Must include graphic and/or video design work)</p>
               {errors.portfolio && (
                 <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
                   <FaExclamationTriangle className="text-xs" />
                   {errors.portfolio}
+                </p>
+              )}
+            </div>
+
+            {/* Design Tools */}
+            <div>
+              <label className="block text-sm font-semibold text-[#0b2735] mb-2">
+                <FaTools className="inline mr-2 text-[#efb291]" />
+                Design Tools You Use <span className="text-red-500">*</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-3">(Select all that apply)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {designToolsOptions.map((tool) => (
+                  <label key={tool} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="designTools"
+                      value={tool}
+                      checked={formData.designTools.includes(tool)}
+                      onChange={handleChange}
+                      className="w-4 h-4 text-[#efb291] border-gray-300 rounded focus:ring-[#efb291]"
+                    />
+                    <span className="text-sm text-gray-700">{tool}</span>
+                  </label>
+                ))}
+              </div>
+              {formData.designTools.includes("Other") && (
+                <input
+                  type="text"
+                  name="designToolsOther"
+                  placeholder="Please specify other tools"
+                  className="mt-3 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291]"
+                  onChange={(e) => {
+                    const tools = [...formData.designTools];
+                    const otherIndex = tools.indexOf("Other");
+                    if (otherIndex > -1) {
+                      tools[otherIndex] = `Other: ${e.target.value}`;
+                      setFormData(prev => ({ ...prev, designTools: tools }));
+                    }
+                  }}
+                />
+              )}
+              {errors.designTools && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <FaExclamationTriangle className="text-xs" />
+                  {errors.designTools}
+                </p>
+              )}
+            </div>
+
+            {/* Video Experience */}
+            <div>
+              <label className="block text-sm font-semibold text-[#0b2735] mb-2">
+                <FaVideo className="inline mr-2 text-[#efb291]" />
+                Do you have experience with video design or motion graphics? <span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="videoExperience"
+                    value="Yes"
+                    checked={formData.videoExperience === "Yes"}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-[#efb291] border-gray-300 focus:ring-[#efb291]"
+                  />
+                  <span>Yes</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="videoExperience"
+                    value="No"
+                    checked={formData.videoExperience === "No"}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-[#efb291] border-gray-300 focus:ring-[#efb291]"
+                  />
+                  <span>No</span>
+                </label>
+              </div>
+              {errors.videoExperience && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <FaExclamationTriangle className="text-xs" />
+                  {errors.videoExperience}
+                </p>
+              )}
+            </div>
+
+            {/* Work Availability */}
+            <div>
+              <label className="block text-sm font-semibold text-[#0b2735] mb-2">
+                <FaClock className="inline mr-2 text-[#efb291]" />
+                Work Availability <span className="text-red-500">*</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-3">Are you available to work Monday–Friday, 9:00 AM – 5:00 PM (Kigali time)?</p>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="workAvailability"
+                    value="Yes"
+                    checked={formData.workAvailability === "Yes"}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-[#efb291] border-gray-300 focus:ring-[#efb291]"
+                  />
+                  <span>Yes</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="workAvailability"
+                    value="No"
+                    checked={formData.workAvailability === "No"}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-[#efb291] border-gray-300 focus:ring-[#efb291]"
+                  />
+                  <span>No</span>
+                </label>
+              </div>
+              {errors.workAvailability && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <FaExclamationTriangle className="text-xs" />
+                  {errors.workAvailability}
+                </p>
+              )}
+            </div>
+
+            {/* Contract Confirmation */}
+            <div>
+              <label className="block text-sm font-semibold text-[#0b2735] mb-2">
+                <FaCheck className="inline mr-2 text-[#efb291]" />
+                Contract Requirement Confirmation <span className="text-red-500">*</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-3">Are you able to physically sign a contract in Kigali if selected?</p>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="contractConfirmation"
+                    value="Yes"
+                    checked={formData.contractConfirmation === "Yes"}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-[#efb291] border-gray-300 focus:ring-[#efb291]"
+                  />
+                  <span>Yes</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="contractConfirmation"
+                    value="No"
+                    checked={formData.contractConfirmation === "No"}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-[#efb291] border-gray-300 focus:ring-[#efb291]"
+                  />
+                  <span>No</span>
+                </label>
+              </div>
+              {errors.contractConfirmation && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <FaExclamationTriangle className="text-xs" />
+                  {errors.contractConfirmation}
+                </p>
+              )}
+            </div>
+
+            {/* Technical Readiness */}
+            <div>
+              <label className="block text-sm font-semibold text-[#0b2735] mb-2">
+                <FaCheck className="inline mr-2 text-[#efb291]" />
+                Technical Readiness <span className="text-red-500">*</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-3">Do you have a reliable internet connection and a suitable laptop for full-time remote work?</p>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="technicalReadiness"
+                    value="Yes"
+                    checked={formData.technicalReadiness === "Yes"}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-[#efb291] border-gray-300 focus:ring-[#efb291]"
+                  />
+                  <span>Yes</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="technicalReadiness"
+                    value="No"
+                    checked={formData.technicalReadiness === "No"}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-[#efb291] border-gray-300 focus:ring-[#efb291]"
+                  />
+                  <span>No</span>
+                </label>
+              </div>
+              {errors.technicalReadiness && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <FaExclamationTriangle className="text-xs" />
+                  {errors.technicalReadiness}
                 </p>
               )}
             </div>
@@ -451,7 +801,7 @@ Note: Resume PDF should be attached separately if sending via email client.
                     className="hidden"
                   />
                   <span className="text-gray-600">
-                    {resumeFileName || "Click to upload PDF (Max 5MB)"}
+                    {resumeFileName || "Upload PDF (Max 5MB)"}
                   </span>
                 </label>
               </div>
@@ -484,7 +834,7 @@ Note: Resume PDF should be attached separately if sending via email client.
                 className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] transition-all resize-none ${
                   errors.whyInterested ? "border-red-500" : "border-gray-300"
                 }`}
-                placeholder="Tell us why you're interested in joining Zuba House and what makes you a great fit for this position..."
+                placeholder="Tell us why you want to join Zuba House, what motivates you, and how your skills align with this role."
               />
               <p className="mt-1 text-xs text-gray-500">
                 Minimum 50 characters ({formData.whyInterested.length} / 50)
@@ -495,6 +845,23 @@ Note: Resume PDF should be attached separately if sending via email client.
                   {errors.whyInterested}
                 </p>
               )}
+            </div>
+
+            {/* Additional Info */}
+            <div>
+              <label htmlFor="additionalInfo" className="block text-sm font-semibold text-[#0b2735] mb-2">
+                <FaInfoCircle className="inline mr-2 text-[#efb291]" />
+                Additional Information (Optional)
+              </label>
+              <textarea
+                id="additionalInfo"
+                name="additionalInfo"
+                value={formData.additionalInfo}
+                onChange={handleChange}
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#efb291] transition-all resize-none"
+                placeholder="Anything else you'd like us to know (availability start date, special skills, etc.)"
+              />
             </div>
 
             {/* Submit Error */}
@@ -521,14 +888,11 @@ Note: Resume PDF should be attached separately if sending via email client.
                   </>
                 ) : (
                   <>
-                    <FaEnvelope />
+                    <FaCheckCircle />
                     <span>Submit Application</span>
                   </>
                 )}
               </button>
-              <p className="text-xs text-gray-500 text-center mt-3">
-                Your application will be sent to info@zubahouse.com with a copy to it.deboss019@gmail.com
-              </p>
             </div>
           </form>
         </motion.div>
@@ -538,4 +902,3 @@ Note: Resume PDF should be attached separately if sending via email client.
 };
 
 export default ApplyForm;
-
