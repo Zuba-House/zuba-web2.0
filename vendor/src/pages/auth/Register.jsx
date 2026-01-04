@@ -201,8 +201,31 @@ const Register = () => {
       });
 
       if (response.data?.error === false) {
-        toast.success(response.data?.message || 'Application submitted successfully!');
-        setTimeout(() => navigate('/login'), 2000);
+        // Save tokens if provided (for auto-login)
+        if (response.data?.data?.accesstoken) {
+          localStorage.setItem('accessToken', response.data.data.accesstoken);
+          if (response.data.data.refreshToken) {
+            localStorage.setItem('refreshToken', response.data.data.refreshToken);
+          }
+          
+          // Store user and vendor info
+          if (response.data.data.user) {
+            localStorage.setItem('user', JSON.stringify(response.data.data.user));
+            localStorage.setItem('userRole', response.data.data.user.role || 'VENDOR');
+          }
+          if (response.data.data.vendor) {
+            localStorage.setItem('vendor', JSON.stringify(response.data.data.vendor));
+            if (response.data.data.vendorId) {
+              localStorage.setItem('vendorId', response.data.data.vendorId);
+            }
+          }
+          
+          toast.success(response.data?.message || 'Application submitted successfully! Redirecting to dashboard...');
+          setTimeout(() => navigate('/dashboard'), 2000);
+        } else {
+          toast.success(response.data?.message || 'Application submitted successfully! Please login.');
+          setTimeout(() => navigate('/login'), 2000);
+        }
       } else {
         // Check if email verification is required
         if (response.data?.data?.requiresEmailVerification) {

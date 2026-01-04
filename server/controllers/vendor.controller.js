@@ -760,16 +760,36 @@ export const applyToBecomeVendor = async (req, res) => {
       // Clear pending OTP data
       pendingOTPStore.delete(normalizedEmail);
       
+      // Generate tokens for auto-login
+      const generatedAccessToken = (await import('../utils/generatedAccessToken.js')).default;
+      const genertedRefreshToken = (await import('../utils/generatedRefreshToken.js')).default;
+      const accessToken = await generatedAccessToken(user._id);
+      const refreshToken = await genertedRefreshToken(user._id);
+      
       return res.status(201).json({
         error: false,
         success: true,
         message: 'Vendor application updated successfully! Your application is under review. You will be notified once approved.',
         data: {
+          accesstoken: accessToken,
+          refreshToken: refreshToken,
           vendorId: vendor._id,
           storeName: vendor.storeName,
           storeSlug: vendor.storeSlug,
           status: vendor.status,
-          emailVerified: true
+          emailVerified: true,
+          user: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role
+          },
+          vendor: {
+            id: vendor._id,
+            storeName: vendor.storeName,
+            storeSlug: vendor.storeSlug,
+            status: vendor.status
+          }
         }
       });
     } else {
@@ -835,16 +855,43 @@ export const applyToBecomeVendor = async (req, res) => {
     // Clear pending OTP data
     pendingOTPStore.delete(normalizedEmail);
 
+    // Generate tokens for auto-login after registration
+    const generatedAccessToken = (await import('../utils/generatedAccessToken.js')).default;
+    const genertedRefreshToken = (await import('../utils/generatedRefreshToken.js')).default;
+    const accessToken = await generatedAccessToken(user._id);
+    const refreshToken = await genertedRefreshToken(user._id);
+
+    console.log('✅ Vendor application created successfully:', {
+      vendorId: vendor._id,
+      storeName: vendor.storeName,
+      email: normalizedEmail.substring(0, 10) + '...',
+      status: vendor.status
+    });
+
     return res.status(201).json({
       error: false,
       success: true,
       message: 'Vendor application submitted successfully! Your application is under review. You will be notified once approved.',
       data: {
+        accesstoken: accessToken,
+        refreshToken: refreshToken,
         vendorId: vendor._id,
         storeName: vendor.storeName,
         storeSlug: vendor.storeSlug,
         status: vendor.status,
-        emailVerified: true
+        emailVerified: true,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role
+        },
+        vendor: {
+          id: vendor._id,
+          storeName: vendor.storeName,
+          storeSlug: vendor.storeSlug,
+          status: vendor.status
+        }
       }
     });
   } catch (error) {
