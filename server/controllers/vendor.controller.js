@@ -492,8 +492,78 @@ export const applyToBecomeVendor = async (req, res) => {
           });
         }
         
-        // If vendor is PENDING or REJECTED, we'll update it
-        console.log('ℹ️ Found existing vendor with status:', existingVendorAccount.status, '- will update during application');
+        // If vendor is PENDING or REJECTED, update it and return early
+        console.log('🔄 Found existing vendor with status:', existingVendorAccount.status, '- updating it');
+        
+        // Update existing vendor
+        existingVendorAccount.storeName = storeName.trim();
+        existingVendorAccount.storeSlug = storeSlug.toLowerCase().trim();
+        existingVendorAccount.description = description || '';
+        existingVendorAccount.email = normalizedEmail;
+        existingVendorAccount.phone = phone || '';
+        existingVendorAccount.whatsapp = whatsapp || '';
+        existingVendorAccount.country = country || '';
+        existingVendorAccount.city = city || '';
+        existingVendorAccount.addressLine1 = addressLine1 || '';
+        existingVendorAccount.addressLine2 = addressLine2 || '';
+        existingVendorAccount.postalCode = postalCode || '';
+        existingVendorAccount.categories = categories || [];
+        existingVendorAccount.status = 'PENDING'; // Reset to pending for re-review
+        existingVendorAccount.ownerUser = user._id; // Ensure owner is set
+        await existingVendorAccount.save();
+        
+        // Update user
+        user.role = 'VENDOR';
+        user.verify_email = true;
+        user.status = 'Active';
+        if (name) user.name = name;
+        if (password && password.length >= 6) {
+          const salt = await bcryptjs.genSalt(10);
+          user.password = await bcryptjs.hash(password, salt);
+        }
+        user.vendor = existingVendorAccount._id;
+        user.vendorId = existingVendorAccount._id;
+        await user.save();
+        
+        // Clear pending OTP data
+        if (pendingData) {
+          pendingOTPStore.delete(normalizedEmail);
+        }
+        
+        // Generate tokens
+        const generatedAccessToken = (await import('../utils/generatedAccessToken.js')).default;
+        const genertedRefreshToken = (await import('../utils/generatedRefreshToken.js')).default;
+        const accessToken = await generatedAccessToken(user._id);
+        const refreshToken = await genertedRefreshToken(user._id);
+        
+        console.log('✅ Existing vendor application updated successfully');
+        
+        return res.status(201).json({
+          error: false,
+          success: true,
+          message: 'Vendor application updated successfully! Your application is under review. You will be notified once approved.',
+          data: {
+            accesstoken: accessToken,
+            refreshToken: refreshToken,
+            vendorId: existingVendorAccount._id,
+            storeName: existingVendorAccount.storeName,
+            storeSlug: existingVendorAccount.storeSlug,
+            status: existingVendorAccount.status,
+            emailVerified: true,
+            user: {
+              id: user._id,
+              name: user.name,
+              email: user.email,
+              role: user.role
+            },
+            vendor: {
+              id: existingVendorAccount._id,
+              storeName: existingVendorAccount.storeName,
+              storeSlug: existingVendorAccount.storeSlug,
+              status: existingVendorAccount.status
+            }
+          }
+        });
       }
       
       // Update existing user to become vendor (if not already)
@@ -607,18 +677,40 @@ export const applyToBecomeVendor = async (req, res) => {
         await user.save();
         
         // Clear pending OTP data
-        pendingOTPStore.delete(normalizedEmail);
+        if (pendingData) {
+          pendingOTPStore.delete(normalizedEmail);
+        }
+        
+        // Generate tokens
+        const generatedAccessToken = (await import('../utils/generatedAccessToken.js')).default;
+        const genertedRefreshToken = (await import('../utils/generatedRefreshToken.js')).default;
+        const accessToken = await generatedAccessToken(user._id);
+        const refreshToken = await genertedRefreshToken(user._id);
         
         return res.status(201).json({
           error: false,
           success: true,
           message: 'Vendor application updated successfully! Your application is under review. You will be notified once approved.',
           data: {
+            accesstoken: accessToken,
+            refreshToken: refreshToken,
             vendorId: existingVendorByEmail._id,
             storeName: existingVendorByEmail.storeName,
             storeSlug: existingVendorByEmail.storeSlug,
             status: existingVendorByEmail.status,
-            emailVerified: true
+            emailVerified: true,
+            user: {
+              id: user._id,
+              name: user.name,
+              email: user.email,
+              role: user.role
+            },
+            vendor: {
+              id: existingVendorByEmail._id,
+              storeName: existingVendorByEmail.storeName,
+              storeSlug: existingVendorByEmail.storeSlug,
+              status: existingVendorByEmail.status
+            }
           }
         });
       }
@@ -661,18 +753,40 @@ export const applyToBecomeVendor = async (req, res) => {
       await user.save();
       
       // Clear pending OTP data
-      pendingOTPStore.delete(normalizedEmail);
+      if (pendingData) {
+        pendingOTPStore.delete(normalizedEmail);
+      }
+      
+      // Generate tokens
+      const generatedAccessToken2 = (await import('../utils/generatedAccessToken.js')).default;
+      const genertedRefreshToken2 = (await import('../utils/generatedRefreshToken.js')).default;
+      const accessToken2 = await generatedAccessToken2(user._id);
+      const refreshToken2 = await genertedRefreshToken2(user._id);
       
       return res.status(201).json({
         error: false,
         success: true,
         message: 'Vendor application updated successfully! Your application is under review. You will be notified once approved.',
         data: {
+          accesstoken: accessToken2,
+          refreshToken: refreshToken2,
           vendorId: existingVendorByEmail._id,
           storeName: existingVendorByEmail.storeName,
           storeSlug: existingVendorByEmail.storeSlug,
           status: existingVendorByEmail.status,
-          emailVerified: true
+          emailVerified: true,
+          user: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role
+          },
+          vendor: {
+            id: existingVendorByEmail._id,
+            storeName: existingVendorByEmail.storeName,
+            storeSlug: existingVendorByEmail.storeSlug,
+            status: existingVendorByEmail.status
+          }
         }
       });
     }
