@@ -168,7 +168,7 @@ const ApplyForm = () => {
     if (!formData.workAvailability) newErrors.workAvailability = "Please specify work availability";
     if (!formData.contractConfirmation) newErrors.contractConfirmation = "Please confirm contract requirement";
     if (!formData.technicalReadiness) newErrors.technicalReadiness = "Please confirm technical readiness";
-    if (!formData.resume) newErrors.resume = "Resume (PDF) is required";
+    if (!resume) newErrors.resume = "Resume (PDF) is required";
     if (!formData.whyInterested.trim()) {
       newErrors.whyInterested = "Please tell us why you're interested in applying at Zuba House";
     } else if (formData.whyInterested.trim().length < 50) {
@@ -219,17 +219,40 @@ const ApplyForm = () => {
         }
       );
 
-      if (response.data.success) {
+      if (response.data && response.data.success) {
         setApplicationId(response.data.applicationId);
         setSubmitted(true);
       } else {
-        setErrors({ submit: response.data.error || "Failed to submit application" });
+        setErrors({ 
+          submit: response.data?.error || response.data?.message || "Failed to submit application. Please try again." 
+        });
       }
     } catch (error) {
       console.error("Error submitting application:", error);
-      setErrors({
-        submit: error.response?.data?.error || error.message || "An error occurred. Please try again."
-      });
+      
+      let errorMessage = "An error occurred. Please try again.";
+      
+      if (error.response) {
+        // Server responded with error
+        errorMessage = error.response.data?.error || 
+                      error.response.data?.message || 
+                      `Server error: ${error.response.status}`;
+        
+        // Handle specific error cases
+        if (error.response.status === 400) {
+          if (error.response.data?.missingFields) {
+            errorMessage = `Please fill in all required fields: ${error.response.data.missingFields.join(', ')}`;
+          }
+        }
+      } else if (error.request) {
+        // Request was made but no response received
+        errorMessage = "Network error. Please check your internet connection and try again.";
+      } else {
+        // Error setting up the request
+        errorMessage = error.message || "An unexpected error occurred.";
+      }
+      
+      setErrors({ submit: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -787,34 +810,67 @@ const ApplyForm = () => {
                 <FaFilePdf className="inline mr-2 text-[#efb291]" />
                 Resume (PDF Format) <span className="text-red-500">*</span>
               </label>
-              <div className="flex items-center gap-4">
+              <div className="space-y-3">
                 <label
                   htmlFor="resume"
-                  className="flex-1 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#efb291] transition-all text-center"
+                  className={`flex items-center justify-center gap-3 px-6 py-4 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
+                    resumeFileName 
+                      ? "border-green-400 bg-green-50 hover:border-green-500" 
+                      : errors.resume
+                      ? "border-red-400 bg-red-50 hover:border-red-500"
+                      : "border-gray-300 hover:border-[#efb291] hover:bg-gray-50"
+                  }`}
                 >
                   <input
                     type="file"
                     id="resume"
                     name="resume"
-                    accept=".pdf"
+                    accept=".pdf,application/pdf"
                     onChange={handleFileChange}
                     className="hidden"
                   />
-                  <span className="text-gray-600">
-                    {resumeFileName || "Upload PDF (Max 5MB)"}
-                  </span>
+                  <FaFilePdf className={`text-2xl ${resumeFileName ? "text-green-600" : "text-gray-400"}`} />
+                  <div className="flex flex-col">
+                    <span className={`text-sm font-medium ${resumeFileName ? "text-green-700" : "text-gray-600"}`}>
+                      {resumeFileName || "Click to upload PDF"}
+                    </span>
+                    {!resumeFileName && (
+                      <span className="text-xs text-gray-500">Max 5MB</span>
+                    )}
+                  </div>
                 </label>
+                {resumeFileName && !errors.resume && (
+                  <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg p-3">
+                    <FaCheckCircle className="text-base" />
+                    <span className="flex-1">
+                      <strong>{resumeFileName}</strong> selected successfully
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResume(null);
+                        setResumeFileName("");
+                        const fileInput = document.getElementById('resume');
+                        if (fileInput) fileInput.value = '';
+                        if (errors.resume) {
+                          setErrors(prev => {
+                            const newErrors = { ...prev };
+                            delete newErrors.resume;
+                            return newErrors;
+                          });
+                        }
+                      }}
+                      className="text-red-500 hover:text-red-700 text-xs font-semibold"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
               </div>
               {errors.resume && (
-                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                <p className="mt-2 text-sm text-red-500 flex items-center gap-1">
                   <FaExclamationTriangle className="text-xs" />
                   {errors.resume}
-                </p>
-              )}
-              {resumeFileName && !errors.resume && (
-                <p className="mt-1 text-sm text-green-600 flex items-center gap-1">
-                  <FaCheckCircle className="text-xs" />
-                  {resumeFileName} selected
                 </p>
               )}
             </div>

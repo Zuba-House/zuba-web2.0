@@ -42,11 +42,28 @@ export const submitJobApplication = async (req, res) => {
 
         const resumeFile = req.file;
 
-        // Validation
-        if (!name || !email || !location || !phone || !portfolio || !resumeFile) {
+        // Validation with specific error messages
+        const missingFields = [];
+        if (!name) missingFields.push('name');
+        if (!email) missingFields.push('email');
+        if (!location) missingFields.push('location');
+        if (!phone) missingFields.push('phone');
+        if (!portfolio) missingFields.push('portfolio');
+        if (!resumeFile) missingFields.push('resume');
+
+        if (missingFields.length > 0) {
+            // Clean up file if it was uploaded but other fields are missing
+            if (resumeFile && resumeFile.path) {
+                try {
+                    fs.unlinkSync(resumeFile.path);
+                } catch (unlinkError) {
+                    console.error('Error deleting resume file:', unlinkError);
+                }
+            }
             return res.status(400).json({
                 success: false,
-                error: 'Missing required fields'
+                error: `Missing required fields: ${missingFields.join(', ')}`,
+                missingFields: missingFields
             });
         }
 
@@ -232,7 +249,10 @@ Resume: Attached as PDF
         const senderEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER || process.env.EMAIL || 'orders@zubahouse.com';
         const senderName = process.env.EMAIL_SENDER_NAME || 'Zuba House';
 
-        const msg = {
+        const applicationId = `APP-${Date.now()}`;
+        
+        // Email to Zuba House team
+        const teamMsg = {
             to: ['info@zubahouse.com'],
             cc: ['it.deboss019@gmail.com'],
             from: {
@@ -253,8 +273,100 @@ Resume: Attached as PDF
             ]
         };
 
+        // Confirmation email to applicant
+        const confirmationHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #0b2735 0%, #0f3547 100%); color: #efb291; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
+        .content { background: #f9f9f9; padding: 20px; border: 1px solid #ddd; }
+        .footer { background: #0b2735; color: #e5e2db; padding: 15px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px; }
+        .highlight { background: #efb291; color: #0b2735; padding: 10px; border-radius: 5px; font-weight: bold; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2 style="margin: 0;">✅ Application Received!</h2>
+        </div>
+        <div class="content">
+            <p>Dear ${name},</p>
+            <p>Thank you for your interest in joining <strong>Zuba House</strong>! We have successfully received your job application for the position of <strong>${position || 'Position'}</strong>.</p>
+            
+            <div class="highlight">
+                Application ID: ${applicationId}
+            </div>
+            
+            <h3 style="color: #0b2735;">What Happens Next?</h3>
+            <ul>
+                <li>Our team will review your application and portfolio</li>
+                <li>We'll carefully evaluate your qualifications and experience</li>
+                <li>If your profile matches our requirements, we'll contact you via email or phone</li>
+                <li>Applications are reviewed on a rolling basis</li>
+            </ul>
+            
+            <p>We appreciate your interest in being part of the Zuba House team and look forward to learning more about you!</p>
+            
+            <p>Best regards,<br>
+            <strong>The Zuba House Team</strong></p>
+        </div>
+        <div class="footer">
+            <p style="margin: 0;">This is an automated confirmation email. Please do not reply to this message.</p>
+            <p style="margin: 5px 0 0 0;">For inquiries, please contact us at info@zubahouse.com</p>
+        </div>
+    </div>
+</body>
+</html>
+        `.trim();
+
+        const confirmationText = `
+Application Received - Zuba House
+
+Dear ${name},
+
+Thank you for your interest in joining Zuba House! We have successfully received your job application for the position of ${position || 'Position'}.
+
+Application ID: ${applicationId}
+
+What Happens Next?
+- Our team will review your application and portfolio
+- We'll carefully evaluate your qualifications and experience
+- If your profile matches our requirements, we'll contact you via email or phone
+- Applications are reviewed on a rolling basis
+
+We appreciate your interest in being part of the Zuba House team and look forward to learning more about you!
+
+Best regards,
+The Zuba House Team
+
+---
+This is an automated confirmation email. Please do not reply to this message.
+For inquiries, please contact us at info@zubahouse.com
+        `.trim();
+
+        const confirmationMsg = {
+            to: email,
+            from: {
+                email: senderEmail,
+                name: senderName
+            },
+            subject: `Application Received - ${position || 'Position'} | Zuba House`,
+            html: confirmationHtml,
+            text: confirmationText
+        };
+
         try {
-            await sgMail.send(msg);
+            // Send email to team with attachment
+            await sgMail.send(teamMsg);
+            console.log('✅ Application email sent to team');
+            
+            // Send confirmation email to applicant
+            await sgMail.send(confirmationMsg);
+            console.log('✅ Confirmation email sent to applicant');
             
             // Clean up uploaded file after sending
             try {
@@ -266,7 +378,7 @@ Resume: Attached as PDF
             return res.status(200).json({
                 success: true,
                 message: 'Application submitted successfully',
-                applicationId: `APP-${Date.now()}`
+                applicationId: applicationId
             });
         } catch (emailError) {
             console.error('SendGrid error:', emailError);
