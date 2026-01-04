@@ -33,15 +33,8 @@ export async function registerUserController(request, response) {
             })
         }
 
-        // Check if email is admin email (only admin emails can register in admin panel)
-        const { isAdminEmail } = await import('../config/adminEmails.js');
-        if (!isAdminEmail(email)) {
-            return response.status(403).json({
-                message: "Access denied. Only authorized admin emails can create accounts.",
-                error: true,
-                success: false
-            })
-        }
+        // NOTE: Admin email check removed - this endpoint is for regular user registration
+        // Admin email check is only applied to admin panel routes, not general user routes
 
         user = await UserModel.findOne({ email: email });
 
@@ -149,18 +142,8 @@ export async function authWithGoogle(request, response) {
     const { name, email, password, avatar, mobile, role } = request.body;
 
     try {
-        // Check if email is admin email (only admin emails can login to admin panel)
-        const { isAdminEmail } = await import('../config/adminEmails.js');
-        if (!isAdminEmail(email)) {
-            // Clear any existing tokens/cookies
-            response.clearCookie('accessToken');
-            response.clearCookie('refreshToken');
-            return response.status(403).json({
-                message: "Access denied. Only authorized admin emails can access the admin panel.",
-                error: true,
-                success: false
-            })
-        }
+        // NOTE: Admin email check removed - this endpoint is for regular user Google auth
+        // Admin email check is only applied to admin panel routes, not general user routes
 
         const existingUser = await UserModel.findOne({ email: email });
 
@@ -250,18 +233,8 @@ export async function loginUserController(request, response) {
     try {
         const { email, password } = request.body;
 
-        // Check if email is admin email (only admin emails can login to admin panel)
-        const { isAdminEmail } = await import('../config/adminEmails.js');
-        if (!isAdminEmail(email)) {
-            // Clear any existing tokens/cookies
-            response.clearCookie('accessToken');
-            response.clearCookie('refreshToken');
-            return response.status(403).json({
-                message: "Access denied. Only authorized admin emails can access the admin panel.",
-                error: true,
-                success: false
-            })
-        }
+        // NOTE: Admin email check removed - this endpoint is for regular user login
+        // Admin email check is only applied to admin panel routes, not general user routes
 
         const user = await UserModel.findOne({ email: email });
 
