@@ -17,7 +17,9 @@ import {
   FaLightbulb,
   FaGlobeAfrica,
   FaGraduationCap,
-  FaHeart
+  FaHeart,
+  FaPalette,
+  FaVideo
 } from "react-icons/fa";
 
 const Career = () => {
@@ -74,6 +76,47 @@ const Career = () => {
       icon: <FaHeart className="text-[40px] text-[#efb291]" />,
       title: "Purpose-Driven",
       description: "Be part of a mission to empower African entrepreneurs and celebrate African culture globally."
+    }
+  ];
+
+  // Active Hiring Positions
+  const activePositions = [
+    {
+      id: 1,
+      title: "Professional Graphic Designer",
+      icon: <FaPalette className="text-[40px] text-[#efb291]" />,
+      type: "Remote | Contract-Based",
+      responsibilities: [
+        "Design high-quality graphics for Zuba House and our partnered companies",
+        "Create visually engaging content for social media, marketing campaigns, and branding materials",
+        "Produce design assets for both static and video content",
+        "Collaborate closely with the Zuba House team to develop and execute creative ideas",
+        "Ensure consistency in brand identity across all platforms"
+      ],
+      requirements: [
+        "Minimum 2 years of professional experience in graphic design",
+        "Strong portfolio showcasing graphic and video design work",
+        "Proficiency in Adobe Creative Suite (Photoshop, Illustrator, InDesign, etc.)",
+        "Ability to use video design and editing tools (e.g., After Effects, Premiere Pro, or equivalent)",
+        "Highly creative, detail-oriented, and able to work independently",
+        "Reliable and stable internet connection",
+        "Own a suitable laptop and necessary equipment for professional design work"
+      ],
+      workArrangement: [
+        "Fully remote role",
+        "Must be able to physically sign a contract in Kigali",
+        "Working hours: Monday to Friday, 9:00 AM – 5:00 PM (Kigali time)",
+        "Must submit a weekly progress report by Saturday evening",
+        "Must be available for virtual interviews and in-person interviews when applicable"
+      ],
+      whyJoin: [
+        "Work with a brand dedicated to promoting African culture and craftsmanship",
+        "Collaborate with diverse teams across Zuba House and partner companies",
+        "Opportunity to make a meaningful impact through creative work",
+        "Inclusive and creative environment that values innovation and originality"
+      ],
+      applicationDeadline: "January 20",
+      isActive: true
     }
   ];
 
@@ -149,13 +192,13 @@ const Career = () => {
             className="text-center max-w-4xl mx-auto"
             variants={fadeInUp}
           >
-            {/* Not Hiring Badge */}
+            {/* We're Hiring Badge */}
             <motion.div
               className="inline-block mb-6 bg-[rgba(239,178,145,0.15)] border border-[rgba(239,178,145,0.3)] rounded-full px-6 py-2"
               variants={fadeInUp}
             >
               <p className="text-[#efb291] text-sm font-medium">
-                ⚠️ Not Currently Hiring | Professional Internship Program Coming Soon
+                🎉 We're Hiring | Join Our Growing Team
               </p>
             </motion.div>
 
@@ -388,17 +431,125 @@ const Career = () => {
             </div>
           </motion.div>
 
-          {/* Available Positions */}
+          {/* Active Hiring Positions */}
+          {activePositions.length > 0 && (
+            <motion.div variants={fadeInUp} className="mb-16">
+              <h3 className="text-2xl lg:text-3xl font-bold text-center text-[#0b2735] mb-12">
+                Available <span className="text-[#efb291]">Positions</span>
+              </h3>
+
+              <div className="grid grid-cols-1 gap-8 max-w-4xl mx-auto">
+                {activePositions.map((position) => (
+                  <motion.div
+                    key={position.id}
+                    className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-[#efb291]"
+                    variants={fadeInUp}
+                  >
+                    <div className="bg-gradient-to-br from-[#0b2735] to-[#0f3547] p-8 text-center">
+                      <div className="flex justify-center mb-4">{position.icon}</div>
+                      <h3 className="text-2xl lg:text-3xl font-bold text-[#e5e2db] mb-2">
+                        {position.title}
+                      </h3>
+                      <div className="flex items-center justify-center gap-2 text-[#efb291] text-sm">
+                        <FaClock />
+                        <span>{position.type}</span>
+                      </div>
+                    </div>
+
+                    <div className="p-8">
+                      <div className="mb-8">
+                        <h4 className="text-lg font-bold text-[#0b2735] mb-4 flex items-center gap-2">
+                          <FaChartLine className="text-[#efb291]" />
+                          Key Responsibilities
+                        </h4>
+                        <ul className="space-y-3">
+                          {position.responsibilities.map((resp, idx) => (
+                            <li key={idx} className="flex items-start gap-3 text-gray-700">
+                              <span className="text-[#efb291] mt-1">▸</span>
+                              <span className="text-sm leading-relaxed">{resp}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="mb-8">
+                        <h4 className="text-lg font-bold text-[#0b2735] mb-4 flex items-center gap-2">
+                          <FaBullhorn className="text-[#efb291]" />
+                          Requirements
+                        </h4>
+                        <ul className="space-y-3">
+                          {position.requirements.map((req, idx) => (
+                            <li key={idx} className="flex items-start gap-3 text-gray-700">
+                              <span className="text-[#efb291] mt-1">✓</span>
+                              <span className="text-sm leading-relaxed">{req}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="mb-8">
+                        <h4 className="text-lg font-bold text-[#0b2735] mb-4 flex items-center gap-2">
+                          <FaMapMarkerAlt className="text-[#efb291]" />
+                          Work Arrangement
+                        </h4>
+                        <ul className="space-y-3">
+                          {position.workArrangement.map((arr, idx) => (
+                            <li key={idx} className="flex items-start gap-3 text-gray-700">
+                              <span className="text-[#efb291] mt-1">•</span>
+                              <span className="text-sm leading-relaxed">{arr}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="mb-8">
+                        <h4 className="text-lg font-bold text-[#0b2735] mb-4 flex items-center gap-2">
+                          <FaHeart className="text-[#efb291]" />
+                          Why Join Zuba House?
+                        </h4>
+                        <ul className="space-y-3">
+                          {position.whyJoin.map((reason, idx) => (
+                            <li key={idx} className="flex items-start gap-3 text-gray-700">
+                              <span className="text-[#efb291] mt-1">★</span>
+                              <span className="text-sm leading-relaxed">{reason}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <Link
+                        to={`/careers/apply/${position.id}`}
+                        className="block w-full bg-[#efb291] text-[#0b2735] px-6 py-4 rounded-lg font-bold text-center hover:bg-[#e5a67d] transition-all shadow-lg hover:shadow-xl mb-4"
+                      >
+                        Apply Now
+                      </Link>
+
+                      <div className="bg-[#efb291] bg-opacity-10 border border-[#efb291] rounded-lg p-4 text-center">
+                        <p className="text-[#0b2735] font-semibold text-sm">
+                          Applications open until <span className="text-[#efb291]">{position.applicationDeadline}</span>
+                        </p>
+                        <p className="text-gray-600 text-xs mt-2">
+                          Applications will be reviewed on a rolling basis, so early submission is encouraged
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Internship Positions (Coming Soon) */}
           <motion.div variants={fadeInUp}>
             <h3 className="text-2xl lg:text-3xl font-bold text-center text-[#0b2735] mb-12">
-              Available <span className="text-[#efb291]">Positions</span>
+              Upcoming <span className="text-[#efb291]">Internship Program</span>
             </h3>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
               {internshipRoles.map((role) => (
                 <motion.div
                   key={role.id}
-                  className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-[#efb291]"
+                  className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-[#efb291] opacity-75"
                   variants={fadeInUp}
                 >
                   <div className="bg-gradient-to-br from-[#0b2735] to-[#0f3547] p-8 text-center">
@@ -486,7 +637,7 @@ const Career = () => {
 
               <div className="space-y-4 text-[#e5e2db]">
                 <p className="text-base lg:text-lg leading-relaxed">
-                  <strong className="text-[#efb291]">Current Status:</strong> We are <strong>not currently hiring</strong> for permanent positions or accepting applications at this time.
+                  <strong className="text-[#efb291]">Current Status:</strong> We are <strong>actively hiring</strong> for the Professional Graphic Designer position. Applications are open until <strong>January 20</strong>.
                 </p>
 
                 <p className="text-base lg:text-lg leading-relaxed">
@@ -494,12 +645,12 @@ const Career = () => {
                 </p>
 
                 <p className="text-base lg:text-lg leading-relaxed">
-                  <strong className="text-[#efb291]">Eligibility:</strong> The program is open to candidates based in <strong>Rwanda</strong> with relevant skills and experience in software development or digital marketing.
+                  <strong className="text-[#efb291]">Eligibility:</strong> The internship program is open to candidates based in <strong>Rwanda</strong> with relevant skills and experience in software development or digital marketing.
                 </p>
 
                 <div className="bg-[rgba(239,178,145,0.15)] border border-[#efb291] rounded-xl p-6 mt-6">
                   <p className="text-base lg:text-lg leading-relaxed font-medium">
-                    <strong className="text-[#efb291]">Stay Updated:</strong> Want to be notified when applications open? Email us at <a href="mailto:info@zubahouse.com" className="underline hover:text-[#efb291]">info@zubahouse.com</a> with the subject "Internship Interest 2026" to join our waitlist.
+                    <strong className="text-[#efb291]">Questions?</strong> Email us at <a href="mailto:info@zubahouse.com" className="underline hover:text-[#efb291]">info@zubahouse.com</a> for any inquiries about our open positions or upcoming internship program.
                   </p>
                 </div>
               </div>

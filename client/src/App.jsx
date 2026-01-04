@@ -25,6 +25,7 @@ import Orders from "./Pages/Orders";
 import AboutUs from "./Pages/About";
 import FAQ from "./Pages/FAQ";
 import Career from "./Pages/Career";
+import ApplyForm from "./Pages/Career/ApplyForm";
 import ReturnRefundPolicy from "./Pages/ReturnRefundPolicy";
 import OrderTracking from "./Pages/OrderTracking";
 import ShippingInfo from "./Pages/ShippingInfo";
@@ -850,6 +851,7 @@ function App() {
             <Route path={"/about"} exact={true} element={<AboutUs />} />
             <Route path={"/faq"} exact={true} element={<FAQ />} />
             <Route path={"/careers"} exact={true} element={<Career />} />
+            <Route path={"/careers/apply/:positionId"} exact={true} element={<ApplyForm />} />
             <Route path={"/return-refund-policy"} exact={true} element={<ReturnRefundPolicy />} />
             <Route path={"/order-tracking"} exact={true} element={<OrderTracking />} />
             <Route path={"/shipping-info"} exact={true} element={<ShippingInfo />} />
