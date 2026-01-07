@@ -262,7 +262,8 @@ export const verifyOTP = async (req, res) => {
         });
       }
 
-      // Mark as verified in pending store (DO NOT CREATE USER YET)
+      // ✅ CRITICAL: Mark as verified in pending store (DO NOT CREATE USER HERE)
+      // User creation happens ONLY in applyToBecomeVendor function after form submission
       pendingOTPStore.set(normalizedEmail, {
         ...pendingData,
         verified: true,
@@ -270,6 +271,7 @@ export const verifyOTP = async (req, res) => {
       });
 
       console.log('✅ OTP verified for new user (pending store):', normalizedEmail.substring(0, 10) + '...');
+      console.log('📝 User will be created during application submission, not here');
 
       return res.status(200).json({
         error: false,
@@ -422,7 +424,7 @@ export const applyToBecomeVendor = async (req, res) => {
       });
     }
 
-    // CRITICAL: Check OTP verification FIRST (from pending store)
+    // ===== CRITICAL: Check OTP verification FIRST (from pending store) =====
     const pendingData = pendingOTPStore.get(normalizedEmail);
     const existingUser = await UserModel.findOne({ email: normalizedEmail });
     
@@ -431,12 +433,11 @@ export const applyToBecomeVendor = async (req, res) => {
     
     if (pendingData && pendingData.verified) {
       // New user flow - check pending OTP store
-      isEmailVerified = true;
-      
       // Check if verification is still valid (within 30 minutes)
       const verificationAge = Date.now() - (pendingData.verifiedAt || 0);
       if (verificationAge > 30 * 60 * 1000) {
         pendingOTPStore.delete(normalizedEmail);
+        console.error('❌ Verification expired for:', normalizedEmail);
         return res.status(400).json({
           error: true,
           success: false,
@@ -445,18 +446,38 @@ export const applyToBecomeVendor = async (req, res) => {
         });
       }
       
+      isEmailVerified = true;
       console.log('✅ Email verified via pending OTP store');
     } else if (existingUser && existingUser.verify_email) {
       // Existing user flow - check user's verify_email flag (backward compatibility)
       isEmailVerified = true;
       console.log('✅ Email verified via existing user record');
     } else {
-      // Email not verified
-      console.log('❌ Email not verified, rejecting application');
+      // Email not verified - REJECT EARLY
+      console.error('❌ Email not verified, rejecting application for:', normalizedEmail);
+      
+      if (!pendingData) {
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'Please request and verify OTP first. Start from Step 1: Send OTP.',
+          data: { requiresEmailVerification: true, hint: 'Start from Step 1: Send OTP' }
+        });
+      }
+      
+      if (!pendingData.verified) {
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'Please verify your email with OTP first. Complete Step 2: Verify OTP.',
+          data: { requiresEmailVerification: true, hint: 'Complete Step 2: Verify OTP' }
+        });
+      }
+      
       return res.status(400).json({
         error: true,
         success: false,
-        message: 'Please verify your email with OTP first. Complete Step 2: Verify OTP.',
+        message: 'Email verification required. Please verify your email with OTP first.',
         data: { requiresEmailVerification: true }
       });
     }
@@ -588,7 +609,18 @@ export const applyToBecomeVendor = async (req, res) => {
       await user.save();
       console.log('✅ Existing user updated to VENDOR');
     } else {
-      // Create new user account (ONLY if OTP was verified)
+      // ===== CREATE NEW USER ACCOUNT (ONLY if OTP was verified) =====
+      // Double-check OTP verification before creating user
+      if (!isEmailVerified) {
+        console.error('❌ Attempted to create user without OTP verification:', normalizedEmail);
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'Email verification required. Please verify your email with OTP first.',
+          data: { requiresEmailVerification: true }
+        });
+      }
+      
       if (!password || password.length < 6) {
         return res.status(400).json({
           error: true,
@@ -605,6 +637,7 @@ export const applyToBecomeVendor = async (req, res) => {
         });
       }
 
+      console.log('👤 Creating new user account for vendor application...');
       const salt = await bcryptjs.genSalt(10);
       const hashedPassword = await bcryptjs.hash(password, salt);
 
@@ -617,7 +650,7 @@ export const applyToBecomeVendor = async (req, res) => {
         verify_email: true // Already verified via OTP
       });
       
-      console.log('✅ New user created for vendor application');
+      console.log('✅ New user created for vendor application:', user._id);
     }
 
     // Validate user._id exists before creating vendor
