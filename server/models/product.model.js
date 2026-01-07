@@ -326,36 +326,6 @@ const SEOSchema = new mongoose.Schema({
   }
 }, { _id: false });
 
-// Seller/Vendor Schema
-const SellerSchema = new mongoose.Schema({
-  sellerId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    default: null
-  },
-  sellerName: {
-    type: String,
-    default: ''
-  },
-  sellerRating: {
-    type: Number,
-    default: 0,
-    min: 0,
-    max: 5
-  },
-  commissionRate: {
-    type: Number,
-    default: 0.12,
-    min: 0,
-    max: 1
-  },
-  commissionType: {
-    type: String,
-    enum: ['percentage', 'fixed'],
-    default: 'percentage'
-  }
-}, { _id: false });
-
 // ============================================
 // MAIN PRODUCT SCHEMA
 // ============================================
@@ -429,15 +399,8 @@ const ProductSchema = new mongoose.Schema({
     trim: true
   }],
   
-  // ========== SELLER/VENDOR INFORMATION ==========
-  seller: SellerSchema,
+  // ========== VENDOR INFORMATION ==========
   vendor: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Vendor',
-    default: null,
-    index: true
-  },
-  vendorId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Vendor',
     default: null,
@@ -676,7 +639,7 @@ ProductSchema.index({ status: 1, visibility: 1 });
 ProductSchema.index({ category: 1, status: 1 });
 ProductSchema.index({ categories: 1, status: 1 });
 ProductSchema.index({ brand: 1, status: 1 });
-ProductSchema.index({ 'seller.sellerId': 1, status: 1 });
+ProductSchema.index({ vendor: 1, status: 1 });
 ProductSchema.index({ productType: 1 });
 ProductSchema.index({ isFeatured: 1, status: 1 });
 ProductSchema.index({ 'pricing.price': 1 });

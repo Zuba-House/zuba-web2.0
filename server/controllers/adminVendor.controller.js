@@ -988,12 +988,14 @@ export const approveVendorProduct = async (req, res) => {
         console.error('Failed to send product approved email:', err);
       });
     } else {
-      // Try to find vendor by vendorId
-      const vendor = await VendorModel.findById(product.vendorId || product.vendor);
-      if (vendor?.email) {
-        sendVendorProductApproved(vendor, product).catch(err => {
-          console.error('Failed to send product approved email:', err);
-        });
+      // Try to find vendor by vendor field
+      if (product.vendor) {
+        const vendor = await VendorModel.findById(product.vendor);
+        if (vendor?.email) {
+          sendVendorProductApproved(vendor, product).catch(err => {
+            console.error('Failed to send product approved email:', err);
+          });
+        }
       }
     }
 
@@ -1069,12 +1071,14 @@ export const rejectVendorProduct = async (req, res) => {
         console.error('Failed to send product rejected email:', err);
       });
     } else {
-      // Try to find vendor by vendorId
-      const vendor = await VendorModel.findById(product.vendorId || product.vendor);
-      if (vendor?.email) {
-        sendVendorProductRejected(vendor, product, reason).catch(err => {
-          console.error('Failed to send product rejected email:', err);
-        });
+      // Try to find vendor by vendor field
+      if (product.vendor) {
+        const vendor = await VendorModel.findById(product.vendor);
+        if (vendor?.email) {
+          sendVendorProductRejected(vendor, product, reason).catch(err => {
+            console.error('Failed to send product rejected email:', err);
+          });
+        }
       }
     }
 

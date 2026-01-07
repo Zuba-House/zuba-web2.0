@@ -565,8 +565,7 @@ export async function createProduct(request, response) {
             sku: request.body.sku || null,
             barcode: request.body.barcode || null,
             // Vendor information (if vendor product)
-            vendor: isVendor && !isAdmin ? request.vendorId : null,
-            vendorId: isVendor && !isAdmin ? request.vendorId : null
+            vendor: isVendor && !isAdmin ? request.vendorId : null
         };
 
         // NEW: Ensure attributes are populated for variable products
