@@ -834,6 +834,13 @@ function App() {
               element={<BrandProductsPage />}
             />
             
+            {/* Own It brand - /ownit or /OwnIt */}
+            <Route
+              path={"/ownit"}
+              exact={true}
+              element={<BrandProductsPage />}
+            />
+            
             <Route
               path={"/product/:id"}
               exact={true}

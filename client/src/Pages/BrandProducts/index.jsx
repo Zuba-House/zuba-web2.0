@@ -30,6 +30,13 @@ const BRAND_CONFIG = {
     headerColor: "#0b2735",
     accentColor: "#eeb190"
   },
+  ownit: {
+    displayName: "Own It",
+    brandQuery: "Own It", // The exact brand name in the database (can also match case-insensitively)
+    description: "Discover the Own It collection. Bold designs, premium quality, authentic style.",
+    headerColor: "#0b2735",
+    accentColor: "#eeb190"
+  },
   // Add more brands as needed:
   // brandslug: {
   //   displayName: "Brand Display Name",
