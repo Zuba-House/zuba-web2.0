@@ -507,13 +507,13 @@ const ProductItem = (props) => {
         </div>
       </div>
 
-      <div className="info p-3 py-5 relative pb-[50px] lg:h-[190px] h-auto">
-        <h6 className="text-[10px] lg:text-[13px] !font-[400] truncate">
+      <div className="info p-3 py-3 lg:py-5 relative pb-[42px] lg:pb-[50px] lg:h-[190px] h-auto">
+        <h6 className="text-[10px] lg:text-[13px] !font-[400] truncate mb-1">
           <span className="link transition-all block truncate">
             {item?.brand}
           </span>
         </h6>
-        <h3 className="text-[11px] lg:text-[13px] title mt-1 font-[500] mb-1 text-[#000] line-clamp-2">
+        <h3 className="text-[11px] lg:text-[13px] title mt-0 font-[500] mb-2 text-[#000] line-clamp-2">
           <Link to={`/product/${item?._id}`} className="link transition-all block">
             {item?.name}
           </Link>
@@ -567,7 +567,7 @@ const ProductItem = (props) => {
         </div>
 
 
-        <div className="!absolute bottom-[15px] left-0 pl-3 pr-3 w-full">
+        <div className="!absolute bottom-[10px] left-0 right-0 pl-3 pr-3 w-full">
 
           {
             isAdded === false ?
