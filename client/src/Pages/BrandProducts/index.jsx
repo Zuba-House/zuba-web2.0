@@ -189,7 +189,7 @@ const BrandProductsPage = () => {
   return (
     <section className="pb-0">
       <div className="bg-white p-2">
-        <div className="container">
+        <div className="container mx-auto px-4 max-w-7xl">
           {/* Breadcrumbs */}
           <Breadcrumbs aria-label="breadcrumb" className="mb-4 pt-4">
             <Link to="/" className="text-[#0b2735] hover:text-[#eeb190]">
@@ -294,9 +294,9 @@ const BrandProductsPage = () => {
           {/* Products Grid/List */}
           <div
             className={`grid ${itemView === "grid"
-              ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+              ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6"
               : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-1"
-              } gap-4`}
+              } gap-4 lg:gap-5 xl:gap-6`}
           >
             {itemView === "grid" ? (
               <>
