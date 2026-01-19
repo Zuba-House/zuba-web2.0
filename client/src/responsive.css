@@ -866,6 +866,141 @@
         font-size: 13px !important;
         line-height: 1.5 !important;
     }
+    
+    /* Global Text Overflow Prevention */
+    * {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+    
+    /* Prevent text from overflowing containers */
+    h1, h2, h3, h4, h5, h6, p, span, a, div {
+        max-width: 100% !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+    }
+    
+    /* Brand names and short text - single line with ellipsis */
+    .productItem .info h6,
+    .productItemListView .info h6 {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        max-width: 100% !important;
+    }
+    
+    /* Product titles - 2 lines max with ellipsis */
+    .productItem .title,
+    .productItemListView .title {
+        overflow: hidden !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        text-overflow: ellipsis !important;
+        word-break: break-word !important;
+        max-width: 100% !important;
+    }
+    
+    /* Price text - prevent overflow */
+    .productItem .price,
+    .productItem .oldPrice,
+    .productItemListView .price,
+    .productItemListView .oldPrice {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        max-width: 100% !important;
+    }
+    
+    /* Description text - 3 lines max */
+    .productItemListView .info p {
+        overflow: hidden !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 3 !important;
+        -webkit-box-orient: vertical !important;
+        text-overflow: ellipsis !important;
+        word-break: break-word !important;
+        max-width: 100% !important;
+    }
+    
+    /* Button text - prevent overflow */
+    button, .btn {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        max-width: 100% !important;
+    }
+    
+    /* Links - prevent overflow */
+    a {
+        max-width: 100% !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+    }
+    
+    /* Header and Navigation Text */
+    header .col1,
+    header .col2,
+    header .col3 {
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+    
+    header a,
+    header button,
+    header span {
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+    
+    /* Navigation menu items */
+    .navigation ul li a,
+    .navigation ul li button {
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+    
+    /* Category names */
+    .homeCatSlider .item h3 {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        word-break: break-word !important;
+        max-width: 100% !important;
+    }
+    
+    /* Blog titles and descriptions */
+    .blogItem h2,
+    .blogItem p {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        word-break: break-word !important;
+        max-width: 100% !important;
+    }
+    
+    /* Cart items text */
+    .cartItem .itemName,
+    .cartItem .itemPrice {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        max-width: 100% !important;
+    }
+    
+    /* Product detail page text */
+    .product-details-wrapper h1,
+    .product-details-wrapper h2,
+    .product-details-wrapper p {
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+        max-width: 100% !important;
+    }
 }
 
 /* ========================================
@@ -937,6 +1072,26 @@
     .productItem .info {
         padding: 15px !important;
         height: 190px !important;
+    }
+    
+    /* Desktop Text Overflow Prevention */
+    .productItem .title,
+    .productItemListView .title {
+        overflow: hidden !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        text-overflow: ellipsis !important;
+        word-break: break-word !important;
+        max-width: 100% !important;
+    }
+    
+    .productItem .info h6,
+    .productItemListView .info h6 {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        max-width: 100% !important;
     }
     
     /* Action Buttons - Desktop hover effect */

@@ -366,18 +366,18 @@ const ProductItem = (props) => {
       </div>
 
       <div className="info p-3 py-5 pb-0 px-3 lg:px-8  w-full lg:w-[75%]">
-        <h6 className="text-[15px] !font-[400]">
-          <Link to="/" className="link transition-all">
+        <h6 className="text-[15px] !font-[400] truncate">
+          <Link to="/" className="link transition-all block truncate">
            {props?.item?.brand}
           </Link>
         </h6>
-        <h3 className="text-[18px] title mt-3 font-[500] mb-1 text-[#000]" style={{lineHeight:'25px'}}>
-          <Link to={`/product/${props?.item?._id}`} className="link transition-all">
+        <h3 className="text-[18px] title mt-3 font-[500] mb-1 text-[#000] line-clamp-2" style={{lineHeight:'25px'}}>
+          <Link to={`/product/${props?.item?._id}`} className="link transition-all block">
            {props?.item?.name}
           </Link>
         </h3>
 
-        <p className="text-[14px] mb-3">
+        <p className="text-[14px] mb-3 line-clamp-3">
          {props?.item?.description}
         </p>
 

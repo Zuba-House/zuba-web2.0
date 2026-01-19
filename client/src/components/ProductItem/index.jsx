@@ -508,14 +508,14 @@ const ProductItem = (props) => {
       </div>
 
       <div className="info p-3 py-5 relative pb-[50px] lg:h-[190px] h-auto">
-        <h6 className="text-[10px] lg:text-[13px] !font-[400]">
-          <span className="link transition-all">
+        <h6 className="text-[10px] lg:text-[13px] !font-[400] truncate">
+          <span className="link transition-all block truncate">
             {item?.brand}
           </span>
         </h6>
-        <h3 className="text-[11px] lg:text-[13px] title mt-1 font-[500] mb-1 text-[#000]">
-          <Link to={`/product/${item?._id}`} className="link transition-all">
-            {item?.name?.substring(0, 25) + (item?.name?.length > 25 ? '...' : '')}
+        <h3 className="text-[11px] lg:text-[13px] title mt-1 font-[500] mb-1 text-[#000] line-clamp-2">
+          <Link to={`/product/${item?._id}`} className="link transition-all block">
+            {item?.name}
           </Link>
         </h3>
 
