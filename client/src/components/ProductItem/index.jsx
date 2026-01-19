@@ -333,7 +333,7 @@ const ProductItem = (props) => {
                 // Try featuredImage first
                 const featuredUrl = getImageUrl(item?.featuredImage);
                 if (featuredUrl) {
-                  return getOptimizedImageUrl(featuredUrl, { width: 600, height: 600, quality: 'auto', format: 'auto' });
+                  return getOptimizedImageUrl(featuredUrl, { width: 800, height: 800, quality: 'auto', format: 'auto' });
                 }
                 
                 // Try images array - check all images
@@ -341,7 +341,7 @@ const ProductItem = (props) => {
                   for (let i = 0; i < item.images.length; i++) {
                     const imgUrl = getImageUrl(item.images[i]);
                     if (imgUrl) {
-                      return getOptimizedImageUrl(imgUrl, { width: 600, height: 600, quality: 'auto', format: 'auto' });
+                      return getOptimizedImageUrl(imgUrl, { width: 800, height: 800, quality: 'auto', format: 'auto' });
                     }
                   }
                 }
@@ -351,7 +351,7 @@ const ProductItem = (props) => {
                   for (let i = 0; i < item.bannerimages.length; i++) {
                     const imgUrl = getImageUrl(item.bannerimages[i]);
                     if (imgUrl) {
-                      return getOptimizedImageUrl(imgUrl, { width: 600, height: 600, quality: 'auto', format: 'auto' });
+                      return getOptimizedImageUrl(imgUrl, { width: 800, height: 800, quality: 'auto', format: 'auto' });
                     }
                   }
                 }
@@ -359,7 +359,7 @@ const ProductItem = (props) => {
                 // Try image field (singular)
                 const singleImageUrl = getImageUrl(item?.image);
                 if (singleImageUrl) {
-                  return getOptimizedImageUrl(singleImageUrl, { width: 600, height: 600, quality: 'auto', format: 'auto' });
+                  return getOptimizedImageUrl(singleImageUrl, { width: 800, height: 800, quality: 'auto', format: 'auto' });
                 }
                 
                 // Last resort: data URI placeholder

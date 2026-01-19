@@ -165,7 +165,8 @@ export const isCloudinaryUrl = (url) => {
 export const getDefaultOptions = {
   logo: () => ({ width: 400, height: 200, quality: 90, format: 'auto' }),
   thumbnail: () => ({ width: 300, height: 300, quality: 'auto', format: 'auto' }),
-  product: () => ({ width: 600, height: 600, quality: 'auto', format: 'auto' }),
+  product: () => ({ width: 800, height: 800, quality: 'auto', format: 'auto' }), // Optimized for large screens
+  productThumbnail: () => ({ width: 400, height: 400, quality: 'auto', format: 'auto' }), // For smaller displays
   banner: () => ({ width: 1200, height: 600, quality: 'auto', format: 'auto' }),
   large: () => ({ width: 1200, quality: 'auto', format: 'auto' })
 };
