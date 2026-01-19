@@ -215,7 +215,7 @@ const Header = () => {
               <Search />
             </div>
 
-            <div className="col3 w-auto lg:w-[30%] flex items-center pl-2 lg:pl-7">
+            <div className="col3 w-auto lg:w-[30%] flex items-center pl-2 pr-2 lg:pl-7 lg:pr-0">
               <ul className="flex items-center justify-end gap-2 lg:gap-3 w-full">
                 {context.isLogin === false && context?.windowWidth > 992 ? (
                   <li className="list-none">
@@ -371,18 +371,32 @@ const Header = () => {
                     <IconButton
                       aria-label="cart"
                       onClick={() => context.setOpenCartPanel(true)}
-                      className="hover:!text-[#efb291] !w-[44px] !min-w-[44px] !h-[44px] lg:!w-auto lg:!h-auto"
+                      className="hover:!text-[#efb291] !w-[44px] !min-w-[44px] !h-[44px] !p-2 lg:!w-auto lg:!h-auto lg:!p-1"
                       sx={{
                         '@media (max-width: 992px)': {
                           minWidth: '44px',
                           minHeight: '44px',
                           width: '44px',
                           height: '44px',
-                          padding: '8px'
+                          padding: '10px',
+                          marginRight: '0'
                         }
                       }}
                     >
-                      <StyledBadge badgeContent={context?.cartData?.length !== 0 ? context?.cartData?.length : 0} color="secondary">
+                      <StyledBadge 
+                        badgeContent={context?.cartData?.length !== 0 ? context?.cartData?.length : 0} 
+                        color="secondary"
+                        sx={{
+                          '& .MuiBadge-badge': {
+                            '@media (max-width: 992px)': {
+                              fontSize: '10px',
+                              minWidth: '18px',
+                              height: '18px',
+                              padding: '0 4px'
+                            }
+                          }
+                        }}
+                      >
                         <MdOutlineShoppingCart className="text-[#e5e2db] text-[20px] lg:text-[24px]" />
                       </StyledBadge>
                     </IconButton>

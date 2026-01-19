@@ -178,10 +178,20 @@
         width: auto !important;
         min-width: auto !important;
         padding-left: 8px !important;
+        padding-right: 8px !important;
+        flex-shrink: 0 !important;
     }
     
     header .col3 ul {
         gap: 8px !important;
+        flex-wrap: nowrap !important;
+        justify-content: flex-end !important;
+    }
+    
+    /* Header container - ensure proper spacing */
+    header .container {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
     }
     
     /* Hamburger menu - ensure it's visible */
@@ -204,12 +214,25 @@
         min-height: 44px !important;
         width: 44px !important;
         height: 44px !important;
-        padding: 8px !important;
+        padding: 10px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         z-index: 50 !important;
         position: relative !important;
+        margin-right: 0 !important;
+        flex-shrink: 0 !important;
+    }
+    
+    /* Cart button badge - responsive sizing */
+    button[aria-label="cart"] .MuiBadge-badge,
+    .MuiIconButton-root[aria-label="cart"] .MuiBadge-badge {
+        font-size: 10px !important;
+        min-width: 18px !important;
+        height: 18px !important;
+        padding: 0 4px !important;
+        right: 4px !important;
+        top: 4px !important;
     }
     
     /* Header cart button container */
@@ -218,6 +241,7 @@
         align-items: center !important;
         justify-content: flex-end !important;
         z-index: 50 !important;
+        flex-shrink: 0 !important;
     }
     
     header .col3 ul {
@@ -225,6 +249,56 @@
         align-items: center !important;
         gap: 8px !important;
         flex-wrap: nowrap !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Ensure cart icon is properly sized */
+    button[aria-label="cart"] svg,
+    .MuiIconButton-root[aria-label="cart"] svg {
+        width: 20px !important;
+        height: 20px !important;
+        flex-shrink: 0 !important;
+    }
+    
+    /* Header layout - prevent overflow */
+    header .header {
+        overflow: visible !important;
+    }
+    
+    header .container {
+        overflow: visible !important;
+        max-width: 100% !important;
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+    
+    /* Very small screens - extra padding */
+    @media (max-width: 375px) {
+        header .col3 {
+            padding-left: 4px !important;
+            padding-right: 4px !important;
+        }
+        
+        header .container {
+            padding-left: 8px !important;
+            padding-right: 8px !important;
+        }
+        
+        button[aria-label="cart"],
+        .MuiIconButton-root[aria-label="cart"] {
+            min-width: 40px !important;
+            width: 40px !important;
+            height: 40px !important;
+            padding: 8px !important;
+        }
+    }
+    
+    /* Small screens - ensure proper spacing */
+    @media (min-width: 376px) and (max-width: 480px) {
+        header .col3 {
+            padding-right: 12px !important;
+        }
     }
 
     /* Button Sizes */
