@@ -19,6 +19,7 @@ import { MyContext } from "../../App";
 const DashboardBoxes = (props) => {
 
   const context = useContext(MyContext);
+  const isFullAdmin = props?.isFullAdmin !== false; // Default to true for backward compatibility
 
 
   return (
@@ -49,29 +50,31 @@ const DashboardBoxes = (props) => {
         }}
         className="dashboardBoxesSlider mb-5"
       >
-        <SwiperSlide>
-          <div className="box bg-[#10b981] p-5 py-6  cursor-pointer hover:bg-[#289974] rounded-md border border-[rgba(0,0,0,0.1)] flex items-center gap-4">
-            <FiPieChart className="text-[40px] text-[#fff]" />
-            <div className="info w-[80%]">
-              <h3 className="text-white">Total Users</h3>
-              <b className="text-white text-[20px]">{props?.users}</b>
+        {isFullAdmin && props?.users !== null && props?.users !== undefined && (
+          <SwiperSlide>
+            <div className="box bg-[#10b981] p-5 py-6  cursor-pointer hover:bg-[#289974] rounded-md border border-[rgba(0,0,0,0.1)] flex items-center gap-4">
+              <FiPieChart className="text-[40px] text-[#fff]" />
+              <div className="info w-[80%]">
+                <h3 className="text-white">Total Users</h3>
+                <b className="text-white text-[20px]">{props?.users}</b>
+              </div>
+              <IoStatsChartSharp className="text-[45px] text-[#fff]" />
             </div>
-            <IoStatsChartSharp className="text-[45px] text-[#fff]" />
-          </div>
-        </SwiperSlide>
+          </SwiperSlide>
+        )}
 
-
-
-        <SwiperSlide>
-          <div className="box bg-[#3872fa] p-5 py-6 cursor-pointer hover:bg-[#346ae8] rounded-md border border-[rgba(0,0,0,0.1)] flex items-center gap-4">
-            <GoGift className="text-[40px] text-[#fff]" />
-            <div className="info w-[80%]">
-              <h3 className="text-white">Total Orders</h3>
-              <b className="text-white text-[20px]">{props?.orders}</b>
+        {isFullAdmin && props?.orders !== null && props?.orders !== undefined && (
+          <SwiperSlide>
+            <div className="box bg-[#3872fa] p-5 py-6 cursor-pointer hover:bg-[#346ae8] rounded-md border border-[rgba(0,0,0,0.1)] flex items-center gap-4">
+              <GoGift className="text-[40px] text-[#fff]" />
+              <div className="info w-[80%]">
+                <h3 className="text-white">Total Orders</h3>
+                <b className="text-white text-[20px]">{props?.orders}</b>
+              </div>
+              <FiPieChart className="text-[40px] text-[#fff]" />
             </div>
-            <FiPieChart className="text-[40px] text-[#fff]" />
-          </div>
-        </SwiperSlide>
+          </SwiperSlide>
+        )}
 
 
 
@@ -88,6 +91,19 @@ const DashboardBoxes = (props) => {
 
 
 
+        {isFullAdmin && props?.reviews !== null && props?.reviews !== undefined && (
+          <SwiperSlide>
+            <div className="box p-5  bg-[#f22c61]  py-6 cursor-pointer hover:bg-[#d52c59] rounded-md border border-[rgba(0,0,0,0.1)] flex items-center gap-4">
+              <MdOutlineReviews className="text-[40px]  text-[#fff]" />
+              <div className="info w-[80%]">
+                <h3 className="text-white">Total Reviews</h3>
+                <b className="text-white text-[20px]">{props.reviews}</b>
+              </div>
+              <IoStatsChartSharp className="text-[50px] text-[#fff]" />
+            </div>
+          </SwiperSlide>
+        )}
+        
         <SwiperSlide>
           <div className="box p-5  bg-[#f22c61]  py-6 cursor-pointer hover:bg-[#d52c59] rounded-md border border-[rgba(0,0,0,0.1)] flex items-center gap-4">
             <MdOutlineReviews className="text-[40px]  text-[#fff]" />

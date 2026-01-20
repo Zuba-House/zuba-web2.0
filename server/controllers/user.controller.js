@@ -52,13 +52,23 @@ export async function registerUserController(request, response) {
         const salt = await bcryptjs.genSalt(10);
         const hashPassword = await bcryptjs.hash(password, salt);
 
+        // Check if email is authorized for marketing manager role
+        const { isMarketingManagerEmail } = await import('../config/adminEmails.js');
+        const normalizedEmail = email.toLowerCase().trim();
+        let userRole = 'USER'; // Default role
+        
+        if (isMarketingManagerEmail(normalizedEmail)) {
+            userRole = 'MARKETING_MANAGER';
+            console.log('✅ Setting MARKETING_MANAGER role for:', normalizedEmail);
+        }
+
         user = new UserModel({
             email: email,
             password: hashPassword,
             name: name,
             otp: verifyCode,
             otpExpires: Date.now() + 600000,
-
+            role: userRole
         });
 
         await user.save();

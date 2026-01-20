@@ -23,6 +23,7 @@ import { MyContext } from '../../App';
 import SearchBox from "../../Components/SearchBox";
 import { fetchDataFromApi } from "../../utils/api";
 import Products from "../Products";
+import { isAdmin } from "../../config/adminEmails";
 
 
 const Dashboard = () => {
@@ -51,6 +52,9 @@ const Dashboard = () => {
   const [ordersCount, setOrdersCount] = useState(null);
 
   const context = useContext(MyContext);
+  
+  // Check if user is full admin (not marketing manager)
+  const isFullAdmin = context?.userData ? isAdmin(context.userData) : false;
 
 
     useEffect(() => {
@@ -99,6 +103,10 @@ const Dashboard = () => {
 
 
   useEffect(() => {
+    // Only fetch orders if full admin
+    if (!isFullAdmin) {
+      return;
+    }
 
     // Filter orders based on search query
     if (orderSearchQuery !== "") {
@@ -121,26 +129,29 @@ const Dashboard = () => {
         console.error('Error fetching orders:', error);
       })
     }
-  }, [orderSearchQuery])
+  }, [orderSearchQuery, isFullAdmin])
 
 
 
   useEffect(() => {
     getTotalSalesByYear();
 
-    fetchDataFromApi("/api/user/getAllUsers").then((res) => {
-      if (res?.error === false) {
-        setUsers(res?.users)
-      }
-    })
+    // Only fetch users and reviews if full admin
+    if (isFullAdmin) {
+      fetchDataFromApi("/api/user/getAllUsers").then((res) => {
+        if (res?.error === false) {
+          setUsers(res?.users)
+        }
+      })
 
-    fetchDataFromApi("/api/user/getAllReviews").then((res) => {
-      if (res?.error === false) {
-        setAllReviews(res?.reviews)
-      }
-    })
+      fetchDataFromApi("/api/user/getAllReviews").then((res) => {
+        if (res?.error === false) {
+          setAllReviews(res?.reviews)
+        }
+      })
+    }
 
-  }, [])
+  }, [isFullAdmin])
 
 
 
@@ -219,14 +230,22 @@ const Dashboard = () => {
       </div>
 
       {
-        productData?.products?.length !== 0 && users?.length !== 0 && allReviews?.length !== 0 && <DashboardBoxes orders={ordersCount} products={productData?.totalCount || productData?.total || productData?.products?.length} users={users?.length} reviews={allReviews?.length} category={context?.catData?.length} />
+        productData?.products?.length !== 0 && <DashboardBoxes 
+          orders={isFullAdmin ? ordersCount : null} 
+          products={productData?.totalCount || productData?.total || productData?.products?.length} 
+          users={isFullAdmin ? users?.length : null} 
+          reviews={isFullAdmin ? allReviews?.length : null} 
+          category={context?.catData?.length}
+          isFullAdmin={isFullAdmin}
+        />
       }
 
       <Products/>
 
-      <div className="card my-4 shadow-md sm:rounded-lg bg-white">
-        <div className="grid grid-cols-1 lg:grid-cols-2 px-5 py-5 flex-col sm:flex-row">
-          <h2 className="text-[18px] font-[600] text-left mb-2 lg:mb-0">Recent Orders</h2>
+      {isFullAdmin && (
+        <div className="card my-4 shadow-md sm:rounded-lg bg-white">
+          <div className="grid grid-cols-1 lg:grid-cols-2 px-5 py-5 flex-col sm:flex-row">
+            <h2 className="text-[18px] font-[600] text-left mb-2 lg:mb-0">Recent Orders</h2>
           <div className="ml-auto w-full">
             <SearchBox
               searchQuery={orderSearchQuery}
@@ -472,9 +491,10 @@ const Dashboard = () => {
         }
 
       </div>
+      )}
 
-
-       <div className="card my-4 shadow-md sm:rounded-lg bg-white">
+      {isFullAdmin && (
+        <div className="card my-4 shadow-md sm:rounded-lg bg-white">
             <div className="flex items-center justify-between px-5 py-5 pb-0">
               <h2 class="text-[18px] font-[600]">Total Users & Total Sales</h2>
             </div>
@@ -543,6 +563,7 @@ const Dashboard = () => {
               }
             </div>
           </div>
+      )}
     </>
   );
 };

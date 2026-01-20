@@ -26,7 +26,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { fetchDataFromApi } from "./utils/api";
 import { useEffect } from "react";
 import Profile from "./Pages/Profile";
-import { isAdmin } from "./config/adminEmails";
+import { isAdmin, canAccessAdminPanel } from "./config/adminEmails";
 import ProductDetails from "./Pages/Products/productDetails";
 import AddProductEnhanced from "./Pages/Products/AddProductEnhanced";
 import VariationsManager from "./Pages/Products/VariationsManager";
@@ -849,9 +849,9 @@ function App() {
         const userData = res.data;
         setUserData(userData);
         
-        // Check if user is admin (both role and email must match)
-        if (userData && !isAdmin(userData)) {
-          console.warn('❌ Non-admin user detected, automatically logging out:', {
+        // Check if user can access admin panel (admin or marketing manager)
+        if (userData && !canAccessAdminPanel(userData)) {
+          console.warn('❌ Unauthorized user detected, automatically logging out:', {
             email: userData.email,
             role: userData.role
           });
@@ -869,7 +869,7 @@ function App() {
           });
           
           if (!currentPath.includes('/login')) {
-            alertBox("error", "Access denied. Only admin emails can access the admin panel. You have been automatically logged out.");
+            alertBox("error", "Access denied. Only authorized emails can access the admin panel. You have been automatically logged out.");
             
             // Redirect to login immediately
             setTimeout(() => {
