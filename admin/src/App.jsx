@@ -849,36 +849,37 @@ function App() {
         const userData = res.data;
         setUserData(userData);
         
+        // TEMPORARILY DISABLED: Admin panel access check - Remove this comment block to re-enable restriction
         // Check if user can access admin panel (admin or marketing manager)
-        if (userData && !canAccessAdminPanel(userData)) {
-          console.warn('❌ Unauthorized user detected, automatically logging out:', {
-            email: userData.email,
-            role: userData.role
-          });
-          
-          // Force logout - clear all tokens and session data
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("refreshToken");
-          localStorage.removeItem("userEmail");
-          setIsLogin(false);
-          setUserData(null);
-          
-          // Call logout API to invalidate server-side session
-          fetchDataFromApi(`/api/user/logout?token=${localStorage.getItem('accessToken')}`).catch(() => {
-            // Ignore errors - we're already clearing everything
-          });
-          
-          if (!currentPath.includes('/login')) {
-            alertBox("error", "Access denied. Only authorized emails can access the admin panel. You have been automatically logged out.");
-            
-            // Redirect to login immediately
-            setTimeout(() => {
-              if (!window.location.pathname.includes('/login')) {
-                window.location.href = "/login";
-              }
-            }, 1000);
-          }
-        }
+        // if (userData && !canAccessAdminPanel(userData)) {
+        //   console.warn('❌ Unauthorized user detected, automatically logging out:', {
+        //     email: userData.email,
+        //     role: userData.role
+        //   });
+        //   
+        //   // Force logout - clear all tokens and session data
+        //   localStorage.removeItem("accessToken");
+        //   localStorage.removeItem("refreshToken");
+        //   localStorage.removeItem("userEmail");
+        //   setIsLogin(false);
+        //   setUserData(null);
+        //   
+        //   // Call logout API to invalidate server-side session
+        //   fetchDataFromApi(`/api/user/logout?token=${localStorage.getItem('accessToken')}`).catch(() => {
+        //     // Ignore errors - we're already clearing everything
+        //   });
+        //   
+        //   if (!currentPath.includes('/login')) {
+        //     alertBox("error", "Access denied. Only authorized emails can access the admin panel. You have been automatically logged out.");
+        //     
+        //     // Redirect to login immediately
+        //     setTimeout(() => {
+        //       if (!window.location.pathname.includes('/login')) {
+        //         window.location.href = "/login";
+        //       }
+        //     }, 1000);
+        //   }
+        // }
       }).catch((error) => {
         console.error('Error fetching user details:', error);
         // If there's an error, clear tokens

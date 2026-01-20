@@ -40,28 +40,29 @@ const SignUp = () => {
     const history = useNavigate();
 
     useEffect(() => {
+        // TEMPORARILY DISABLED: Admin email check on page load - Remove this comment block to re-enable restriction
         // Check if user is already logged in but not admin - auto logout
-        const token = localStorage.getItem('accessToken');
-        if (token) {
-            fetchDataFromApi("/api/user/user-details").then((res) => {
-                if (res?.data && res.data.email) {
-                    if (!isAdminEmail(res.data.email)) {
-                        // Non-admin user detected - force logout
-                        localStorage.removeItem("accessToken");
-                        localStorage.removeItem("refreshToken");
-                        localStorage.removeItem("userEmail");
-                        context.setIsLogin(false);
-                        context.alertBox("error", "Access denied. Only admin emails can access the admin panel.");
-                    }
-                }
-            }).catch(() => {
-                // If check fails, clear tokens anyway
-                localStorage.removeItem("accessToken");
-                localStorage.removeItem("refreshToken");
-                localStorage.removeItem("userEmail");
-                context.setIsLogin(false);
-            });
-        }
+        // const token = localStorage.getItem('accessToken');
+        // if (token) {
+        //     fetchDataFromApi("/api/user/user-details").then((res) => {
+        //         if (res?.data && res.data.email) {
+        //             if (!isAdminEmail(res.data.email)) {
+        //                 // Non-admin user detected - force logout
+        //                 localStorage.removeItem("accessToken");
+        //                 localStorage.removeItem("refreshToken");
+        //                 localStorage.removeItem("userEmail");
+        //                 context.setIsLogin(false);
+        //                 context.alertBox("error", "Access denied. Only admin emails can access the admin panel.");
+        //             }
+        //         }
+        //     }).catch(() => {
+        //         // If check fails, clear tokens anyway
+        //         localStorage.removeItem("accessToken");
+        //         localStorage.removeItem("refreshToken");
+        //         localStorage.removeItem("userEmail");
+        //         context.setIsLogin(false);
+        //     });
+        // }
 
         fetchDataFromApi("/api/logo").then((res) => {
             if (res?.logo && res.logo.length > 0 && res.logo[0]?.logo) {
@@ -106,17 +107,18 @@ const SignUp = () => {
             return false
         }
 
+        // TEMPORARILY DISABLED: Admin email check - Remove this comment block to re-enable restriction
         // Check if email is admin email
-        if (!isAdminEmail(formFields.email)) {
-            // Clear any existing tokens
-            localStorage.removeItem("accessToken");
-            localStorage.removeItem("refreshToken");
-            localStorage.removeItem("userEmail");
-            context.setIsLogin(false);
-            context.alertBox("error", "Access denied. Only authorized admin emails can create accounts.");
-            setIsLoading(false);
-            return false;
-        }
+        // if (!isAdminEmail(formFields.email)) {
+        //     // Clear any existing tokens
+        //     localStorage.removeItem("accessToken");
+        //     localStorage.removeItem("refreshToken");
+        //     localStorage.removeItem("userEmail");
+        //     context.setIsLogin(false);
+        //     context.alertBox("error", "Access denied. Only authorized admin emails can create accounts.");
+        //     setIsLoading(false);
+        //     return false;
+        // }
 
         if (formFields.password === "") {
             context.alertBox("error", "Please enter password");
@@ -171,18 +173,19 @@ const SignUp = () => {
                     role: "USER"
                 };
 
+                // TEMPORARILY DISABLED: Admin email check for Google signup - Remove this comment block to re-enable restriction
                 // Check if email is admin email
-                if (!isAdminEmail(fields.email)) {
-                    // Clear any existing tokens
-                    localStorage.removeItem("accessToken");
-                    localStorage.removeItem("refreshToken");
-                    localStorage.removeItem("userEmail");
-                    context.setIsLogin(false);
-                    setLoadingGoogle(false);
-                    setIsLoading(false);
-                    context.alertBox("error", "Access denied. Only authorized admin emails can create accounts.");
-                    return;
-                }
+                // if (!isAdminEmail(fields.email)) {
+                //     // Clear any existing tokens
+                //     localStorage.removeItem("accessToken");
+                //     localStorage.removeItem("refreshToken");
+                //     localStorage.removeItem("userEmail");
+                //     context.setIsLogin(false);
+                //     setLoadingGoogle(false);
+                //     setIsLoading(false);
+                //     context.alertBox("error", "Access denied. Only authorized admin emails can create accounts.");
+                //     return;
+                // }
 
                 postData("/api/user/authWithGoogle", fields).then((res) => {
 
