@@ -164,29 +164,172 @@ export async function registerUserController(request, response) {
     }
 }
 
+// Resend OTP for email verification
+export async function resendOTPController(request, response) {
+    try {
+        const { email } = request.body;
+
+        if (!email) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: "Email is required"
+            });
+        }
+
+        const user = await UserModel.findOne({ email: email.toLowerCase().trim() });
+        
+        if (!user) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        // Generate new OTP
+        const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+        user.otp = verifyCode;
+        user.otpExpires = Date.now() + 600000; // 10 minutes
+        await user.save();
+
+        // Send verification email
+        console.log('📧 ====== RESENDING OTP EMAIL ======');
+        console.log('📧 Recipient:', email);
+        console.log('👤 Name:', user.name);
+        console.log('🔐 New OTP Code:', verifyCode);
+        console.log('⏰ Expires in: 10 minutes');
+        
+        // Check SendGrid configuration
+        const hasSendGridKey = !!process.env.SENDGRID_API_KEY;
+        const senderEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER || process.env.EMAIL;
+        console.log(`📧 SendGrid Config: API_KEY=${hasSendGridKey ? 'SET' : 'NOT SET'}, FROM=${senderEmail || 'NOT SET'}`);
+        
+        let emailSent = false;
+        let emailError = null;
+        
+        try {
+            if (!hasSendGridKey) {
+                console.error('❌ SENDGRID_API_KEY is not set - email cannot be sent');
+                emailError = 'SENDGRID_API_KEY environment variable is not configured';
+            } else {
+                emailSent = await sendEmailFun({
+                    sendTo: email,
+                    subject: "Verify Your Email - Zuba House (Resent)",
+                    text: `Hi ${user.name},\n\nYour new verification code is: ${verifyCode}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, please ignore this email.\n\nBest regards,\nZuba House Team`,
+                    html: VerificationEmail(user.name, verifyCode)
+                });
+
+                if (emailSent) {
+                    console.log('✅ OTP email resent successfully to:', email);
+                    console.log('====================================\n');
+                } else {
+                    console.error('❌ Failed to resend OTP email to:', email);
+                    emailError = 'Email delivery failed - check SendGrid configuration';
+                }
+            }
+        } catch (emailErrorCaught) {
+            console.error('❌ Error resending OTP email:', {
+                to: email,
+                error: emailErrorCaught.message,
+                stack: emailErrorCaught.stack
+            });
+            emailError = emailErrorCaught.message;
+        }
+        
+        // Log OTP in console for debugging (always)
+        console.log('🔑 NEW OTP CODE (for verification):', verifyCode);
+        console.log('====================================\n');
+
+        const isLocal = !process.env.RENDER && !process.env.VERCEL;
+        const successMessage = emailSent 
+            ? "OTP has been resent to your email. Please check your inbox (and spam folder)."
+            : `OTP has been regenerated. ${isLocal ? 'Check server console for OTP code.' : 'Email delivery issue - OTP included in response.'}`;
+
+        return response.status(200).json({
+            success: true,
+            error: false,
+            message: successMessage,
+            data: {
+                email: email,
+                emailSent: emailSent,
+                // Include OTP in response when email fails (for admin/testing)
+                ...(!emailSent ? { otp: verifyCode } : {}),
+                ...(emailError ? { emailError: emailError } : {})
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Resend OTP error:', error);
+        return response.status(500).json({
+            error: true,
+            success: false,
+            message: error.message || "Failed to resend OTP"
+        });
+    }
+}
+
 export async function verifyEmailController(request, response) {
     try {
         const { email, otp } = request.body;
 
-        const user = await UserModel.findOne({ email: email });
+        if (!email || !otp) {
+            return response.status(400).json({ 
+                error: true, 
+                success: false, 
+                message: "Email and OTP are required" 
+            });
+        }
+
+        const user = await UserModel.findOne({ email: email.toLowerCase().trim() });
         if (!user) {
-            return response.status(400).json({ error: true, success: false, message: "User not found" });
+            return response.status(400).json({ 
+                error: true, 
+                success: false, 
+                message: "User not found" 
+            });
+        }
+
+        // Check if OTP exists and is not expired
+        if (!user.otp) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: "No OTP found. Please request a new OTP."
+            });
         }
 
         const isCodeValid = user.otp === otp;
-        const isNotExpired = user.otpExpires > Date.now();
+        const isNotExpired = user.otpExpires && user.otpExpires > Date.now();
 
-        if (isCodeValid && isNotExpired) {
-            user.verify_email = true;
-            user.otp = null;
-            user.otpExpires = null;
-            await user.save();
-            return response.status(200).json({ error: false, success: true, message: "Email verified successfully" });
-        } else if (!isCodeValid) {
-            return response.status(400).json({ error: true, success: false, message: "Invalid OTP" });
-        } else {
-            return response.status(400).json({ error: true, success: false, message: "OTP expired" });
+        if (!isCodeValid) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: "Invalid OTP code. Please check and try again."
+            });
         }
+
+        if (!isNotExpired) {
+            return response.status(400).json({
+                error: true,
+                success: false,
+                message: "OTP has expired. Please request a new OTP."
+            });
+        }
+
+        // If we reach here, OTP is valid and not expired
+        user.verify_email = true;
+        user.otp = null;
+        user.otpExpires = null;
+        await user.save();
+        
+        console.log('✅ Email verified successfully for:', email);
+        return response.status(200).json({ 
+            error: false, 
+            success: true, 
+            message: "Email verified successfully" 
+        });
 
     } catch (error) {
         return response.status(500).json({

@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import {addReview, approveReview, authWithGoogle, changePasswordController, deleteMultiple, deleteUser, forgotPasswordController, getAllReviews, getAllUsers, getProductReviewsAdmin, getReviews, loginUserController, logoutController, logoutAllNonAdminUsers, markReviewAsSpam, refreshToken, registerUserController, rejectReview, removeImageFromCloudinary, resetpassword, updateUserDetails, userAvatarController, userDetails, verifyEmailController, verifyForgotPasswordOtp} from '../controllers/user.controller.js';
+import {addReview, approveReview, authWithGoogle, changePasswordController, deleteMultiple, deleteUser, forgotPasswordController, getAllReviews, getAllUsers, getProductReviewsAdmin, getReviews, loginUserController, logoutController, logoutAllNonAdminUsers, markReviewAsSpam, refreshToken, registerUserController, rejectReview, removeImageFromCloudinary, resetpassword, resendOTPController, updateUserDetails, userAvatarController, userDetails, verifyEmailController, verifyForgotPasswordOtp} from '../controllers/user.controller.js';
 import auth, { optionalAuth } from '../middlewares/auth.js';
 import requireAdminEmail from '../middlewares/adminEmailCheck.js';
 import upload from '../middlewares/multer.js';
@@ -7,6 +7,7 @@ import upload from '../middlewares/multer.js';
 const userRouter = Router()
 userRouter.post('/register',registerUserController)
 userRouter.post('/verifyEmail',verifyEmailController)
+userRouter.post('/resend-otp',resendOTPController)
 userRouter.post('/login',loginUserController)
 userRouter.post('/authWithGoogle',authWithGoogle)
 userRouter.get('/logout',auth,logoutController);
