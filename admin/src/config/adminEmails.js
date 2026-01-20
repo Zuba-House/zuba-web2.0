@@ -38,6 +38,16 @@ export const isMarketingManagerEmail = (email) => {
 };
 
 /**
+ * Check if an email can access admin panel (either admin or marketing manager email)
+ * @param {string} email - Email address to check
+ * @returns {boolean} - True if email can access admin panel
+ */
+export const canAccessAdminPanelByEmail = (email) => {
+  if (!email) return false;
+  return isAdminEmail(email) || isMarketingManagerEmail(email);
+};
+
+/**
  * Check if user can access admin panel (ADMIN or MARKETING_MANAGER)
  * @param {object} userData - User data object
  * @returns {boolean} - True if user can access admin panel
@@ -79,6 +89,7 @@ export default {
   MARKETING_MANAGER_EMAILS,
   isAdminEmail,
   isMarketingManagerEmail,
+  canAccessAdminPanelByEmail,
   canAccessAdminPanel,
   isAdmin,
   isMarketingManager

@@ -14,7 +14,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { fetchDataFromApi, postData } from "../../utils/api";
 import { useContext } from "react";
 import { MyContext } from "../../App.jsx";
-import { isAdminEmail } from "../../config/adminEmails";
+import { isAdminEmail, canAccessAdminPanel, canAccessAdminPanelByEmail } from "../../config/adminEmails";
 
 import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { firebaseApp } from "../../firebase";
@@ -37,28 +37,29 @@ const Login = () => {
   const history = useNavigate();
 
   useEffect(() => {
+    // TEMPORARILY DISABLED: Admin email check on page load - Remove this comment block to re-enable restriction
     // Check if user is already logged in but not admin - auto logout
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      fetchDataFromApi("/api/user/user-details").then((res) => {
-        if (res?.data && res.data.email) {
-          if (!isAdminEmail(res.data.email)) {
-            // Non-admin user detected - force logout
-            localStorage.removeItem("accessToken");
-            localStorage.removeItem("refreshToken");
-            localStorage.removeItem("userEmail");
-            context.setIsLogin(false);
-            context.alertBox("error", "Access denied. Only admin emails can access the admin panel.");
-          }
-        }
-      }).catch(() => {
-        // If check fails, clear tokens anyway
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("userEmail");
-        context.setIsLogin(false);
-      });
-    }
+    // const token = localStorage.getItem('accessToken');
+    // if (token) {
+    //   fetchDataFromApi("/api/user/user-details").then((res) => {
+    //     if (res?.data && res.data.email) {
+    //       if (!canAccessAdminPanel(res.data.email)) {
+    //         // Non-admin user detected - force logout
+    //         localStorage.removeItem("accessToken");
+    //         localStorage.removeItem("refreshToken");
+    //         localStorage.removeItem("userEmail");
+    //         context.setIsLogin(false);
+    //         context.alertBox("error", "Access denied. Only admin emails can access the admin panel.");
+    //       }
+    //     }
+    //   }).catch(() => {
+    //     // If check fails, clear tokens anyway
+    //     localStorage.removeItem("accessToken");
+    //     localStorage.removeItem("refreshToken");
+    //     localStorage.removeItem("userEmail");
+    //     context.setIsLogin(false);
+    //   });
+    // }
 
     // Fetch logo - this endpoint might not require auth, but handle errors gracefully
     fetchDataFromApi("/api/logo").then((res) => {
@@ -129,17 +130,18 @@ const Login = () => {
       return false
     }
 
-    // Check if email is admin email
-    if (!isAdminEmail(formFields.email)) {
-      // Clear any existing tokens
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      localStorage.removeItem("userEmail");
-      context.setIsLogin(false);
-      context.alertBox("error", "Access denied. Only authorized admin emails can access the admin panel.");
-      setIsLoading(false);
-      return false;
-    }
+    // TEMPORARILY DISABLED: Admin email check - Remove this comment block to re-enable restriction
+    // Check if email can access admin panel (admin or marketing manager)
+    // if (!canAccessAdminPanelByEmail(formFields.email)) {
+    //   // Clear any existing tokens
+    //   localStorage.removeItem("accessToken");
+    //   localStorage.removeItem("refreshToken");
+    //   localStorage.removeItem("userEmail");
+    //   context.setIsLogin(false);
+    //   context.alertBox("error", "Access denied. Only authorized admin emails can access the admin panel.");
+    //   setIsLoading(false);
+    //   return false;
+    // }
 
     postData("/api/user/login", formFields, { withCredentials: true }).then((res) => {
 
@@ -191,18 +193,19 @@ const Login = () => {
           role: "USER"
         };
 
-        // Check if email is admin email
-        if (!isAdminEmail(fields.email)) {
-          // Clear any existing tokens
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("refreshToken");
-          localStorage.removeItem("userEmail");
-          context.setIsLogin(false);
-          setLoadingGoogle(false);
-          setIsLoading(false);
-          context.alertBox("error", "Access denied. Only authorized admin emails can access the admin panel.");
-          return;
-        }
+        // TEMPORARILY DISABLED: Admin email check for Google signup - Remove this comment block to re-enable restriction
+        // Check if email can access admin panel (admin or marketing manager)
+        // if (!canAccessAdminPanelByEmail(fields.email)) {
+        //   // Clear any existing tokens
+        //   localStorage.removeItem("accessToken");
+        //   localStorage.removeItem("refreshToken");
+        //   localStorage.removeItem("userEmail");
+        //   context.setIsLogin(false);
+        //   setLoadingGoogle(false);
+        //   setIsLoading(false);
+        //   context.alertBox("error", "Access denied. Only authorized admin emails can access the admin panel.");
+        //   return;
+        // }
 
         postData("/api/user/authWithGoogle", fields).then((res) => {
 
