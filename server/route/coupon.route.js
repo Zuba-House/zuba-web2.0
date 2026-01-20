@@ -1,6 +1,6 @@
 import express from 'express';
 import auth, { optionalAuth } from '../middlewares/auth.js';
-import requireAdminEmail from '../middlewares/adminEmailCheck.js';
+import { requireAdminPanelAccess } from '../middlewares/adminEmailCheck.js';
 import * as couponController from '../controllers/coupon.controller.js';
 
 const router = express.Router();
@@ -10,11 +10,11 @@ router.post('/validate', optionalAuth, couponController.validateCoupon);
 router.post('/apply', optionalAuth, couponController.applyCoupon);
 router.get('/', couponController.getActiveCoupons);
 
-// Admin routes - require authentication and admin email
-router.post('/', auth, requireAdminEmail, couponController.createCoupon);
-router.get('/all', auth, requireAdminEmail, couponController.getAllCoupons);
-router.put('/:id', auth, requireAdminEmail, couponController.updateCoupon);
-router.delete('/:id', auth, requireAdminEmail, couponController.deleteCoupon);
+// Admin/Marketing Manager routes - require authentication and admin panel access
+router.post('/', auth, requireAdminPanelAccess, couponController.createCoupon);
+router.get('/all', auth, requireAdminPanelAccess, couponController.getAllCoupons);
+router.put('/:id', auth, requireAdminPanelAccess, couponController.updateCoupon);
+router.delete('/:id', auth, requireAdminPanelAccess, couponController.deleteCoupon);
 
 export default router;
 
