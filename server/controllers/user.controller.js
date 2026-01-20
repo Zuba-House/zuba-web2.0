@@ -73,19 +73,41 @@ export async function registerUserController(request, response) {
 
         await user.save();
 
-        // Send verification email
-        console.log('📧 Sending OTP email to:', email);
-        const emailSent = await sendEmailFun({
-            sendTo: email,
-            subject: "Verify Your Email - Zuba House",
-            text: "",
-            html: VerificationEmail(name, verifyCode)
-        });
+        // Send verification email - CRITICAL: Must send OTP for account verification
+        console.log('📧 ====== SENDING OTP EMAIL ======');
+        console.log('📧 Recipient:', email);
+        console.log('👤 Name:', name);
+        console.log('🔐 OTP Code:', verifyCode);
+        console.log('⏰ Expires in: 10 minutes');
+        console.log('👤 Role:', userRole);
+        
+        let emailSent = false;
+        try {
+            emailSent = await sendEmailFun({
+                sendTo: email,
+                subject: "Verify Your Email - Zuba House",
+                text: `Hi ${name},\n\nYour verification code is: ${verifyCode}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, please ignore this email.\n\nBest regards,\nZuba House Team`,
+                html: VerificationEmail(name, verifyCode)
+            });
 
-        if (emailSent) {
-            console.log('✅ OTP email sent successfully to:', email);
-        } else {
-            console.error('❌ Failed to send OTP email to:', email);
+            if (emailSent) {
+                console.log('✅ OTP email sent successfully to:', email);
+                console.log('====================================\n');
+            } else {
+                console.error('❌ Failed to send OTP email to:', email);
+                console.error('⚠️ Registration succeeded but email delivery failed');
+                console.log('====================================\n');
+                // Log OTP in console for debugging if email fails
+                console.log('🔑 OTP CODE (for manual verification if needed):', verifyCode);
+            }
+        } catch (emailError) {
+            console.error('❌ Error sending OTP email:', {
+                to: email,
+                error: emailError.message,
+                stack: emailError.stack
+            });
+            console.log('🔑 OTP CODE (for manual verification if needed):', verifyCode);
+            console.log('====================================\n');
             // Don't fail registration, but log the error
         }
 
@@ -95,11 +117,15 @@ export async function registerUserController(request, response) {
             process.env.JSON_WEB_TOKEN_SECRET_KEY
         );
 
+        // Determine success message based on email delivery
+        const successMessage = emailSent 
+            ? "User registered successfully! Please check your email for the verification code (OTP)."
+            : "User registered successfully! Please check your email for the verification code. If you don't receive it, check your spam folder or contact support.";
 
         return response.status(200).json({
             success: true,
             error: false,
-            message: "User registered successfully! ",
+            message: successMessage,
             token: token, // Optional: include this if needed for verification
         });
 
