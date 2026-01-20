@@ -81,53 +81,77 @@ export async function registerUserController(request, response) {
         console.log('⏰ Expires in: 10 minutes');
         console.log('👤 Role:', userRole);
         
+        // Check SendGrid configuration
+        const hasSendGridKey = !!process.env.SENDGRID_API_KEY;
+        const senderEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER || process.env.EMAIL;
+        console.log(`📧 SendGrid Config: API_KEY=${hasSendGridKey ? 'SET' : 'NOT SET'}, FROM=${senderEmail || 'NOT SET'}`);
+        
         let emailSent = false;
+        let emailError = null;
+        
         try {
-            emailSent = await sendEmailFun({
-                sendTo: email,
-                subject: "Verify Your Email - Zuba House",
-                text: `Hi ${name},\n\nYour verification code is: ${verifyCode}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, please ignore this email.\n\nBest regards,\nZuba House Team`,
-                html: VerificationEmail(name, verifyCode)
-            });
-
-            if (emailSent) {
-                console.log('✅ OTP email sent successfully to:', email);
-                console.log('====================================\n');
+            if (!hasSendGridKey) {
+                console.error('❌ SENDGRID_API_KEY is not set - email cannot be sent');
+                emailError = 'SENDGRID_API_KEY environment variable is not configured';
             } else {
-                console.error('❌ Failed to send OTP email to:', email);
-                console.error('⚠️ Registration succeeded but email delivery failed');
-                console.log('====================================\n');
-                // Log OTP in console for debugging if email fails
-                console.log('🔑 OTP CODE (for manual verification if needed):', verifyCode);
+                emailSent = await sendEmailFun({
+                    sendTo: email,
+                    subject: "Verify Your Email - Zuba House",
+                    text: `Hi ${name},\n\nYour verification code is: ${verifyCode}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, please ignore this email.\n\nBest regards,\nZuba House Team`,
+                    html: VerificationEmail(name, verifyCode)
+                });
+
+                if (emailSent) {
+                    console.log('✅ OTP email sent successfully to:', email);
+                    console.log('====================================\n');
+                } else {
+                    console.error('❌ Failed to send OTP email to:', email);
+                    console.error('⚠️ Registration succeeded but email delivery failed');
+                    emailError = 'Email delivery failed - check SendGrid configuration';
+                }
             }
-        } catch (emailError) {
+        } catch (emailErrorCaught) {
             console.error('❌ Error sending OTP email:', {
                 to: email,
-                error: emailError.message,
-                stack: emailError.stack
+                error: emailErrorCaught.message,
+                stack: emailErrorCaught.stack
             });
-            console.log('🔑 OTP CODE (for manual verification if needed):', verifyCode);
-            console.log('====================================\n');
-            // Don't fail registration, but log the error
+            emailError = emailErrorCaught.message;
         }
+        
+        // Log OTP in console for debugging (always)
+        console.log('🔑 OTP CODE (for verification):', verifyCode);
+        console.log('====================================\n');
 
-        // Create a JWT token for verification purposes
+        // Create a JWT token for verification purposes (expires in 7 days)
         const token = jwt.sign(
             { email: user.email, id: user._id },
-            process.env.JSON_WEB_TOKEN_SECRET_KEY
+            process.env.JSON_WEB_TOKEN_SECRET_KEY,
+            { expiresIn: '7d' } // Extended expiration for email verification token
         );
 
-        // Determine success message based on email delivery
+        // Determine success message and response data
+        const isLocal = !process.env.RENDER && !process.env.VERCEL;
         const successMessage = emailSent 
             ? "User registered successfully! Please check your email for the verification code (OTP)."
-            : "User registered successfully! Please check your email for the verification code. If you don't receive it, check your spam folder or contact support.";
+            : `User registered successfully! ${isLocal ? 'Check server console for OTP code.' : 'Email delivery issue - OTP included in response for verification.'}`;
 
-        return response.status(200).json({
+        // Build response - include OTP if email failed (for testing/admin use)
+        const responseData = {
             success: true,
             error: false,
             message: successMessage,
-            token: token, // Optional: include this if needed for verification
-        });
+            token: token,
+            data: {
+                email: email,
+                emailSent: emailSent,
+                // Include OTP in response when email fails (for admin/testing)
+                ...(!emailSent ? { otp: verifyCode } : {}),
+                ...(emailError ? { emailError: emailError } : {})
+            }
+        };
+
+        return response.status(200).json(responseData);
 
 
 

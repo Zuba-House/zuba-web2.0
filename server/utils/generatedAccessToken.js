@@ -15,7 +15,7 @@ const generatedAccessToken = async (userId) => {
     const token = await jwt.sign(
         payload,
         process.env.SECRET_KEY_ACCESS_TOKEN,
-        { expiresIn: '24h' }
+        { expiresIn: '7d' } // Extended from 24h to 7 days for better user experience
     )
 
     return token
