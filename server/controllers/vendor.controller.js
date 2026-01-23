@@ -1701,12 +1701,23 @@ async function sendOTPEmail(email, name, otp) {
   console.log('👤 Name:', name);
   console.log('🔐 OTP:', otp);
   
+  // Generate email template
+  const emailHtml = VerificationEmail(name, otp);
+  const emailText = `Hi ${name},\n\nYour verification code is: ${otp}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, please ignore this email.\n\nBest regards,\nZuba House Team`;
+  
+  console.log('📧 Email template prepared:', {
+    hasHtml: !!emailHtml,
+    htmlLength: emailHtml?.length || 0,
+    hasText: !!emailText,
+    textLength: emailText?.length || 0
+  });
+  
   try {
     const result = await sendEmailFun({
       sendTo: email, // Can be string or array
-      subject: "🔐 Verify Your Email - Zuba House Vendor Registration",
-      text: `Hi ${name},\n\nYour verification code is: ${otp}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, please ignore this email.\n\nBest regards,\nZuba House Team`,
-      html: VerificationEmail(name, otp)
+      subject: "Verify Your Email - Zuba House Vendor Registration", // Removed emoji - might cause SendGrid issues
+      text: emailText,
+      html: emailHtml
     });
     
     if (result) {
@@ -1714,7 +1725,8 @@ async function sendOTPEmail(email, name, otp) {
       console.log('====================================\n');
       return true;
     } else {
-      console.log('⚠️ SendEmailFun returned false for:', email);
+      console.error('❌ SendEmailFun returned false for:', email);
+      console.error('⚠️ Check server logs above for detailed SendGrid error information');
       console.log('====================================\n');
       return false;
     }
@@ -1724,6 +1736,13 @@ async function sendOTPEmail(email, name, otp) {
       error: error.message,
       stack: error.stack
     });
+    if (error.response) {
+      console.error('❌ SendGrid error response:', {
+        statusCode: error.response.statusCode,
+        body: error.response.body,
+        errors: error.response.body?.errors
+      });
+    }
     console.log('====================================\n');
     throw error;
   }

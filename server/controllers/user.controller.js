@@ -10,7 +10,7 @@ import { isAdminEmail } from '../config/adminEmails.js';
 
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
-import ReviewModel from '../models/reviews.model.js.js';
+import ReviewModel from '../models/reviews.model.js';
 
 cloudinary.config({
     cloud_name: process.env.cloudinary_Config_Cloud_Name,
@@ -36,7 +36,8 @@ export async function registerUserController(request, response) {
         // NOTE: Admin email check removed - this endpoint is for regular user registration
         // Admin email check is only applied to admin panel routes, not general user routes
 
-        user = await UserModel.findOne({ email: email });
+        const normalizedEmail = email.toLowerCase().trim();
+        user = await UserModel.findOne({ email: normalizedEmail });
 
         if (user) {
             return response.json({
@@ -54,7 +55,6 @@ export async function registerUserController(request, response) {
 
         // Check if email is authorized for marketing manager role
         const { isMarketingManagerEmail } = await import('../config/adminEmails.js');
-        const normalizedEmail = email.toLowerCase().trim();
         let userRole = 'USER'; // Default role
         
         if (isMarketingManagerEmail(normalizedEmail)) {
@@ -63,7 +63,7 @@ export async function registerUserController(request, response) {
         }
 
         user = new UserModel({
-            email: email,
+            email: normalizedEmail,
             password: hashPassword,
             name: name,
             otp: verifyCode,
@@ -75,7 +75,7 @@ export async function registerUserController(request, response) {
 
         // Send verification email - CRITICAL: Must send OTP for account verification
         console.log('📧 ====== SENDING OTP EMAIL ======');
-        console.log('📧 Recipient:', email);
+        console.log('📧 Recipient:', normalizedEmail);
         console.log('👤 Name:', name);
         console.log('🔐 OTP Code:', verifyCode);
         console.log('⏰ Expires in: 10 minutes');
@@ -94,25 +94,45 @@ export async function registerUserController(request, response) {
                 console.error('❌ SENDGRID_API_KEY is not set - email cannot be sent');
                 emailError = 'SENDGRID_API_KEY environment variable is not configured';
             } else {
-                emailSent = await sendEmailFun({
-                    sendTo: email,
+                // Generate email template
+                const emailHtml = VerificationEmail(name, verifyCode);
+                const emailText = `Hi ${name},\n\nYour verification code is: ${verifyCode}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, please ignore this email.\n\nBest regards,\nZuba House Team`;
+                
+                console.log('📧 Calling sendEmailFun with:', {
+                    sendTo: normalizedEmail,
                     subject: "Verify Your Email - Zuba House",
-                    text: `Hi ${name},\n\nYour verification code is: ${verifyCode}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, please ignore this email.\n\nBest regards,\nZuba House Team`,
-                    html: VerificationEmail(name, verifyCode)
+                    hasHtml: !!emailHtml,
+                    htmlLength: emailHtml?.length || 0,
+                    hasText: !!emailText,
+                    textLength: emailText?.length || 0
                 });
+                
+                // Validate email template before sending
+                if (!emailHtml || emailHtml.trim().length === 0) {
+                    console.error('❌ Email HTML template is empty or invalid');
+                    emailError = 'Email template generation failed';
+                } else {
+                    emailSent = await sendEmailFun({
+                        sendTo: normalizedEmail,
+                        subject: "Verify Your Email - Zuba House",
+                        text: emailText,
+                        html: emailHtml
+                    });
+                }
 
                 if (emailSent) {
-                    console.log('✅ OTP email sent successfully to:', email);
+                    console.log('✅ OTP email sent successfully to:', normalizedEmail);
                     console.log('====================================\n');
                 } else {
-                    console.error('❌ Failed to send OTP email to:', email);
+                    console.error('❌ Failed to send OTP email to:', normalizedEmail);
                     console.error('⚠️ Registration succeeded but email delivery failed');
-                    emailError = 'Email delivery failed - check SendGrid configuration';
+                    console.error('⚠️ Check server logs above for detailed SendGrid error information');
+                    emailError = 'Email delivery failed - check SendGrid configuration and server logs';
                 }
             }
         } catch (emailErrorCaught) {
             console.error('❌ Error sending OTP email:', {
-                to: email,
+                to: normalizedEmail,
                 error: emailErrorCaught.message,
                 stack: emailErrorCaught.stack
             });
@@ -143,7 +163,7 @@ export async function registerUserController(request, response) {
             message: successMessage,
             token: token,
             data: {
-                email: email,
+                email: normalizedEmail,
                 emailSent: emailSent,
                 // Include OTP in response when email fails (for admin/testing)
                 ...(!emailSent ? { otp: verifyCode } : {}),
@@ -213,19 +233,39 @@ export async function resendOTPController(request, response) {
                 console.error('❌ SENDGRID_API_KEY is not set - email cannot be sent');
                 emailError = 'SENDGRID_API_KEY environment variable is not configured';
             } else {
-                emailSent = await sendEmailFun({
+                // Generate email template
+                const emailHtml = VerificationEmail(user.name, verifyCode);
+                const emailText = `Hi ${user.name},\n\nYour new verification code is: ${verifyCode}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, please ignore this email.\n\nBest regards,\nZuba House Team`;
+                
+                console.log('📧 Calling sendEmailFun (resend) with:', {
                     sendTo: email,
                     subject: "Verify Your Email - Zuba House (Resent)",
-                    text: `Hi ${user.name},\n\nYour new verification code is: ${verifyCode}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, please ignore this email.\n\nBest regards,\nZuba House Team`,
-                    html: VerificationEmail(user.name, verifyCode)
+                    hasHtml: !!emailHtml,
+                    htmlLength: emailHtml?.length || 0,
+                    hasText: !!emailText,
+                    textLength: emailText?.length || 0
                 });
+                
+                // Validate email template before sending
+                if (!emailHtml || emailHtml.trim().length === 0) {
+                    console.error('❌ Email HTML template is empty or invalid');
+                    emailError = 'Email template generation failed';
+                } else {
+                    emailSent = await sendEmailFun({
+                        sendTo: email,
+                        subject: "Verify Your Email - Zuba House (Resent)",
+                        text: emailText,
+                        html: emailHtml
+                    });
+                }
 
                 if (emailSent) {
                     console.log('✅ OTP email resent successfully to:', email);
                     console.log('====================================\n');
                 } else {
                     console.error('❌ Failed to resend OTP email to:', email);
-                    emailError = 'Email delivery failed - check SendGrid configuration';
+                    console.error('⚠️ Check server logs above for detailed SendGrid error information');
+                    emailError = 'Email delivery failed - check SendGrid configuration and server logs';
                 }
             }
         } catch (emailErrorCaught) {
@@ -348,13 +388,14 @@ export async function authWithGoogle(request, response) {
         // NOTE: Admin email check removed - this endpoint is for regular user Google auth
         // Admin email check is only applied to admin panel routes, not general user routes
 
-        const existingUser = await UserModel.findOne({ email: email });
+        const normalizedEmail = email ? email.toLowerCase().trim() : email;
+        const existingUser = await UserModel.findOne({ email: normalizedEmail });
 
         if (!existingUser) {
             const user = await UserModel.create({
                 name: name,
                 mobile: mobile,
-                email: email,
+                email: normalizedEmail,
                 password: "null",
                 avatar: avatar,
                 role: role,
@@ -439,7 +480,8 @@ export async function loginUserController(request, response) {
         // NOTE: Admin email check removed - this endpoint is for regular user login
         // Admin email check is only applied to admin panel routes, not general user routes
 
-        const user = await UserModel.findOne({ email: email });
+        const normalizedEmail = email.toLowerCase().trim();
+        const user = await UserModel.findOne({ email: normalizedEmail });
 
         if (!user) {
             return response.status(400).json({
@@ -744,7 +786,16 @@ export async function forgotPasswordController(request, response) {
     try {
         const { email } = request.body
 
-        const user = await UserModel.findOne({ email: email })
+        if (!email) {
+            return response.status(400).json({
+                message: "Email is required",
+                error: true,
+                success: false
+            })
+        }
+
+        const normalizedEmail = email.toLowerCase().trim();
+        const user = await UserModel.findOne({ email: normalizedEmail })
 
         if (!user) {
             return response.status(400).json({
@@ -762,18 +813,18 @@ export async function forgotPasswordController(request, response) {
 
             await user.save();
 
-            console.log('📧 Sending forgot password OTP email to:', email);
+            console.log('📧 Sending forgot password OTP email to:', normalizedEmail);
             const emailSent = await sendEmailFun({
-                sendTo: email,
+                sendTo: normalizedEmail,
                 subject: "Password Reset OTP - Zuba House",
                 text: "",
                 html: VerificationEmail(user.name, verifyCode)
             });
 
             if (emailSent) {
-                console.log('✅ Forgot password OTP email sent successfully to:', email);
+                console.log('✅ Forgot password OTP email sent successfully to:', normalizedEmail);
             } else {
-                console.error('❌ Failed to send forgot password OTP email to:', email);
+                console.error('❌ Failed to send forgot password OTP email to:', normalizedEmail);
             }
 
             return response.json({
@@ -800,19 +851,20 @@ export async function verifyForgotPasswordOtp(request, response) {
     try {
         const { email, otp } = request.body;
 
-        const user = await UserModel.findOne({ email: email })
-
-        if (!user) {
+        if (!email || !otp) {
             return response.status(400).json({
-                message: "Email not available",
+                message: "Email and OTP are required",
                 error: true,
                 success: false
             })
         }
 
-        if (!email || !otp) {
+        const normalizedEmail = email.toLowerCase().trim();
+        const user = await UserModel.findOne({ email: normalizedEmail })
+
+        if (!user) {
             return response.status(400).json({
-                message: "Provide required field email, otp.",
+                message: "Email not available",
                 error: true,
                 success: false
             })
@@ -871,7 +923,8 @@ export async function resetpassword(request, response) {
             })
         }
 
-        const user = await UserModel.findOne({ email });
+        const normalizedEmail = email.toLowerCase().trim();
+        const user = await UserModel.findOne({ email: normalizedEmail });
         if (!user) {
             return response.status(400).json({
                 message: "Email is not available",
