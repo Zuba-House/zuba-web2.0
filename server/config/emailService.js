@@ -219,9 +219,21 @@ async function sendEmail(to, subject, text, html) {
     if (error.response?.statusCode === 401) {
       errorMessage = 'SendGrid API key is invalid or unauthorized. Please check your SENDGRID_API_KEY.';
     } else if (error.response?.statusCode === 403) {
-      errorMessage = 'SendGrid API key does not have permission to send emails. Check API key permissions.';
+      errorMessage = 'SendGrid API key does not have permission to send emails. This may be due to: 1) Trial expired - upgrade your SendGrid plan, 2) API key missing "Mail Send" permission, or 3) Sender email not verified.';
     } else if (error.response?.statusCode === 400) {
-      errorMessage = `SendGrid validation error: ${error.response?.body?.errors?.[0]?.message || error.message}`;
+      const errorBody = error.response?.body;
+      const firstError = errorBody?.errors?.[0];
+      
+      // Check for trial expiration or account issues
+      if (firstError?.message?.toLowerCase().includes('trial') || 
+          firstError?.message?.toLowerCase().includes('upgrade') ||
+          firstError?.message?.toLowerCase().includes('subscription')) {
+        errorMessage = `SendGrid trial expired or account issue: ${firstError.message}. Please upgrade your SendGrid plan to continue sending emails.`;
+      } else {
+        errorMessage = `SendGrid validation error: ${firstError?.message || error.message}`;
+      }
+    } else if (error.response?.statusCode === 402) {
+      errorMessage = 'SendGrid payment required. Your trial has expired. Please upgrade your SendGrid plan to continue sending emails.';
     }
     
     return { 

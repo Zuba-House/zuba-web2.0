@@ -116,7 +116,8 @@ const Career = () => {
         "Inclusive and creative environment that values innovation and originality"
       ],
       applicationDeadline: "January 20",
-      isActive: true
+      isActive: false, // Position closed - hiring complete
+      status: "Hiring Complete"
     }
   ];
 
@@ -517,21 +518,41 @@ const Career = () => {
                         </ul>
                       </div>
 
-                      <Link
-                        to={`/careers/apply/${position.id}`}
-                        className="block w-full bg-[#efb291] text-[#0b2735] px-6 py-4 rounded-lg font-bold text-center hover:bg-[#e5a67d] transition-all shadow-lg hover:shadow-xl mb-4"
-                      >
-                        Apply Now
-                      </Link>
+                      {position.isActive ? (
+                        <>
+                          <Link
+                            to={`/careers/apply/${position.id}`}
+                            className="block w-full bg-[#efb291] text-[#0b2735] px-6 py-4 rounded-lg font-bold text-center hover:bg-[#e5a67d] transition-all shadow-lg hover:shadow-xl mb-4"
+                          >
+                            Apply Now
+                          </Link>
 
-                      <div className="bg-[#efb291] bg-opacity-10 border border-[#efb291] rounded-lg p-4 text-center">
-                        <p className="text-[#0b2735] font-semibold text-sm">
-                          Applications open until <span className="text-[#efb291]">{position.applicationDeadline}</span>
-                        </p>
-                        <p className="text-gray-600 text-xs mt-2">
-                          Applications will be reviewed on a rolling basis, so early submission is encouraged
-                        </p>
-                      </div>
+                          <div className="bg-[#efb291] bg-opacity-10 border border-[#efb291] rounded-lg p-4 text-center">
+                            <p className="text-[#0b2735] font-semibold text-sm">
+                              Applications open until <span className="text-[#efb291]">{position.applicationDeadline}</span>
+                            </p>
+                            <p className="text-gray-600 text-xs mt-2">
+                              Applications will be reviewed on a rolling basis, so early submission is encouraged
+                            </p>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="bg-gray-200 text-gray-600 px-6 py-4 rounded-lg font-bold text-center cursor-not-allowed mb-4">
+                            Position Closed
+                          </div>
+
+                          <div className="bg-gray-100 border border-gray-300 rounded-lg p-4 text-center">
+                            <p className="text-gray-700 font-semibold text-sm">
+                              <span className="text-gray-600">Status: </span>
+                              <span className="text-gray-800">{position.status || "Hiring Complete"}</span>
+                            </p>
+                            <p className="text-gray-500 text-xs mt-2">
+                              We have completed hiring for this position. Thank you for your interest!
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 ))}
@@ -637,7 +658,7 @@ const Career = () => {
 
               <div className="space-y-4 text-[#e5e2db]">
                 <p className="text-base lg:text-lg leading-relaxed">
-                  <strong className="text-[#efb291]">Current Status:</strong> We are <strong>actively hiring</strong> for the Professional Graphic Designer position. Applications are open until <strong>January 20</strong>.
+                  <strong className="text-[#efb291]">Current Status:</strong> We have <strong>completed hiring</strong> for the Professional Graphic Designer position. Thank you to all applicants!
                 </p>
 
                 <p className="text-base lg:text-lg leading-relaxed">
