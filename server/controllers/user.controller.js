@@ -10,7 +10,7 @@ import { isAdminEmail } from '../config/adminEmails.js';
 
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
-import ReviewModel from '../models/reviews.model.js';
+import ReviewModel from '../models/reviews.model.js.js';
 
 cloudinary.config({
     cloud_name: process.env.cloudinary_Config_Cloud_Name,
