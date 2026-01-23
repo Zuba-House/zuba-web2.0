@@ -197,7 +197,8 @@ export async function resendOTPController(request, response) {
             });
         }
 
-        const user = await UserModel.findOne({ email: email.toLowerCase().trim() });
+        const normalizedEmail = email.toLowerCase().trim();
+        const user = await UserModel.findOne({ email: normalizedEmail });
         
         if (!user) {
             return response.status(400).json({
@@ -215,7 +216,7 @@ export async function resendOTPController(request, response) {
 
         // Send verification email
         console.log('📧 ====== RESENDING OTP EMAIL ======');
-        console.log('📧 Recipient:', email);
+        console.log('📧 Recipient:', normalizedEmail);
         console.log('👤 Name:', user.name);
         console.log('🔐 New OTP Code:', verifyCode);
         console.log('⏰ Expires in: 10 minutes');
@@ -234,11 +235,12 @@ export async function resendOTPController(request, response) {
                 emailError = 'SENDGRID_API_KEY environment variable is not configured';
             } else {
                 // Generate email template
-                const emailHtml = VerificationEmail(user.name, verifyCode);
-                const emailText = `Hi ${user.name},\n\nYour new verification code is: ${verifyCode}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, please ignore this email.\n\nBest regards,\nZuba House Team`;
+                const userName = user.name || 'User';
+                const emailHtml = VerificationEmail(userName, verifyCode);
+                const emailText = `Hi ${userName},\n\nYour new verification code is: ${verifyCode}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, please ignore this email.\n\nBest regards,\nZuba House Team`;
                 
                 console.log('📧 Calling sendEmailFun (resend) with:', {
-                    sendTo: email,
+                    sendTo: normalizedEmail,
                     subject: "Verify Your Email - Zuba House (Resent)",
                     hasHtml: !!emailHtml,
                     htmlLength: emailHtml?.length || 0,
@@ -252,7 +254,7 @@ export async function resendOTPController(request, response) {
                     emailError = 'Email template generation failed';
                 } else {
                     emailSent = await sendEmailFun({
-                        sendTo: email,
+                        sendTo: normalizedEmail,
                         subject: "Verify Your Email - Zuba House (Resent)",
                         text: emailText,
                         html: emailHtml
@@ -260,17 +262,17 @@ export async function resendOTPController(request, response) {
                 }
 
                 if (emailSent) {
-                    console.log('✅ OTP email resent successfully to:', email);
+                    console.log('✅ OTP email resent successfully to:', normalizedEmail);
                     console.log('====================================\n');
                 } else {
-                    console.error('❌ Failed to resend OTP email to:', email);
+                    console.error('❌ Failed to resend OTP email to:', normalizedEmail);
                     console.error('⚠️ Check server logs above for detailed SendGrid error information');
                     emailError = 'Email delivery failed - check SendGrid configuration and server logs';
                 }
             }
         } catch (emailErrorCaught) {
             console.error('❌ Error resending OTP email:', {
-                to: email,
+                to: normalizedEmail,
                 error: emailErrorCaught.message,
                 stack: emailErrorCaught.stack
             });
@@ -291,7 +293,7 @@ export async function resendOTPController(request, response) {
             error: false,
             message: successMessage,
             data: {
-                email: email,
+                email: normalizedEmail,
                 emailSent: emailSent,
                 // Include OTP in response when email fails (for admin/testing)
                 ...(!emailSent ? { otp: verifyCode } : {}),
