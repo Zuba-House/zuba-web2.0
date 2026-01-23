@@ -11,8 +11,9 @@ const requiredEnvVars = [
     'cloudinary_Config_Cloud_Name',
     'cloudinary_Config_api_key',
     'cloudinary_Config_api_secret',
-    'EMAIL',
-    'EMAIL_PASS',
+    // EMAIL and EMAIL_PASS are optional - we use SendGrid now
+    // 'EMAIL',
+    // 'EMAIL_PASS',
 ];
 
 const optionalEnvVars = [
@@ -28,6 +29,13 @@ const optionalEnvVars = [
     'PAYPAL_SECRET_TEST',
     'PAYPAL_CLIENT_ID_LIVE',
     'PAYPAL_SECRET_LIVE',
+    // Email configuration - SendGrid is preferred
+    'SENDGRID_API_KEY',
+    'EMAIL_FROM',
+    'EMAIL_USER',
+    'EMAIL',
+    'EMAIL_PASS',
+    'EMAIL_SENDER_NAME',
 ];
 
 export function validateEnv() {
@@ -44,6 +52,11 @@ export function validateEnv() {
     // Check MongoDB connection (at least one is required)
     if (!process.env.MONGODB_URI && !process.env.MONGODB_LOCAL_URI) {
         missing.push('MONGODB_URI or MONGODB_LOCAL_URI');
+    }
+
+    // Check email configuration - SendGrid is preferred
+    if (!process.env.SENDGRID_API_KEY) {
+        warnings.push('SENDGRID_API_KEY is not set - email sending will fail. Set SENDGRID_API_KEY for email functionality.');
     }
 
     // Check Stripe configuration if using Stripe
