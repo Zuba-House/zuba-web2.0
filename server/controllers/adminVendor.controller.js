@@ -322,24 +322,17 @@ export const createVendor = async (req, res) => {
           }
         });
       } else {
-        // Vendor exists but belongs to different user - delete old vendor and create new one
-        console.log('⚠️ Vendor exists with different owner, deleting old vendor and creating new one');
-        await VendorModel.findByIdAndDelete(existingVendorByEmail._id);
-        
-        // Also clear vendor reference from old user if exists
-        if (existingVendorByEmail.ownerUser) {
-          const oldUser = await UserModel.findById(existingVendorByEmail.ownerUser);
-          if (oldUser) {
-            oldUser.vendor = null;
-            oldUser.vendorId = null;
-            if (oldUser.role === 'VENDOR' && !oldUser.vendor) {
-              oldUser.role = 'USER'; // Revert role if no vendor account
-            }
-            await oldUser.save();
+        // Vendor exists but belongs to different user - prevent replacement
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: `A vendor account with email "${normalizedEmail}" already exists and belongs to another user. Please use a different email address.`,
+          data: {
+            emailTaken: true,
+            existingVendorId: existingVendorByEmail._id,
+            existingStoreName: existingVendorByEmail.storeName
           }
-        }
-        
-        // Continue to create new vendor below
+        });
       }
     }
 
@@ -366,10 +359,12 @@ export const createVendor = async (req, res) => {
     user.vendorId = vendor._id;
     await user.save();
 
-    // Send welcome email if approved
+    // Send welcome email with temporary password if approved
     if (status === 'APPROVED') {
       try {
-        await sendVendorWelcome(vendor, user);
+        // Get the password (plain text) for email - only if it was provided
+        const tempPassword = password || null;
+        await sendVendorWelcome(vendor, user, tempPassword);
       } catch (emailError) {
         console.error('Failed to send welcome email:', emailError);
         // Don't fail the request if email fails
@@ -451,6 +446,102 @@ export const createVendor = async (req, res) => {
       success: false,
       message: error.message || 'Failed to create vendor',
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+};
+
+/**
+ * POST /api/admin/vendors/:id/impersonate
+ * Admin can impersonate vendor to access vendor dashboard
+ * Returns vendor access tokens for admin to use
+ */
+export const impersonateVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.userId;
+
+    // Get admin user
+    const adminUser = await UserModel.findById(adminId);
+    if (!adminUser || adminUser.role !== 'ADMIN') {
+      return res.status(403).json({
+        error: true,
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    // Get vendor
+    const vendor = await VendorModel.findById(id)
+      .populate('ownerUser', 'name email role status');
+
+    if (!vendor) {
+      return res.status(404).json({
+        error: true,
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    // Get vendor owner user
+    const vendorUser = vendor.ownerUser;
+    if (!vendorUser) {
+      return res.status(404).json({
+        error: true,
+        success: false,
+        message: 'Vendor owner user not found'
+      });
+    }
+
+    // Generate tokens for vendor user (admin will use these to access vendor dashboard)
+    const generatedAccessToken = (await import('../utils/generatedAccessToken.js')).default;
+    const genertedRefreshToken = (await import('../utils/generatedRefreshToken.js')).default;
+    
+    const accessToken = await generatedAccessToken(vendorUser._id);
+    const refreshToken = await genertedRefreshToken(vendorUser._id);
+
+    // Log admin impersonation
+    console.log('🔐 Admin impersonating vendor:', {
+      adminId: adminId,
+      adminEmail: adminUser.email,
+      vendorId: vendor._id,
+      vendorEmail: vendor.email,
+      vendorStoreName: vendor.storeName,
+      timestamp: new Date().toISOString()
+    });
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message: `Access granted to vendor "${vendor.storeName}" dashboard`,
+      data: {
+        accesstoken: accessToken,
+        refreshToken: refreshToken,
+        vendor: {
+          id: vendor._id,
+          storeName: vendor.storeName,
+          storeSlug: vendor.storeSlug,
+          status: vendor.status,
+          email: vendor.email
+        },
+        user: {
+          id: vendorUser._id,
+          name: vendorUser.name,
+          email: vendorUser.email,
+          role: vendorUser.role
+        },
+        impersonatedBy: {
+          adminId: adminId,
+          adminEmail: adminUser.email
+        },
+        note: 'Use these tokens to access vendor dashboard. This is an admin impersonation session.'
+      }
+    });
+  } catch (error) {
+    console.error('Impersonate vendor error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Failed to impersonate vendor'
     });
   }
 };
@@ -775,6 +866,116 @@ export const deleteVendorPermanent = async (req, res) => {
       error: true,
       success: false,
       message: error.message || 'Server error'
+    });
+  }
+};
+
+/**
+ * DELETE /api/admin/vendors/all
+ * Delete ALL vendors from the database (Admin only)
+ * This will:
+ * - Delete all vendor documents
+ * - Delete all vendor products
+ * - Delete all vendor payouts
+ * - Update user roles back to USER
+ * - Remove vendor references from users
+ */
+export const deleteAllVendors = async (req, res) => {
+  try {
+    const adminId = req.userId;
+    
+    // Verify admin
+    const adminUser = await UserModel.findById(adminId);
+    if (!adminUser || adminUser.role !== 'ADMIN') {
+      return res.status(403).json({
+        error: true,
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    console.log('🗑️ Admin deleting all vendors:', {
+      adminId: adminId,
+      adminEmail: adminUser.email,
+      timestamp: new Date().toISOString()
+    });
+
+    // Get count before deletion
+    const vendorCount = await VendorModel.countDocuments();
+    console.log(`📊 Found ${vendorCount} vendors to delete`);
+
+    if (vendorCount === 0) {
+      return res.status(200).json({
+        error: false,
+        success: true,
+        message: 'No vendors to delete',
+        data: {
+          vendorsDeleted: 0,
+          productsDeleted: 0,
+          payoutsDeleted: 0,
+          usersUpdated: 0
+        }
+      });
+    }
+
+    // Get all vendor IDs
+    const vendors = await VendorModel.find({}).select('_id ownerUser storeName email');
+    const vendorIds = vendors.map(v => v._id);
+    const ownerUserIds = vendors.map(v => v.ownerUser).filter(Boolean);
+
+    console.log('\n📋 Vendors to be deleted:');
+    vendors.forEach(v => {
+      console.log(`   - ${v.storeName || 'N/A'} (${v.email || 'N/A'})`);
+    });
+
+    // Delete all products associated with vendors
+    const productDeleteResult = await ProductModel.deleteMany({ vendor: { $in: vendorIds } });
+    console.log(`\n🗑️ Deleted ${productDeleteResult.deletedCount} product(s)`);
+
+    // Delete all payouts associated with vendors
+    let payoutDeleteResult = { deletedCount: 0 };
+    try {
+      const PayoutModel = (await import('../models/payout.model.js')).default;
+      payoutDeleteResult = await PayoutModel.deleteMany({ vendor: { $in: vendorIds } });
+      console.log(`🗑️ Deleted ${payoutDeleteResult.deletedCount} payout record(s)`);
+    } catch (e) {
+      console.log('⚠️ Payout model not found or no payouts to delete');
+    }
+
+    // Update users - remove vendor references and change role back to USER
+    const userUpdateResult = await UserModel.updateMany(
+      { _id: { $in: ownerUserIds } },
+      {
+        $set: { role: 'USER' },
+        $unset: { vendor: 1, vendorId: 1 }
+      }
+    );
+    console.log(`👤 Updated ${userUpdateResult.modifiedCount} user(s) - role changed to USER`);
+
+    // Delete all vendors
+    const vendorDeleteResult = await VendorModel.deleteMany({});
+    console.log(`🗑️ Deleted ${vendorDeleteResult.deletedCount} vendor(s)`);
+
+    console.log('\n✅ All vendors deleted successfully!');
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message: `Successfully deleted all ${vendorDeleteResult.deletedCount} vendor(s) and related data`,
+      data: {
+        vendorsDeleted: vendorDeleteResult.deletedCount,
+        productsDeleted: productDeleteResult.deletedCount,
+        payoutsDeleted: payoutDeleteResult.deletedCount,
+        usersUpdated: userUpdateResult.modifiedCount
+      }
+    });
+  } catch (error) {
+    console.error('❌ Delete all vendors error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Failed to delete all vendors',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };

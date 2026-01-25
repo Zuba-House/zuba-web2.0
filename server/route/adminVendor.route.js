@@ -37,7 +37,9 @@ router.post('/payouts/:payoutId/mark-paid', adminPayoutController.markPayoutAsPa
 // Vendor management routes
 router.get('/', adminVendorController.getAllVendors);
 router.post('/', adminVendorController.createVendor); // Admin can create vendors
+router.delete('/all', adminVendorController.deleteAllVendors); // Delete ALL vendors (must come before /:id)
 router.get('/:id', adminVendorController.getVendorById);
+router.post('/:id/impersonate', adminVendorController.impersonateVendor); // Admin can impersonate vendor
 router.put('/:id', adminVendorController.updateVendor);
 router.put('/:id/status', adminVendorController.updateVendorStatus);
 router.put('/:id/withdrawal-access', adminVendorController.updateWithdrawalAccess);

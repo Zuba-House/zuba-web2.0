@@ -19,8 +19,38 @@ const requireVendor = async (req, res, next) => {
       });
     }
 
-    // Check role and vendorId (set by auth middleware)
-    if (req.userRole !== 'VENDOR' || !req.vendorId) {
+    // Allow admin to access vendor routes (for impersonation)
+    const isAdmin = req.userRole === 'ADMIN';
+    
+    // If admin, allow access but need to get vendor from query/params
+    if (isAdmin) {
+      // Admin can access vendor routes - vendorId might be in query or params
+      const vendorIdFromQuery = req.query.vendorId || req.params.vendorId || req.body.vendorId;
+      if (vendorIdFromQuery) {
+        const vendor = await VendorModel.findById(vendorIdFromQuery);
+        if (vendor) {
+          req.vendor = vendor;
+          req.vendorId = vendor._id;
+          req.isAdminImpersonating = true; // Flag to indicate admin impersonation
+          // Skip status checks for admin (admin can view even suspended vendors)
+          return next();
+        }
+      }
+      // If admin but no vendorId specified, check if user has vendor role
+      // (admin might also be a vendor)
+      if (req.vendorId) {
+        // Admin has vendor account, proceed normally
+      } else {
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'Admin access: Please specify vendorId in query, params, or body'
+        });
+      }
+    }
+    
+    // Check role and vendorId for non-admin users
+    if (!isAdmin && (req.userRole !== 'VENDOR' || !req.vendorId)) {
       return res.status(403).json({ 
         error: true,
         success: false,
@@ -40,46 +70,49 @@ const requireVendor = async (req, res, next) => {
       });
     }
 
-    // Block suspended vendors
-    if (vendor.status === 'SUSPENDED') {
-      return res.status(403).json({
-        error: true,
-        success: false,
-        message: 'Your vendor account has been suspended. Please contact support for more information.',
-        code: 'VENDOR_SUSPENDED',
-        status: 'SUSPENDED'
-      });
-    }
-
-    // Block rejected vendors
-    if (vendor.status === 'REJECTED') {
-      return res.status(403).json({
-        error: true,
-        success: false,
-        message: 'Your vendor application was rejected. Please contact support if you believe this is an error.',
-        code: 'VENDOR_REJECTED',
-        status: 'REJECTED'
-      });
-    }
-
-    // Block pending vendors from most operations
-    if (vendor.status === 'PENDING') {
-      // Allow access to profile view and limited endpoints for pending vendors
-      const allowedPathsForPending = ['/me', '/application-status'];
-      const currentPath = req.path;
-      
-      const isAllowed = allowedPathsForPending.some(path => 
-        currentPath === path || currentPath.endsWith(path)
-      );
-      
-      if (!isAllowed) {
+    // Skip status checks for admin impersonation
+    if (!req.isAdminImpersonating) {
+      // Block suspended vendors
+      if (vendor.status === 'SUSPENDED') {
         return res.status(403).json({
           error: true,
           success: false,
-          message: 'Your vendor account is pending approval. You will be notified once your application is reviewed.',
-          code: 'VENDOR_PENDING',
-          status: 'PENDING'
+          message: 'Your vendor account has been suspended. Please contact support for more information.',
+          code: 'VENDOR_SUSPENDED',
+          status: 'SUSPENDED'
         });
+      }
+
+      // Block rejected vendors
+      if (vendor.status === 'REJECTED') {
+        return res.status(403).json({
+          error: true,
+          success: false,
+          message: 'Your vendor application was rejected. Please contact support if you believe this is an error.',
+          code: 'VENDOR_REJECTED',
+          status: 'REJECTED'
+        });
+      }
+
+      // Block pending vendors from most operations
+      if (vendor.status === 'PENDING') {
+        // Allow access to profile view and limited endpoints for pending vendors
+        const allowedPathsForPending = ['/me', '/application-status'];
+        const currentPath = req.path;
+        
+        const isAllowed = allowedPathsForPending.some(path => 
+          currentPath === path || currentPath.endsWith(path)
+        );
+        
+        if (!isAllowed) {
+          return res.status(403).json({
+            error: true,
+            success: false,
+            message: 'Your vendor account is pending approval. You will be notified once your application is reviewed.',
+            code: 'VENDOR_PENDING',
+            status: 'PENDING'
+          });
+        }
       }
     }
 

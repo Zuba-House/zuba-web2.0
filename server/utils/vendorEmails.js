@@ -11,10 +11,30 @@ const getVendorUrl = () => process.env.VENDOR_URL || 'https://vendor.zubahouse.c
 
 /**
  * Send vendor welcome email after approval
+ * @param {Object} vendor - Vendor object
+ * @param {Object} user - User object
+ * @param {String} tempPassword - Temporary password (optional, for admin-created accounts)
  */
-export const sendVendorWelcome = async (vendor) => {
+export const sendVendorWelcome = async (vendor, user = null, tempPassword = null) => {
   try {
     const vendorUrl = getVendorUrl();
+    const vendorEmail = vendor.email || (user && user.email) || '';
+    const vendorName = vendor.storeName || (user && user.name) || 'Vendor';
+    
+    // Build login credentials section if temp password provided
+    let credentialsSection = '';
+    if (tempPassword) {
+      credentialsSection = `
+        <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; margin: 20px 0; border-radius: 4px;">
+          <h3 style="margin: 0 0 15px 0; color: #856404;">🔐 Your Login Credentials</h3>
+          <p style="margin: 8px 0;"><strong>Email:</strong> ${vendorEmail}</p>
+          <p style="margin: 8px 0;"><strong>Temporary Password:</strong> <code style="background: white; padding: 4px 8px; border-radius: 3px; font-size: 16px; font-weight: bold; color: #e67e22;">${tempPassword}</code></p>
+          <p style="margin: 15px 0 0 0; color: #856404; font-size: 14px;">
+            <strong>⚠️ Important:</strong> Please change your password after first login for security.
+          </p>
+        </div>
+      `;
+    }
     
     const html = `
       <!DOCTYPE html>
@@ -27,6 +47,7 @@ export const sendVendorWelcome = async (vendor) => {
           .content { padding: 30px; background: #f9f9f9; }
           .button { display: inline-block; background: #e67e22; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
           .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; }
+          code { font-family: 'Courier New', monospace; }
         </style>
       </head>
       <body>
@@ -35,19 +56,23 @@ export const sendVendorWelcome = async (vendor) => {
             <h1>🎉 Welcome to Zuba House Marketplace!</h1>
           </div>
           <div class="content">
-            <p>Hi <strong>${vendor.storeName || 'Vendor'}</strong>,</p>
+            <p>Hi <strong>${vendorName}</strong>,</p>
             <p>Great news! Your vendor account has been <strong style="color: #27ae60;">approved</strong>!</p>
+            
+            ${credentialsSection}
+            
             <p>You can now:</p>
             <ul>
               <li>✅ Add and manage your products</li>
               <li>✅ Receive and fulfill orders</li>
               <li>✅ Track your earnings and request withdrawals</li>
               <li>✅ Create coupons for your products</li>
+              <li>✅ View analytics and reports</li>
             </ul>
             <center>
-              <a href="${vendorUrl}/dashboard" class="button">Go to Your Dashboard</a>
+              <a href="${vendorUrl}/login" class="button">Login to Your Dashboard</a>
             </center>
-            <p>If you have any questions, our support team is here to help.</p>
+            <p style="margin-top: 20px;">If you have any questions, our support team is here to help.</p>
             <p>Best regards,<br>The Zuba House Team</p>
           </div>
           <div class="footer">
@@ -59,12 +84,12 @@ export const sendVendorWelcome = async (vendor) => {
     `;
 
     await sendEmailFun({
-      sendTo: vendor.email,
+      sendTo: vendorEmail,
       subject: '🎉 Welcome to Zuba House - Vendor Account Approved!',
       html
     });
 
-    console.log('✅ Vendor welcome email sent to:', vendor.email);
+    console.log('✅ Vendor welcome email sent to:', vendorEmail);
     return true;
   } catch (error) {
     console.error('❌ Failed to send vendor welcome email:', error);
