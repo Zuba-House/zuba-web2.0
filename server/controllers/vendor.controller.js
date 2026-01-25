@@ -795,36 +795,6 @@ export const applyToBecomeVendor = async (req, res) => {
         }
       });
     }
-      const accessToken2 = await generatedAccessToken2(user._id);
-      const refreshToken2 = await genertedRefreshToken2(user._id);
-      
-      return res.status(201).json({
-        error: false,
-        success: true,
-        message: 'Vendor application updated successfully! Your application is under review. You will be notified once approved.',
-        data: {
-          accesstoken: accessToken2,
-          refreshToken: refreshToken2,
-          vendorId: existingVendorByEmail._id,
-          storeName: existingVendorByEmail.storeName,
-          storeSlug: existingVendorByEmail.storeSlug,
-          status: existingVendorByEmail.status,
-          emailVerified: true,
-          user: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            role: user.role
-          },
-          vendor: {
-            id: existingVendorByEmail._id,
-            storeName: existingVendorByEmail.storeName,
-            storeSlug: existingVendorByEmail.storeSlug,
-            status: existingVendorByEmail.status
-          }
-        }
-      });
-    }
 
     // At this point, we've handled all existing vendor cases above
     // Now create a new vendor account
