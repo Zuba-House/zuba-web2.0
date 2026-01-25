@@ -206,16 +206,19 @@ export const createVendor = async (req, res) => {
       if (user.vendor || user.vendorId) {
         const existingVendor = await VendorModel.findById(user.vendor || user.vendorId);
         if (existingVendor) {
-          return res.status(400).json({
-            error: true,
-            success: false,
-            message: `User already has a vendor account: ${existingVendor.storeName}`,
-            data: {
-              hasVendorAccount: true,
-              vendorId: existingVendor._id,
-              storeName: existingVendor.storeName
-            }
-          });
+          // Check if this is the same vendor being updated (by email)
+          if (existingVendor.email === normalizedEmail) {
+            // Same vendor - allow update, will be handled below
+            console.log('✅ User has existing vendor with same email, will update');
+          } else {
+            // Different vendor - check if admin wants to replace it
+            // For now, allow admin to update the existing vendor
+            console.log('⚠️ User has different vendor account, will update existing one');
+          }
+        } else {
+          // Vendor reference exists but vendor not found - clear the reference
+          user.vendor = null;
+          user.vendorId = null;
         }
       }
       
@@ -266,53 +269,78 @@ export const createVendor = async (req, res) => {
       });
     }
 
-    // Check if slug is already taken
+    // Check if slug is already taken (but allow if it's the same user's vendor)
     const existingVendorBySlug = await VendorModel.findOne({ 
       storeSlug: storeSlug.toLowerCase().trim() 
     });
     
-    if (existingVendorBySlug) {
+    if (existingVendorBySlug && existingVendorBySlug.ownerUser?.toString() !== user._id.toString()) {
       return res.status(400).json({
         error: true,
         success: false,
-        message: 'Store URL slug already taken. Please choose another.'
+        message: 'Store URL slug already taken. Please choose another.',
+        data: {
+          slugTaken: true,
+          existingStoreName: existingVendorBySlug.storeName
+        }
       });
     }
 
     // Check if vendor with this email already exists
     const existingVendorByEmail = await VendorModel.findOne({ email: normalizedEmail });
     if (existingVendorByEmail) {
-      // Update existing vendor
-      existingVendorByEmail.ownerUser = user._id;
-      existingVendorByEmail.storeName = storeName.trim();
-      existingVendorByEmail.storeSlug = storeSlug.toLowerCase().trim();
-      existingVendorByEmail.description = description || '';
-      existingVendorByEmail.phone = phone || '';
-      existingVendorByEmail.whatsapp = whatsapp || '';
-      existingVendorByEmail.country = country || '';
-      existingVendorByEmail.city = city || '';
-      existingVendorByEmail.addressLine1 = addressLine1 || '';
-      existingVendorByEmail.addressLine2 = addressLine2 || '';
-      existingVendorByEmail.postalCode = postalCode || '';
-      existingVendorByEmail.categories = categories || [];
-      existingVendorByEmail.status = status;
-      await existingVendorByEmail.save();
+      // Check if this vendor belongs to the same user
+      if (existingVendorByEmail.ownerUser && existingVendorByEmail.ownerUser.toString() === user._id.toString()) {
+        // Same user - update existing vendor
+        existingVendorByEmail.storeName = storeName.trim();
+        existingVendorByEmail.storeSlug = storeSlug.toLowerCase().trim();
+        existingVendorByEmail.description = description || '';
+        existingVendorByEmail.phone = phone || '';
+        existingVendorByEmail.whatsapp = whatsapp || '';
+        existingVendorByEmail.country = country || '';
+        existingVendorByEmail.city = city || '';
+        existingVendorByEmail.addressLine1 = addressLine1 || '';
+        existingVendorByEmail.addressLine2 = addressLine2 || '';
+        existingVendorByEmail.postalCode = postalCode || '';
+        existingVendorByEmail.categories = categories || [];
+        existingVendorByEmail.status = status;
+        await existingVendorByEmail.save();
 
-      user.vendor = existingVendorByEmail._id;
-      user.vendorId = existingVendorByEmail._id;
-      await user.save();
+        user.vendor = existingVendorByEmail._id;
+        user.vendorId = existingVendorByEmail._id;
+        await user.save();
 
-      return res.status(200).json({
-        error: false,
-        success: true,
-        message: 'Vendor updated successfully!',
-        data: {
-          vendorId: existingVendorByEmail._id,
-          storeName: existingVendorByEmail.storeName,
-          storeSlug: existingVendorByEmail.storeSlug,
-          status: existingVendorByEmail.status
+        return res.status(200).json({
+          error: false,
+          success: true,
+          message: 'Vendor updated successfully!',
+          data: {
+            vendorId: existingVendorByEmail._id,
+            storeName: existingVendorByEmail.storeName,
+            storeSlug: existingVendorByEmail.storeSlug,
+            status: existingVendorByEmail.status
+          }
+        });
+      } else {
+        // Vendor exists but belongs to different user - delete old vendor and create new one
+        console.log('⚠️ Vendor exists with different owner, deleting old vendor and creating new one');
+        await VendorModel.findByIdAndDelete(existingVendorByEmail._id);
+        
+        // Also clear vendor reference from old user if exists
+        if (existingVendorByEmail.ownerUser) {
+          const oldUser = await UserModel.findById(existingVendorByEmail.ownerUser);
+          if (oldUser) {
+            oldUser.vendor = null;
+            oldUser.vendorId = null;
+            if (oldUser.role === 'VENDOR' && !oldUser.vendor) {
+              oldUser.role = 'USER'; // Revert role if no vendor account
+            }
+            await oldUser.save();
+          }
         }
-      });
+        
+        // Continue to create new vendor below
+      }
     }
 
     // Create new vendor

@@ -490,17 +490,25 @@ export const applyToBecomeVendor = async (req, res) => {
     if (user) {
       console.log('📝 Processing existing user for vendor application:', normalizedEmail);
       
-      // Check if already has a vendor account
+      // Check if already has a vendor account (by ownerUser first)
       let existingVendorAccount = await VendorModel.findOne({ 
-        $or: [
-          { ownerUser: user._id },
-          { email: normalizedEmail }
-        ]
+        ownerUser: user._id
       });
       
+      // If no vendor by ownerUser, check by email
+      if (!existingVendorAccount) {
+        existingVendorAccount = await VendorModel.findOne({ 
+          email: normalizedEmail 
+        });
+      }
+      
       if (existingVendorAccount) {
-        // Only reject if vendor is ACTIVE or APPROVED
-        if (existingVendorAccount.status === 'APPROVED' || existingVendorAccount.status === 'ACTIVE') {
+        // Check if vendor belongs to this user
+        const belongsToUser = existingVendorAccount.ownerUser && 
+                              existingVendorAccount.ownerUser.toString() === user._id.toString();
+        
+        // Only reject if vendor is ACTIVE or APPROVED AND belongs to this user
+        if (belongsToUser && (existingVendorAccount.status === 'APPROVED' || existingVendorAccount.status === 'ACTIVE')) {
           return res.status(400).json({
             error: true,
             success: false,
@@ -513,56 +521,77 @@ export const applyToBecomeVendor = async (req, res) => {
           });
         }
         
-        // If vendor is PENDING or REJECTED, update it and return early
-        console.log('🔄 Found existing vendor with status:', existingVendorAccount.status, '- updating it');
-        
-        // Update existing vendor
-        existingVendorAccount.storeName = storeName.trim();
-        existingVendorAccount.storeSlug = storeSlug.toLowerCase().trim();
-        existingVendorAccount.description = description || '';
-        existingVendorAccount.email = normalizedEmail;
-        existingVendorAccount.phone = phone || '';
-        existingVendorAccount.whatsapp = whatsapp || '';
-        existingVendorAccount.country = country || '';
-        existingVendorAccount.city = city || '';
-        existingVendorAccount.addressLine1 = addressLine1 || '';
-        existingVendorAccount.addressLine2 = addressLine2 || '';
-        existingVendorAccount.postalCode = postalCode || '';
-        existingVendorAccount.categories = categories || [];
-        existingVendorAccount.status = 'PENDING'; // Reset to pending for re-review
-        existingVendorAccount.ownerUser = user._id; // Ensure owner is set
-        await existingVendorAccount.save();
-        
-        // Update user
-        user.role = 'VENDOR';
-        user.verify_email = true;
-        user.status = 'Active';
-        if (name) user.name = name;
-        if (password && password.length >= 6) {
-          const salt = await bcryptjs.genSalt(10);
-          user.password = await bcryptjs.hash(password, salt);
-        }
-        user.vendor = existingVendorAccount._id;
-        user.vendorId = existingVendorAccount._id;
-        await user.save();
-        
-        // Clear pending OTP data
-        if (pendingData) {
-          pendingOTPStore.delete(normalizedEmail);
-        }
-        
-        // Generate tokens
-        const generatedAccessToken = (await import('../utils/generatedAccessToken.js')).default;
-        const genertedRefreshToken = (await import('../utils/generatedRefreshToken.js')).default;
-        const accessToken = await generatedAccessToken(user._id);
-        const refreshToken = await genertedRefreshToken(user._id);
-        
-        console.log('✅ Existing vendor application updated successfully');
-        
-        return res.status(201).json({
-          error: false,
-          success: true,
-          message: 'Vendor application updated successfully! Your application is under review. You will be notified once approved.',
+        // If vendor belongs to different user, delete it and create new one
+        if (!belongsToUser) {
+          console.log('⚠️ Vendor exists with different owner, deleting old vendor');
+          await VendorModel.findByIdAndDelete(existingVendorAccount._id);
+          
+          // Clear vendor reference from old user if exists
+          if (existingVendorAccount.ownerUser) {
+            const oldUser = await UserModel.findById(existingVendorAccount.ownerUser);
+            if (oldUser) {
+              oldUser.vendor = null;
+              oldUser.vendorId = null;
+              if (oldUser.role === 'VENDOR' && !oldUser.vendor) {
+                oldUser.role = 'USER';
+              }
+              await oldUser.save();
+            }
+          }
+          
+          // Set to null so new vendor will be created below
+          existingVendorAccount = null;
+        } else {
+          // Vendor belongs to this user - update it
+          console.log('🔄 Found existing vendor with status:', existingVendorAccount.status, '- updating it');
+          
+          // Update existing vendor
+          existingVendorAccount.storeName = storeName.trim();
+          existingVendorAccount.storeSlug = storeSlug.toLowerCase().trim();
+          existingVendorAccount.description = description || '';
+          existingVendorAccount.email = normalizedEmail;
+          existingVendorAccount.phone = phone || '';
+          existingVendorAccount.whatsapp = whatsapp || '';
+          existingVendorAccount.country = country || '';
+          existingVendorAccount.city = city || '';
+          existingVendorAccount.addressLine1 = addressLine1 || '';
+          existingVendorAccount.addressLine2 = addressLine2 || '';
+          existingVendorAccount.postalCode = postalCode || '';
+          existingVendorAccount.categories = categories || [];
+          existingVendorAccount.status = 'PENDING'; // Reset to pending for re-review
+          existingVendorAccount.ownerUser = user._id; // Ensure owner is set
+          await existingVendorAccount.save();
+          
+          // Update user
+          user.role = 'VENDOR';
+          user.verify_email = true;
+          user.status = 'Active';
+          if (name) user.name = name;
+          if (password && password.length >= 6) {
+            const salt = await bcryptjs.genSalt(10);
+            user.password = await bcryptjs.hash(password, salt);
+          }
+          user.vendor = existingVendorAccount._id;
+          user.vendorId = existingVendorAccount._id;
+          await user.save();
+          
+          // Clear pending OTP data
+          if (pendingData) {
+            pendingOTPStore.delete(normalizedEmail);
+          }
+          
+          // Generate tokens
+          const generatedAccessToken = (await import('../utils/generatedAccessToken.js')).default;
+          const genertedRefreshToken = (await import('../utils/generatedRefreshToken.js')).default;
+          const accessToken = await generatedAccessToken(user._id);
+          const refreshToken = await genertedRefreshToken(user._id);
+          
+          console.log('✅ Existing vendor application updated successfully');
+          
+          return res.status(201).json({
+            error: false,
+            success: true,
+            message: 'Vendor application updated successfully! Your application is under review. You will be notified once approved.',
           data: {
             accesstoken: accessToken,
             refreshToken: refreshToken,
@@ -585,8 +614,10 @@ export const applyToBecomeVendor = async (req, res) => {
             }
           }
         });
+        }
       }
       
+      // If we reach here, no existing vendor was found or it was deleted
       // Update existing user to become vendor (if not already)
       if (user.role !== 'VENDOR') {
         user.role = 'VENDOR';
@@ -662,127 +693,29 @@ export const applyToBecomeVendor = async (req, res) => {
       });
     }
 
-    // Double-check no vendor exists (safety check - should be caught earlier)
-    // Only check if vendor exists with this email AND has a different owner
-    const existingVendorByEmail = await VendorModel.findOne({ email: normalizedEmail });
-    if (existingVendorByEmail) {
-      // Check if this vendor already belongs to this user
-      if (existingVendorByEmail.ownerUser && existingVendorByEmail.ownerUser.toString() === user._id.toString()) {
-        // Vendor already belongs to this user - check status
-        console.log('🔗 Vendor already belongs to this user, checking status:', existingVendorByEmail.status);
-        
-        // Only reject if vendor is ACTIVE or APPROVED
-        if (existingVendorByEmail.status === 'APPROVED' || existingVendorByEmail.status === 'ACTIVE') {
-          user.vendor = existingVendorByEmail._id;
-          user.vendorId = existingVendorByEmail._id;
-          await user.save();
-          
-          return res.status(400).json({
-            error: true,
-            success: false,
-            message: 'You already have an active vendor account. Please login to access your vendor dashboard.',
-            data: { 
-              hasVendorAccount: true,
-              vendorStatus: existingVendorByEmail.status,
-              storeName: existingVendorByEmail.storeName
-            }
-          });
-        }
-        
-        // If vendor is PENDING or REJECTED, update it instead of rejecting
-        console.log('🔄 Updating existing PENDING/REJECTED vendor for user:', normalizedEmail);
-        existingVendorByEmail.storeName = storeName.trim();
-        existingVendorByEmail.storeSlug = storeSlug.toLowerCase().trim();
-        existingVendorByEmail.description = description || '';
-        existingVendorByEmail.phone = phone || '';
-        existingVendorByEmail.whatsapp = whatsapp || '';
-        existingVendorByEmail.country = country || '';
-        existingVendorByEmail.city = city || '';
-        existingVendorByEmail.addressLine1 = addressLine1 || '';
-        existingVendorByEmail.addressLine2 = addressLine2 || '';
-        existingVendorByEmail.postalCode = postalCode || '';
-        existingVendorByEmail.categories = categories || [];
-        existingVendorByEmail.status = 'PENDING';
-        await existingVendorByEmail.save();
-        
-        user.vendor = existingVendorByEmail._id;
-        user.vendorId = existingVendorByEmail._id;
-        await user.save();
-        
-        // Clear pending OTP data
-        if (pendingData) {
-          pendingOTPStore.delete(normalizedEmail);
-        }
-        
-        // Generate tokens
-        const generatedAccessToken = (await import('../utils/generatedAccessToken.js')).default;
-        const genertedRefreshToken = (await import('../utils/generatedRefreshToken.js')).default;
-        const accessToken = await generatedAccessToken(user._id);
-        const refreshToken = await genertedRefreshToken(user._id);
-        
-        return res.status(201).json({
-          error: false,
-          success: true,
-          message: 'Vendor application updated successfully! Your application is under review. You will be notified once approved.',
-          data: {
-            accesstoken: accessToken,
-            refreshToken: refreshToken,
-            vendorId: existingVendorByEmail._id,
-            storeName: existingVendorByEmail.storeName,
-            storeSlug: existingVendorByEmail.storeSlug,
-            status: existingVendorByEmail.status,
-            emailVerified: true,
-            user: {
-              id: user._id,
-              name: user.name,
-              email: user.email,
-              role: user.role
-            },
-            vendor: {
-              id: existingVendorByEmail._id,
-              storeName: existingVendorByEmail.storeName,
-              storeSlug: existingVendorByEmail.storeSlug,
-              status: existingVendorByEmail.status
-            }
-          }
-        });
-      }
+    // Final check: ensure no vendor exists for this user (safety check)
+    const finalVendorCheck = await VendorModel.findOne({ ownerUser: user._id });
+    if (finalVendorCheck) {
+      // Vendor already exists for this user - update it
+      console.log('🔄 Final check: Vendor exists for user, updating:', finalVendorCheck.status);
       
-      // Vendor exists with this email but different owner - this is a conflict
-      // Only reject if the vendor is ACTIVE or APPROVED
-      if (existingVendorByEmail.status === 'APPROVED' || existingVendorByEmail.status === 'ACTIVE') {
-        console.log('⚠️ Vendor with this email exists but belongs to different user');
-        return res.status(400).json({
-          error: true,
-          success: false,
-          message: 'An active vendor account already exists with this email. Please use a different email or contact support.',
-          data: { 
-            hasVendorAccount: true,
-            vendorStatus: existingVendorByEmail.status,
-            storeName: existingVendorByEmail.storeName
-          }
-        });
-      }
+      finalVendorCheck.storeName = storeName.trim();
+      finalVendorCheck.storeSlug = storeSlug.toLowerCase().trim();
+      finalVendorCheck.description = description || '';
+      finalVendorCheck.email = normalizedEmail;
+      finalVendorCheck.phone = phone || '';
+      finalVendorCheck.whatsapp = whatsapp || '';
+      finalVendorCheck.country = country || '';
+      finalVendorCheck.city = city || '';
+      finalVendorCheck.addressLine1 = addressLine1 || '';
+      finalVendorCheck.addressLine2 = addressLine2 || '';
+      finalVendorCheck.postalCode = postalCode || '';
+      finalVendorCheck.categories = categories || [];
+      finalVendorCheck.status = 'PENDING'; // Reset to pending for re-review
+      await finalVendorCheck.save();
       
-      // If vendor status is PENDING or REJECTED and belongs to different user, update owner
-      console.log('🔧 Found inactive vendor by email with different owner, updating owner reference');
-      existingVendorByEmail.ownerUser = user._id;
-      existingVendorByEmail.storeName = storeName.trim();
-      existingVendorByEmail.storeSlug = storeSlug.toLowerCase().trim();
-      existingVendorByEmail.description = description || '';
-      existingVendorByEmail.phone = phone || '';
-      existingVendorByEmail.whatsapp = whatsapp || '';
-      existingVendorByEmail.country = country || '';
-      existingVendorByEmail.city = city || '';
-      existingVendorByEmail.addressLine1 = addressLine1 || '';
-      existingVendorByEmail.addressLine2 = addressLine2 || '';
-      existingVendorByEmail.postalCode = postalCode || '';
-      existingVendorByEmail.categories = categories || [];
-      existingVendorByEmail.status = 'PENDING';
-      await existingVendorByEmail.save();
-      
-      user.vendor = existingVendorByEmail._id;
-      user.vendorId = existingVendorByEmail._id;
+      user.vendor = finalVendorCheck._id;
+      user.vendorId = finalVendorCheck._id;
       await user.save();
       
       // Clear pending OTP data
@@ -791,8 +724,77 @@ export const applyToBecomeVendor = async (req, res) => {
       }
       
       // Generate tokens
-      const generatedAccessToken2 = (await import('../utils/generatedAccessToken.js')).default;
-      const genertedRefreshToken2 = (await import('../utils/generatedRefreshToken.js')).default;
+      const generatedAccessToken = (await import('../utils/generatedAccessToken.js')).default;
+      const genertedRefreshToken = (await import('../utils/generatedRefreshToken.js')).default;
+      const accessToken = await generatedAccessToken(user._id);
+      const refreshToken = await genertedRefreshToken(user._id);
+      
+      return res.status(201).json({
+        error: false,
+        success: true,
+        message: 'Vendor application updated successfully! Your application is under review. You will be notified once approved.',
+        data: {
+          accesstoken: accessToken,
+          refreshToken: refreshToken,
+          vendorId: finalVendorCheck._id,
+          storeName: finalVendorCheck.storeName,
+          storeSlug: finalVendorCheck.storeSlug,
+          status: finalVendorCheck.status,
+          emailVerified: true,
+          user: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role
+          },
+          vendor: {
+            id: finalVendorCheck._id,
+            storeName: finalVendorCheck.storeName,
+            storeSlug: finalVendorCheck.storeSlug,
+            status: finalVendorCheck.status
+          }
+        }
+      });
+    }
+    
+    // Check if vendor with this email exists but different owner
+    const existingVendorByEmail = await VendorModel.findOne({ email: normalizedEmail });
+    if (existingVendorByEmail) {
+      // Vendor exists with this email but different owner - delete it
+      console.log('⚠️ Vendor exists with different owner, deleting old vendor');
+      await VendorModel.findByIdAndDelete(existingVendorByEmail._id);
+      
+      // Clear vendor reference from old user if exists
+      if (existingVendorByEmail.ownerUser) {
+        const oldUser = await UserModel.findById(existingVendorByEmail.ownerUser);
+        if (oldUser) {
+          oldUser.vendor = null;
+          oldUser.vendorId = null;
+          if (oldUser.role === 'VENDOR' && !oldUser.vendor) {
+            oldUser.role = 'USER';
+          }
+          await oldUser.save();
+        }
+      }
+      
+      // Continue to create new vendor below
+    }
+    
+    // Check if vendor with this slug exists (and doesn't belong to this user)
+    const existingVendorBySlug = await VendorModel.findOne({ 
+      storeSlug: storeSlug.toLowerCase().trim() 
+    });
+    if (existingVendorBySlug && existingVendorBySlug.ownerUser?.toString() !== user._id.toString()) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Store URL slug already taken. Please choose another.',
+        data: { 
+          slugTaken: true,
+          existingStoreName: existingVendorBySlug.storeName
+        }
+      });
+    }
       const accessToken2 = await generatedAccessToken2(user._id);
       const refreshToken2 = await genertedRefreshToken2(user._id);
       
@@ -824,80 +826,37 @@ export const applyToBecomeVendor = async (req, res) => {
       });
     }
 
-    // Check if user already has a vendor account (from earlier check)
-    let vendor = null;
+    // At this point, we've handled all existing vendor cases above
+    // Now create a new vendor account
+    console.log('📝 Creating new vendor account for:', normalizedEmail);
     
-    // First check via user's vendor reference
-    if (user && (user.vendor || user.vendorId)) {
-      vendor = await VendorModel.findById(user.vendor || user.vendorId);
-    }
-    
-    // Also check by ownerUser (in case vendor wasn't linked to user yet)
-    if (!vendor) {
-      vendor = await VendorModel.findOne({ ownerUser: user._id });
-      if (vendor) {
-        // Link it to user
-        user.vendor = vendor._id;
-        user.vendorId = vendor._id;
-        await user.save();
-      }
-    }
-    
-    // Also check by email (final fallback)
-    if (!vendor) {
-      vendor = await VendorModel.findOne({ email: normalizedEmail });
-      if (vendor) {
-        // Link it to user
-        vendor.ownerUser = user._id;
-        user.vendor = vendor._id;
-        user.vendorId = vendor._id;
-        await Promise.all([vendor.save(), user.save()]);
-      }
-    }
-    
-    // If vendor exists but is PENDING or REJECTED, update it instead of creating new
-    if (vendor) {
-      if (vendor.status === 'APPROVED' || vendor.status === 'ACTIVE') {
-        // This shouldn't happen as we check earlier, but just in case
-        return res.status(400).json({
-          error: true,
-          success: false,
-          message: 'You already have an active vendor account. Please login to access your vendor dashboard.',
-          data: { 
-            hasVendorAccount: true,
-            vendorStatus: vendor.status,
-            storeName: vendor.storeName
-          }
-        });
-      }
+    try {
+      const vendor = await VendorModel.create({
+        ownerUser: user._id,
+        storeName: storeName.trim(),
+        storeSlug: storeSlug.toLowerCase().trim(),
+        description: description || '',
+        email: normalizedEmail,
+        phone: phone || '',
+        whatsapp: whatsapp || '',
+        country: country || '',
+        city: city || '',
+        addressLine1: addressLine1 || '',
+        addressLine2: addressLine2 || '',
+        postalCode: postalCode || '',
+        categories: categories || [],
+        status: 'PENDING' // Requires admin approval
+      });
       
-      // Update existing PENDING or REJECTED vendor
-      console.log('🔄 Updating existing vendor application:', vendor._id, 'Status:', vendor.status);
-      vendor.storeName = storeName.trim();
-      vendor.storeSlug = storeSlug.toLowerCase().trim();
-      vendor.description = description || '';
-      vendor.phone = phone || '';
-      vendor.whatsapp = whatsapp || '';
-      vendor.country = country || '';
-      vendor.city = city || '';
-      vendor.addressLine1 = addressLine1 || '';
-      vendor.addressLine2 = addressLine2 || '';
-      vendor.postalCode = postalCode || '';
-      vendor.categories = categories || [];
-      vendor.status = 'PENDING'; // Reset to pending for re-review
-      vendor.ownerUser = user._id; // Ensure owner is set
-      vendor.email = normalizedEmail; // Ensure email is set
-      await vendor.save();
-      
-      // Link vendor to user if not already linked
-      if (!user.vendor || !user.vendorId) {
-        user.vendor = vendor._id;
-        user.vendorId = vendor._id;
-        await user.save();
-      }
+      // Link vendor to user
+      user.vendor = vendor._id;
+      user.vendorId = vendor._id;
+      await user.save();
       
       // Clear pending OTP data
-      pendingOTPStore.delete(normalizedEmail);
+      if (pendingData) {
+        pendingOTPStore.delete(normalizedEmail);
+      }
       
       // Generate tokens for auto-login
       const generatedAccessToken = (await import('../utils/generatedAccessToken.js')).default;
@@ -905,10 +864,12 @@ export const applyToBecomeVendor = async (req, res) => {
       const accessToken = await generatedAccessToken(user._id);
       const refreshToken = await genertedRefreshToken(user._id);
       
+      console.log('✅ New vendor application created successfully:', vendor._id);
+      
       return res.status(201).json({
         error: false,
         success: true,
-        message: 'Vendor application updated successfully! Your application is under review. You will be notified once approved.',
+        message: 'Vendor application submitted successfully! Your application is under review. You will be notified once approved.',
         data: {
           accesstoken: accessToken,
           refreshToken: refreshToken,
@@ -931,111 +892,43 @@ export const applyToBecomeVendor = async (req, res) => {
           }
         }
       });
-    } else {
-      // Create new vendor profile
-      try {
-        vendor = await VendorModel.create({
-          ownerUser: user._id,
-          storeName: storeName.trim(),
-          storeSlug: storeSlug.toLowerCase().trim(),
-          description: description || '',
-          email: normalizedEmail,
-          phone: phone || '',
-          whatsapp: whatsapp || '',
-          country: country || '',
-          city: city || '',
-          addressLine1: addressLine1 || '',
-          addressLine2: addressLine2 || '',
-          postalCode: postalCode || '',
-          categories: categories || [],
-          status: 'PENDING' // Requires admin approval
-        });
-      } catch (createError) {
-        // Handle duplicate key error
-        if (createError.code === 11000) {
-          if (createError.keyPattern?.ownerUser) {
-            // Vendor already exists for this user - fetch and return it
-            vendor = await VendorModel.findOne({ ownerUser: user._id });
-            if (vendor) {
-              return res.status(400).json({
-                error: true,
-                success: false,
-                message: 'You already have a vendor account. Please login to access your vendor dashboard.',
-                data: {
-                  hasVendorAccount: true,
-                  vendorStatus: vendor.status,
-                  storeName: vendor.storeName
-                }
-              });
-            }
-          }
-          if (createError.keyPattern?.storeSlug) {
+    } catch (createError) {
+      console.error('❌ Error creating vendor:', createError);
+      
+      // Handle duplicate key errors
+      if (createError.code === 11000) {
+        if (createError.keyPattern?.ownerUser) {
+          // Vendor already exists for this user - fetch and return it
+          const existingVendor = await VendorModel.findOne({ ownerUser: user._id });
+          if (existingVendor) {
+            user.vendor = existingVendor._id;
+            user.vendorId = existingVendor._id;
+            await user.save();
+            
             return res.status(400).json({
               error: true,
               success: false,
-              message: 'Store URL slug already taken. Please choose another.'
+              message: 'You already have a vendor account. Please login to access your vendor dashboard.',
+              data: {
+                hasVendorAccount: true,
+                vendorStatus: existingVendor.status,
+                storeName: existingVendor.storeName
+              }
             });
           }
+        }
+        if (createError.keyPattern?.storeSlug) {
           return res.status(400).json({
             error: true,
             success: false,
-            message: 'A vendor account with these details already exists'
+            message: 'Store URL slug already taken. Please choose another.'
           });
         }
-        throw createError;
       }
+      
+      // Re-throw to be caught by outer catch
+      throw createError;
     }
-
-    // Link vendor to user
-    user.vendor = vendor._id;
-    user.vendorId = vendor._id;
-    await user.save();
-
-    // Clear pending OTP data (clean up after successful registration)
-    if (pendingData) {
-      pendingOTPStore.delete(normalizedEmail);
-      console.log('🧹 OTP data cleaned up after successful registration');
-    }
-
-    // Generate tokens for auto-login after registration
-    const generatedAccessToken = (await import('../utils/generatedAccessToken.js')).default;
-    const genertedRefreshToken = (await import('../utils/generatedRefreshToken.js')).default;
-    const accessToken = await generatedAccessToken(user._id);
-    const refreshToken = await genertedRefreshToken(user._id);
-
-    console.log('✅ Vendor application created successfully:', {
-      vendorId: vendor._id,
-      storeName: vendor.storeName,
-      email: normalizedEmail.substring(0, 10) + '...',
-      status: vendor.status
-    });
-
-    return res.status(201).json({
-      error: false,
-      success: true,
-      message: 'Vendor application submitted successfully! Your application is under review. You will be notified once approved.',
-      data: {
-        accesstoken: accessToken,
-        refreshToken: refreshToken,
-        vendorId: vendor._id,
-        storeName: vendor.storeName,
-        storeSlug: vendor.storeSlug,
-        status: vendor.status,
-        emailVerified: true,
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role
-        },
-        vendor: {
-          id: vendor._id,
-          storeName: vendor.storeName,
-          storeSlug: vendor.storeSlug,
-          status: vendor.status
-        }
-      }
-    });
   } catch (error) {
     console.error('❌ Apply to become vendor error:', {
       message: error.message,
