@@ -36,76 +36,285 @@ const getShippingZone = (countryCode) => {
 };
 
 /**
+ * Classify product into shipping tier based on category, weight, and name
+ * Returns: 'small' (jewelry, small accessories) or 'standard' (decor, large items)
+ */
+const getProductShippingTier = (item) => {
+  // Safety check: if item is null/undefined, default to standard
+  if (!item) {
+    return 'standard';
+  }
+  
+  // Check product weight (in kg) - ensure it's a valid number
+  const weight = parseFloat(item.weight || item.product?.shipping?.weight || 0.5) || 0.5;
+  
+  // Small items: weight < 0.2kg (200g) are considered small jewelry/accessories
+  if (weight < 0.2) {
+    return 'small';
+  }
+  
+  // Check category name (case-insensitive) - safely handle null/undefined
+  const categoryName = (
+    (item.product?.category?.name || 
+     item.product?.catName || 
+     item.categoryName || 
+     '')
+  ).toString().toLowerCase();
+  
+  // Check product name for keywords - safely handle null/undefined
+  const productName = (
+    (item.name || 
+     item.product?.name || 
+     item.productTitle || 
+     '')
+  ).toString().toLowerCase();
+  
+  // Small item keywords (jewelry, accessories)
+  const smallItemKeywords = [
+    'earring', 'earrings', 'bracelet', 'bracelets', 'necklace', 'necklaces',
+    'ring', 'rings', 'pendant', 'pendants', 'charm', 'charms', 'brooch', 'brooches',
+    'anklet', 'anklets', 'bangle', 'bangles', 'cuff', 'cuffs', 'jewelry', 'jewellery',
+    'accessory', 'accessories', 'watch', 'watches', 'keychain', 'keychains'
+  ];
+  
+  // Large item keywords (decor, furniture, art)
+  const largeItemKeywords = [
+    'decor', 'decoration', 'furniture', 'art', 'painting', 'sculpture', 'statue',
+    'vase', 'vases', 'lamp', 'lamps', 'rug', 'rugs', 'carpet', 'carpets',
+    'curtain', 'curtains', 'mirror', 'mirrors', 'frame', 'frames', 'canvas',
+    'wall art', 'home decor', 'interior', 'furnishing'
+  ];
+  
+  // Check if product name or category contains small item keywords
+  const isSmallItem = smallItemKeywords.some(keyword => 
+    productName.includes(keyword) || categoryName.includes(keyword)
+  );
+  
+  // Check if product name or category contains large item keywords
+  const isLargeItem = largeItemKeywords.some(keyword => 
+    productName.includes(keyword) || categoryName.includes(keyword)
+  );
+  
+  // If explicitly small or large, return that
+  if (isSmallItem) return 'small';
+  if (isLargeItem) return 'standard';
+  
+  // Default based on weight: < 0.3kg = small, >= 0.3kg = standard
+  return weight < 0.3 ? 'small' : 'standard';
+};
+
+/**
  * Calculate fallback shipping rates
  * Used when EasyPost is unavailable or for non-Canada destinations
+ * Now includes product-type-based pricing (small jewelry vs large decor)
  */
 const calculateFallbackRates = (items, destination) => {
   const zone = getShippingZone(destination.countryCode || destination.country);
-  const itemCount = items.reduce((sum, item) => sum + (item.quantity || 1), 0);
   
-  // Zone-based pricing
+  // Classify items by shipping tier
+  const itemGroups = {
+    small: [], // Small jewelry, accessories (earrings, bracelets, etc.)
+    standard: [] // Standard/large items (decor, furniture, etc.)
+  };
+  
+  // Safely process items - skip null/undefined items
+  items.forEach(item => {
+    if (!item) return; // Skip null/undefined items
+    
+    try {
+      const tier = getProductShippingTier(item);
+      const quantity = Math.max(1, parseInt(item.quantity) || 1); // Ensure valid quantity
+      
+      // Ensure tier is valid ('small' or 'standard')
+      const validTier = (tier === 'small' || tier === 'standard') ? tier : 'standard';
+      
+      for (let i = 0; i < quantity; i++) {
+        itemGroups[validTier].push(item);
+      }
+    } catch (error) {
+      // If classification fails, default to standard tier
+      console.warn('Error classifying item for shipping:', error);
+      const quantity = Math.max(1, parseInt(item.quantity) || 1);
+      for (let i = 0; i < quantity; i++) {
+        itemGroups.standard.push(item);
+      }
+    }
+  });
+  
+  const smallItemCount = itemGroups.small.length || 0;
+  const standardItemCount = itemGroups.standard.length || 0;
+  const totalItemCount = smallItemCount + standardItemCount;
+  
+  // Safety check: if no items, return default rates
+  if (totalItemCount === 0) {
+    console.warn('No valid items found for shipping calculation, using default rates');
+    // Return default standard rates
+    return {
+      standard: {
+        name: 'Zuba Standard Shipping',
+        cost: 10,
+        displayCost: '$10.00 USD',
+        delivery: '5-10 business days',
+        estimatedDelivery: '5-10 business days',
+        minDays: 5,
+        maxDays: 10,
+        type: 'standard',
+        source: 'fallback'
+      },
+      express: {
+        name: 'Zuba Express Shipping',
+        cost: 17,
+        displayCost: '$17.00 USD',
+        delivery: '2-5 business days',
+        estimatedDelivery: '2-5 business days',
+        minDays: 2,
+        maxDays: 5,
+        type: 'express',
+        source: 'fallback'
+      }
+    };
+  }
+  
+  // Zone-based pricing with product-type differentiation
   const zonePricing = {
     canada: {
-      standard: { base: 10, additional: 3, expressBase: 17, expressAdditional: 5 },
-      minDays: 5,
-      maxDays: 10
+      // Small items (jewelry, accessories) - cheaper rates
+      small: {
+        standard: { base: 6, additional: 1.5, expressBase: 12, expressAdditional: 2.5 },
+        minDays: 4,
+        maxDays: 8
+      },
+      // Standard items (decor, large items) - regular rates
+      standard: {
+        standard: { base: 10, additional: 3, expressBase: 17, expressAdditional: 5 },
+        minDays: 5,
+        maxDays: 10
+      }
     },
     usa: {
-      standard: { base: 13, additional: 2, expressBase: 20, expressAdditional: 3 },
-      minDays: 7,
-      maxDays: 14
+      small: {
+        standard: { base: 8, additional: 1, expressBase: 15, expressAdditional: 2 },
+        minDays: 6,
+        maxDays: 12
+      },
+      standard: {
+        standard: { base: 13, additional: 2, expressBase: 20, expressAdditional: 3 },
+        minDays: 7,
+        maxDays: 14
+      }
     },
     international: {
-      standard: { base: 15, additional: 2.5, expressBase: 25, expressAdditional: 3 },
-      minDays: 10,
-      maxDays: 20
+      small: {
+        standard: { base: 10, additional: 1.5, expressBase: 20, expressAdditional: 2.5 },
+        minDays: 8,
+        maxDays: 16
+      },
+      standard: {
+        standard: { base: 15, additional: 2.5, expressBase: 25, expressAdditional: 3 },
+        minDays: 10,
+        maxDays: 20
+      }
     }
   };
   
-  const pricing = zonePricing[zone] || zonePricing.international;
+  const zoneData = zonePricing[zone] || zonePricing.international;
   
-  // Calculate costs
-  let standardCost = pricing.standard.base;
-  let expressCost = pricing.expressBase;
-  
-  if (itemCount > 1) {
-    standardCost += (itemCount - 1) * pricing.standard.additional;
-    expressCost += (itemCount - 1) * pricing.expressAdditional;
+  // Calculate costs for small items
+  let smallStandardCost = 0;
+  let smallExpressCost = 0;
+  if (smallItemCount > 0) {
+    const smallPricing = zoneData.small.standard;
+    smallStandardCost = smallPricing.base;
+    smallExpressCost = smallPricing.expressBase;
+    
+    if (smallItemCount > 1) {
+      smallStandardCost += (smallItemCount - 1) * smallPricing.additional;
+      smallExpressCost += (smallItemCount - 1) * smallPricing.expressAdditional;
+    }
   }
+  
+  // Calculate costs for standard items
+  let standardCost = 0;
+  let expressCost = 0;
+  if (standardItemCount > 0) {
+    const standardPricing = zoneData.standard.standard;
+    standardCost = standardPricing.base;
+    expressCost = standardPricing.expressBase;
+    
+    if (standardItemCount > 1) {
+      standardCost += (standardItemCount - 1) * standardPricing.additional;
+      expressCost += (standardItemCount - 1) * standardPricing.expressAdditional;
+    }
+  }
+  
+  // Combine costs (small items + standard items)
+  let totalStandardCost = smallStandardCost + standardCost;
+  let totalExpressCost = smallExpressCost + expressCost;
   
   // Apply maximum caps
   const MAX_STANDARD = 30;
   const MAX_EXPRESS = 40;
   
-  standardCost = Math.min(standardCost, MAX_STANDARD);
-  expressCost = Math.min(expressCost, MAX_EXPRESS);
+  totalStandardCost = Math.min(totalStandardCost, MAX_STANDARD);
+  totalExpressCost = Math.min(totalExpressCost, MAX_EXPRESS);
+  
+  // Calculate delivery days (weighted average based on item types)
+  let minDays, maxDays;
+  if (smallItemCount > 0 && standardItemCount > 0) {
+    // Mixed order: use average
+    const smallDays = zoneData.small.minDays;
+    const standardDays = zoneData.standard.minDays;
+    minDays = Math.round((smallDays * smallItemCount + standardDays * standardItemCount) / totalItemCount);
+    
+    const smallMaxDays = zoneData.small.maxDays;
+    const standardMaxDays = zoneData.standard.maxDays;
+    maxDays = Math.round((smallMaxDays * smallItemCount + standardMaxDays * standardItemCount) / totalItemCount);
+  } else if (smallItemCount > 0) {
+    minDays = zoneData.small.minDays;
+    maxDays = zoneData.small.maxDays;
+  } else {
+    minDays = zoneData.standard.minDays;
+    maxDays = zoneData.standard.maxDays;
+  }
   
   // Calculate express delivery days (60% of standard, but minimum 2-5 days)
-  const expressMinDays = Math.max(2, Math.ceil(pricing.minDays * 0.6));
-  const expressMaxDays = Math.max(5, Math.ceil(pricing.maxDays * 0.6));
+  const expressMinDays = Math.max(2, Math.ceil(minDays * 0.6));
+  const expressMaxDays = Math.max(5, Math.ceil(maxDays * 0.6));
   
   return {
     standard: {
       name: 'Zuba Standard Shipping',
-      cost: Math.round(standardCost * 100) / 100,
-      displayCost: `$${standardCost.toFixed(2)} USD`,
-      delivery: `${pricing.minDays}-${pricing.maxDays} business days`,
-      estimatedDelivery: `${pricing.minDays}-${pricing.maxDays} business days`,
-      minDays: pricing.minDays,
-      maxDays: pricing.maxDays,
+      cost: Math.round(totalStandardCost * 100) / 100,
+      displayCost: `$${totalStandardCost.toFixed(2)} USD`,
+      delivery: `${minDays}-${maxDays} business days`,
+      estimatedDelivery: `${minDays}-${maxDays} business days`,
+      minDays: minDays,
+      maxDays: maxDays,
       type: 'standard',
-      source: 'fallback'
+      source: 'fallback',
+      breakdown: {
+        smallItems: smallItemCount,
+        standardItems: standardItemCount,
+        smallCost: Math.round(smallStandardCost * 100) / 100,
+        standardCost: Math.round(standardCost * 100) / 100
+      }
     },
     express: {
       name: 'Zuba Express Shipping',
-      cost: Math.round(expressCost * 100) / 100,
-      displayCost: `$${expressCost.toFixed(2)} USD`,
+      cost: Math.round(totalExpressCost * 100) / 100,
+      displayCost: `$${totalExpressCost.toFixed(2)} USD`,
       delivery: `${expressMinDays}-${expressMaxDays} business days`,
       estimatedDelivery: `${expressMinDays}-${expressMaxDays} business days`,
       minDays: expressMinDays,
       maxDays: expressMaxDays,
       type: 'express',
-      source: 'fallback'
+      source: 'fallback',
+      breakdown: {
+        smallItems: smallItemCount,
+        standardItems: standardItemCount,
+        smallCost: Math.round(smallExpressCost * 100) / 100,
+        standardCost: Math.round(expressCost * 100) / 100
+      }
     }
   };
 };
