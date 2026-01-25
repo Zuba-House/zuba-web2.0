@@ -165,6 +165,9 @@ export const vendorApi = {
   createProduct: (data) => api.post('/vendor/products', data),
   updateProduct: (id, data) => api.put(`/vendor/products/${id}`, data),
   deleteProduct: (id) => api.delete(`/vendor/products/${id}`),
+  // Browse and claim products
+  browseAvailableProducts: (params) => api.get('/vendor/products/available', { params }),
+  claimProduct: (id) => api.post(`/vendor/products/${id}/claim`),
 
   // Orders
   getOrders: (params) => api.get('/vendor/orders', { params }),

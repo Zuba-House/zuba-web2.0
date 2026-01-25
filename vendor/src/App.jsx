@@ -20,6 +20,7 @@ import DashboardHome from './pages/dashboard/DashboardHome';
 import ProductList from './pages/products/ProductList';
 import ProductForm from './pages/products/ProductForm';
 import ProductFormEnhanced from './pages/products/ProductFormEnhanced';
+import BrowseProducts from './pages/products/BrowseProducts';
 
 // Orders
 import OrderList from './pages/orders/OrderList';
@@ -105,6 +106,13 @@ function App() {
           <ProtectedRoute>
             <VendorDashboardLayout>
               <ProductList />
+            </VendorDashboardLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/products/browse" element={
+          <ProtectedRoute>
+            <VendorDashboardLayout>
+              <BrowseProducts />
             </VendorDashboardLayout>
           </ProtectedRoute>
         } />

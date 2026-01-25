@@ -262,3 +262,213 @@ export const remove = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/vendor/products/available
+ * Browse products available for claiming (products without a vendor)
+ * Vendors can see all products that don't have a vendor assigned yet
+ */
+export const browseAvailable = async (req, res) => {
+  try {
+    const vendorId = req.vendorId;
+    const { page = 1, limit = 20, search = '', category, sort = 'newest' } = req.query;
+
+    // Build filter: products without vendor assigned
+    // Only show products that don't have a vendor (null or doesn't exist)
+    // This ensures one product = one vendor (no duplicates)
+    const filter = {
+      $or: [
+        { vendor: null }, // No vendor assigned
+        { vendor: { $exists: false } } // Vendor field doesn't exist
+      ],
+      status: 'published' // Only show published products
+    };
+
+    // Search filter
+    if (search) {
+      filter.$and = filter.$and || [];
+      filter.$and.push({
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { sku: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } },
+          { brand: { $regex: search, $options: 'i' } }
+        ]
+      });
+    }
+
+    // Category filter
+    if (category) {
+      filter.category = category;
+    }
+
+    // Sort options
+    let sortOption = { createdAt: -1 }; // Default: newest first
+    switch (sort) {
+      case 'newest':
+        sortOption = { createdAt: -1 };
+        break;
+      case 'oldest':
+        sortOption = { createdAt: 1 };
+        break;
+      case 'name_asc':
+        sortOption = { name: 1 };
+        break;
+      case 'name_desc':
+        sortOption = { name: -1 };
+        break;
+      case 'price_low':
+        sortOption = { 'pricing.price': 1, price: 1 };
+        break;
+      case 'price_high':
+        sortOption = { 'pricing.price': -1, price: -1 };
+        break;
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [items, total] = await Promise.all([
+      ProductModel.find(filter)
+        .sort(sortOption)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .populate('category', 'name slug')
+        .populate('categories', 'name slug')
+        .select('-__v')
+        .lean(),
+      ProductModel.countDocuments(filter)
+    ]);
+
+    console.log(`📦 Vendor ${vendorId} browsing available products: ${total} found`);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      data: {
+        items,
+        total,
+        page: Number(page),
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('vendorProduct.browseAvailable error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+/**
+ * POST /api/vendor/products/:id/claim
+ * Claim/add an existing product to vendor's store
+ * One product can only belong to one vendor (no duplicates)
+ */
+export const claimProduct = async (req, res) => {
+  try {
+    const vendorId = req.vendorId;
+    const productId = req.params.id;
+
+    // Get vendor details
+    const vendor = await VendorModel.findById(vendorId);
+    if (!vendor) {
+      return res.status(404).json({
+        error: true,
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    // Check if vendor is approved
+    if (vendor.status !== 'APPROVED') {
+      return res.status(403).json({
+        error: true,
+        success: false,
+        message: 'Only approved vendors can claim products. Your account is pending approval.'
+      });
+    }
+
+    // Find the product
+    const product = await ProductModel.findById(productId);
+    if (!product) {
+      return res.status(404).json({
+        error: true,
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    // Check if product already has a vendor
+    if (product.vendor && product.vendor.toString() !== vendorId.toString()) {
+      const existingVendor = await VendorModel.findById(product.vendor).select('storeName');
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: `This product already belongs to "${existingVendor?.storeName || 'another vendor'}". Each product can only belong to one vendor.`,
+        data: {
+          existingVendor: existingVendor?.storeName || 'Unknown',
+          productId: product._id,
+          productName: product.name
+        }
+      });
+    }
+
+    // Check if vendor already owns this product
+    if (product.vendor && product.vendor.toString() === vendorId.toString()) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'You already own this product',
+        data: {
+          productId: product._id,
+          productName: product.name
+        }
+      });
+    }
+
+    // Check if product is published
+    if (product.status !== 'published') {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Only published products can be claimed'
+      });
+    }
+
+    // Claim the product - assign to vendor
+    product.vendor = vendorId;
+    product.vendorId = vendorId; // Backward compatibility
+    product.vendorShopName = vendor.storeName || '';
+    product.productOwnerType = 'VENDOR';
+    // Keep existing approvalStatus if it exists, otherwise set to APPROVED for claimed products
+    if (!product.approvalStatus) {
+      product.approvalStatus = 'APPROVED';
+    }
+    // Keep product published status
+    product.status = 'published';
+
+    await product.save();
+
+    // Populate for response
+    await product.populate('category', 'name slug');
+    await product.populate('vendor', 'storeName storeSlug');
+
+    console.log(`✅ Product "${product.name}" claimed by vendor "${vendor.storeName}" (ID: ${vendorId})`);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message: `Product "${product.name}" has been successfully added to your store!`,
+      data: product
+    });
+  } catch (error) {
+    console.error('vendorProduct.claimProduct error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Failed to claim product'
+    });
+  }
+};
+

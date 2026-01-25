@@ -12,7 +12,8 @@ const Sidebar = ({ isOpen, setIsOpen, isMobile }) => {
   
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/products', icon: Package, label: 'Products' },
+    { path: '/products', icon: Package, label: 'My Products' },
+    { path: '/products/browse', icon: Search, label: 'Browse & Add Products' },
     { path: '/orders', icon: ShoppingCart, label: 'Orders' },
     { 
       id: 'finance',

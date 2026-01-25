@@ -46,7 +46,9 @@ router.get('/dashboard', vendorController.getDashboardStats);
 
 // Products
 router.get('/products', vendorProductController.list);
+router.get('/products/available', vendorProductController.browseAvailable); // Browse products available for claiming
 router.post('/products', vendorProductController.create);
+router.post('/products/:id/claim', vendorProductController.claimProduct); // Claim/add product to store
 router.get('/products/:id', vendorProductController.get);
 router.put('/products/:id', vendorProductController.update);
 router.delete('/products/:id', vendorProductController.remove);
