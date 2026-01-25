@@ -243,14 +243,76 @@ const Checkout = () => {
       addressId = existingAddress?._id || null;
     }
 
+    // Validate and format cart items to ensure all required fields are present
+    let formattedProducts;
+    try {
+      formattedProducts = (context?.cartData || []).map(item => {
+        const itemPrice = parseFloat(item.price || 0);
+        const itemQuantity = parseInt(item.quantity || 1);
+        const itemSubTotal = item.subTotal || (itemPrice * itemQuantity);
+        
+        // Ensure all required fields are present
+        if (!item.productId) {
+          console.error('❌ Cart item missing productId:', item);
+          throw new Error('Cart item is missing product ID');
+        }
+        if (!item.productTitle && !item.name) {
+          console.error('❌ Cart item missing productTitle:', item);
+          throw new Error('Cart item is missing product title');
+        }
+        if (!itemQuantity || itemQuantity <= 0) {
+          console.error('❌ Cart item has invalid quantity:', item);
+          throw new Error('Cart item has invalid quantity');
+        }
+        if (!itemPrice || itemPrice <= 0) {
+          console.error('❌ Cart item has invalid price:', item);
+          throw new Error('Cart item has invalid price');
+        }
+        
+        return {
+          productId: item.productId,
+          productTitle: item.productTitle || item.name || 'Unknown Product',
+          quantity: itemQuantity,
+          price: itemPrice,
+          subTotal: parseFloat(itemSubTotal.toFixed(2)), // Ensure subTotal is a number
+          image: item.image || '',
+          // Variation fields
+          productType: item.productType || 'simple',
+          variationId: item.variationId || null,
+          variation: item.variation || null,
+          // Backward compatibility fields
+          size: item.size || null,
+          weight: item.weight || null,
+          ram: item.ram || null,
+          // Vendor fields
+          vendor: item.vendor || item.vendorId || null,
+          vendorId: item.vendorId || item.vendor || null,
+          vendorShopName: item.vendorShopName || ''
+        };
+      });
+
+      // Final validation - ensure we have at least one product
+      if (!formattedProducts || formattedProducts.length === 0) {
+        console.error('❌ No valid products in cart');
+        context.alertBox("error", "Your cart is empty. Please add items before placing an order.");
+        setIsProcessingOrder(false);
+        return;
+      }
+    } catch (formatError) {
+      console.error('❌ Error formatting cart items:', formatError);
+      context.alertBox("error", formatError.message || "There was an error processing your cart items. Please try again.");
+      setIsProcessingOrder(false);
+      return;
+    }
+
     const payLoad = {
       userId: user?._id,
-      products: context?.cartData,
+      products: formattedProducts, // Use formatted products instead of raw cartData
       paymentId: paymentIntent?.id || '',
       payment_status: "COMPLETED",
       delivery_address: addressId, // Use address ID if found, otherwise will be created
-      totalAmt: finalTotal, // Use calculated total with shipping and discounts
-      shippingCost: shippingCost,
+      totalAmt: parseFloat(finalTotal.toFixed(2)), // Ensure total is properly formatted
+      shippingCost: parseFloat(shippingCost.toFixed(2)),
       shippingRate: selectedShippingRate,
       phone: phone, // Include phone number
       shippingAddress: shippingAddress, // Include full address data
@@ -282,8 +344,15 @@ const Checkout = () => {
       console.log('📦 Payment Intent ID:', paymentIntent?.id);
       console.log('📦 Order payload:', { 
         userId: user?._id, 
-        productCount: context?.cartData?.length,
-        totalAmt: finalTotal 
+        productCount: formattedProducts.length,
+        totalAmt: finalTotal,
+        products: formattedProducts.map(p => ({
+          productId: p.productId,
+          productTitle: p.productTitle,
+          quantity: p.quantity,
+          price: p.price,
+          subTotal: p.subTotal
+        }))
       });
       
       const res = await postData(`/api/order/create`, payLoad);
@@ -293,7 +362,20 @@ const Checkout = () => {
       console.log('📦 Response success field:', res?.success);
       
       // Check multiple response formats for compatibility
-      const isSuccess = res?.error === false || res?.success === true || res?.orderId || (res && !res.error);
+      // Also check for network errors or API errors
+      const isSuccess = (res && !res.error && res?.error !== true) && 
+                        (res?.error === false || res?.success === true || res?.orderId || res?.order?._id);
+      
+      // Check if response indicates an error
+      if (res?.error === true || res?.isAuthError) {
+        console.error('❌ Order creation failed with error response:', res);
+        context.alertBox("error", res?.message || "Failed to create order. Please try again or contact support.");
+        setIsProcessingOrder(false);
+        setTimeout(() => {
+          window.location.href = "/order/failed";
+        }, 2000);
+        return;
+      }
       
       if (isSuccess) {
         console.log('✅ Order created successfully!');

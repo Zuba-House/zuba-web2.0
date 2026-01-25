@@ -32,6 +32,34 @@ export const createOrderController = async (request, response) => {
             });
         }
 
+        // Validate each product has required fields
+        for (let i = 0; i < request.body.products.length; i++) {
+            const product = request.body.products[i];
+            const missingFields = [];
+            
+            if (!product.productId) missingFields.push('productId');
+            if (!product.productTitle && !product.name) missingFields.push('productTitle');
+            if (!product.quantity || product.quantity <= 0) missingFields.push('quantity');
+            if (!product.price || product.price <= 0) missingFields.push('price');
+            if (!product.subTotal || product.subTotal <= 0) {
+                // Try to calculate subTotal if missing
+                if (product.price && product.quantity) {
+                    product.subTotal = parseFloat((product.price * product.quantity).toFixed(2));
+                } else {
+                    missingFields.push('subTotal');
+                }
+            }
+            
+            if (missingFields.length > 0) {
+                console.error(`❌ Order creation failed: Product ${i + 1} missing required fields:`, missingFields);
+                return response.status(400).json({
+                    error: true,
+                    success: false,
+                    message: `Product ${i + 1} is missing required fields: ${missingFields.join(', ')}`
+                });
+            }
+        }
+
         // Handle guest checkout
         const isGuestOrder = request.body.isGuestOrder || (!request.body.userId && request.body.guestCustomer);
         

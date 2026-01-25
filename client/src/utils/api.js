@@ -29,18 +29,42 @@ export const postData = async (url, formData) => {
             body: JSON.stringify(formData)
         });
 
+        // Try to parse response as JSON
+        let data;
+        try {
+            data = await response.json();
+        } catch (parseError) {
+            // If JSON parsing fails, return error
+            console.error('Failed to parse response as JSON:', parseError);
+            return { 
+                error: true, 
+                success: false,
+                message: `Server error (${response.status}): ${response.statusText}` 
+            };
+        }
 
         if (response.ok) {
-            const data = await response.json();
             return data;
         } else {
-            const errorData = await response.json();
-            return handleAuthError(response.status, errorData);
+            // Handle non-OK responses
+            const errorData = handleAuthError(response.status, data);
+            // Ensure error flag is set for non-OK responses
+            return {
+                ...errorData,
+                error: errorData.error !== false ? true : false, // Explicitly set error flag
+                success: false,
+                status: response.status,
+                statusText: response.statusText
+            };
         }
 
     } catch (error) {
-        console.error('Error:', error);
-        return { error: true, message: 'Network error occurred' };
+        console.error('Network/Request Error:', error);
+        return { 
+            error: true, 
+            success: false,
+            message: error.message || 'Network error occurred. Please check your connection and try again.' 
+        };
     }
 
 }
