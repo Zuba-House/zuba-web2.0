@@ -431,6 +431,15 @@ export const createVendor = async (req, res) => {
         });
       }
 
+      // Check for ownerUser index errors
+      if (error.keyPattern?.ownerUser || (error.message && error.message.includes('ownerUser'))) {
+        return res.status(400).json({
+          error: true,
+          success: false,
+          message: 'User already has a vendor account.'
+        });
+      }
+
       if (error.keyPattern?.storeSlug) {
         return res.status(400).json({
           error: true,
@@ -445,13 +454,14 @@ export const createVendor = async (req, res) => {
           message: 'A vendor with this email already exists.'
         });
       }
-      if (error.keyPattern?.ownerUser) {
-        return res.status(400).json({
-          error: true,
-          success: false,
-          message: 'User already has a vendor account.'
-        });
-      }
+    }
+
+    // Handle Mongoose schema index errors (happens when model is loaded multiple times)
+    if (error.name === 'MongooseError' && error.message && error.message.includes('already has an index')) {
+      // This is a schema-level error, not a database error
+      // The index is already defined, which is fine - just log and continue
+      console.warn('⚠️ Index already defined in schema (non-critical):', error.message);
+      // Don't return error - this is just a warning, the model should still work
     }
 
     // Handle validation errors

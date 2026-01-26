@@ -247,7 +247,8 @@ VendorSchema.methods.updateBalance = async function(amount, type = 'EARNING') {
   await this.save();
 };
 
-const VendorModel = mongoose.model('Vendor', VendorSchema);
+// Check if model already exists to prevent redefinition
+const VendorModel = mongoose.models.Vendor || mongoose.model('Vendor', VendorSchema);
 
 export default VendorModel;
 
