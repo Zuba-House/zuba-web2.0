@@ -53,6 +53,7 @@ const ApplyForm = () => {
   const [errors, setErrors] = useState({});
   const [resumeFileName, setResumeFileName] = useState("");
   const [applicationId, setApplicationId] = useState("");
+  const [positionClosed, setPositionClosed] = useState(false);
 
   const designToolsOptions = [
     "Adobe Photoshop",
@@ -68,10 +69,26 @@ const ApplyForm = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
     const positions = {
-      1: "Professional Graphic Designer"
+      1: {
+        title: "Professional Graphic Designer",
+        isActive: false, // Position closed - deadline was January 20
+        status: "Hiring Complete"
+      }
     };
     if (positionId && positions[positionId]) {
-      setFormData(prev => ({ ...prev, position: positions[positionId] }));
+      const position = positions[positionId];
+      if (!position.isActive) {
+        // Position is closed, set error state
+        setPositionClosed(true);
+        setErrors({ 
+          closed: `This position is no longer accepting applications. ${position.status || 'Hiring Complete'}. The application deadline was January 20.` 
+        });
+      } else {
+        setFormData(prev => ({ ...prev, position: position.title }));
+      }
+    } else if (positionId) {
+      setPositionClosed(true);
+      setErrors({ closed: "Position not found." });
     }
   }, [positionId]);
 
@@ -182,6 +199,12 @@ const ApplyForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Prevent submission if position is closed
+    if (positionClosed) {
+      setErrors({ submit: "This position is no longer accepting applications." });
+      return;
+    }
+    
     if (!validateForm()) {
       return;
     }
@@ -207,6 +230,7 @@ const ApplyForm = () => {
       submitData.append("whyInterested", formData.whyInterested);
       if (formData.additionalInfo) submitData.append("additionalInfo", formData.additionalInfo);
       submitData.append("position", formData.position);
+      if (positionId) submitData.append("positionId", positionId);
       submitData.append("resume", resume);
 
       const response = await axios.post(
@@ -330,6 +354,69 @@ const ApplyForm = () => {
     }
     return <FaUser className="text-[40px] text-[#efb291]" />;
   };
+
+  // Show closed position message if position is closed
+  if (positionClosed) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center px-4 py-12">
+        <motion.div
+          className="max-w-2xl w-full bg-white rounded-3xl shadow-2xl p-8 lg:p-12 text-center border-2 border-red-200"
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          <motion.div
+            className="bg-red-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", delay: 0.2 }}
+          >
+            <FaExclamationTriangle className="text-5xl text-red-500" />
+          </motion.div>
+
+          <h2 className="text-3xl lg:text-4xl font-bold text-[#0b2735] mb-4">
+            Position Closed
+          </h2>
+
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+            <p className="text-gray-700 mb-2 leading-relaxed">
+              {errors.closed || "This position is no longer accepting applications."}
+            </p>
+            <p className="text-sm text-gray-600">
+              The application deadline for this position was <strong>January 20</strong>. We have completed hiring for this role.
+            </p>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 text-left">
+            <p className="text-sm text-gray-700 mb-2">
+              <strong className="text-[#0b2735]">Thank you for your interest!</strong>
+            </p>
+            <ul className="text-sm text-gray-600 space-y-2 list-disc list-inside">
+              <li>We have completed hiring for this position</li>
+              <li>Check back for future opportunities on our careers page</li>
+              <li>Our internship program will launch in Summer 2026</li>
+            </ul>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link
+              to="/careers"
+              className="bg-[#efb291] text-[#0b2735] px-8 py-4 rounded-lg font-bold hover:bg-[#e5a67d] transition-all shadow-lg hover:shadow-xl inline-flex items-center justify-center gap-2"
+            >
+              <FaArrowLeft />
+              Back to Careers
+            </Link>
+            <Link
+              to="/"
+              className="border-2 border-[#efb291] text-[#efb291] px-8 py-4 rounded-lg font-bold hover:bg-[rgba(239,178,145,0.1)] transition-all inline-flex items-center justify-center gap-2"
+            >
+              Go to Home
+            </Link>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">

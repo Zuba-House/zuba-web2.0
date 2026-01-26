@@ -25,8 +25,33 @@ export const submitJobApplication = async (req, res) => {
             technicalReadiness,
             whyInterested,
             additionalInfo,
-            position
+            position,
+            positionId
         } = req.body;
+
+        // Check if position is closed
+        // Position ID 1 (Professional Graphic Designer) is closed - deadline was January 20
+        const closedPositions = {
+            1: {
+                title: "Professional Graphic Designer",
+                deadline: "January 20",
+                status: "Hiring Complete"
+            }
+        };
+
+        // Check by positionId if provided, or by position title
+        const positionIdNum = positionId ? parseInt(positionId) : null;
+        const isClosedById = positionIdNum && closedPositions[positionIdNum];
+        const isClosedByTitle = position && position.includes("Professional Graphic Designer");
+
+        if (isClosedById || isClosedByTitle) {
+            const closedInfo = isClosedById ? closedPositions[positionIdNum] : closedPositions[1];
+            return res.status(400).json({
+                success: false,
+                error: `This position is no longer accepting applications. ${closedInfo.status}. The application deadline was ${closedInfo.deadline}.`,
+                positionClosed: true
+            });
+        }
 
         // Parse designTools if it's a JSON string
         if (typeof designTools === 'string') {

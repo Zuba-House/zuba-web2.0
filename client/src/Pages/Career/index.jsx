@@ -433,14 +433,14 @@ const Career = () => {
           </motion.div>
 
           {/* Active Hiring Positions */}
-          {activePositions.length > 0 && (
+          {activePositions.filter(pos => pos.isActive).length > 0 && (
             <motion.div variants={fadeInUp} className="mb-16">
               <h3 className="text-2xl lg:text-3xl font-bold text-center text-[#0b2735] mb-12">
                 Available <span className="text-[#efb291]">Positions</span>
               </h3>
 
               <div className="grid grid-cols-1 gap-8 max-w-4xl mx-auto">
-                {activePositions.map((position) => (
+                {activePositions.filter(pos => pos.isActive).map((position) => (
                   <motion.div
                     key={position.id}
                     className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-[#efb291]"

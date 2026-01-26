@@ -5,8 +5,7 @@ const VendorSchema = new mongoose.Schema(
     ownerUser: { 
       type: mongoose.Schema.Types.ObjectId, 
       ref: 'User', 
-      required: [true, 'Owner user is required'],
-      index: true
+      required: [true, 'Owner user is required']
       // Note: unique index is created separately to ensure sparse: true works correctly
     },
     storeName: { 
