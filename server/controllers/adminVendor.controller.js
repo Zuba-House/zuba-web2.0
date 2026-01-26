@@ -336,9 +336,18 @@ export const createVendor = async (req, res) => {
       }
     }
 
-    // Create new vendor
+    // Ensure user._id is valid before creating vendor
+    if (!user || !user._id) {
+      return res.status(500).json({
+        error: true,
+        success: false,
+        message: 'Failed to create user account. Please try again.'
+      });
+    }
+
+    // Create new vendor - ensure ownerUser is always set
     const vendor = await VendorModel.create({
-      ownerUser: user._id,
+      ownerUser: user._id, // Required field - must always be set
       storeName: storeName.trim(),
       storeSlug: storeSlug.toLowerCase().trim(),
       description: description || '',
@@ -408,6 +417,20 @@ export const createVendor = async (req, res) => {
     
     // Handle duplicate key errors
     if (error.code === 11000) {
+      // Check for old userId index error (legacy issue)
+      if (error.message && (error.message.includes('userId') || error.message.includes('userId_1'))) {
+        return res.status(500).json({
+          error: true,
+          success: false,
+          message: 'Database index error detected. The system needs to be updated. Please contact support.',
+          details: {
+            issue: 'Old userId index exists in database',
+            solution: 'Run the index fix script: node server/scripts/fixVendorIndexes.js',
+            errorMessage: error.message
+          }
+        });
+      }
+
       if (error.keyPattern?.storeSlug) {
         return res.status(400).json({
           error: true,

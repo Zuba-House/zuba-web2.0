@@ -5,10 +5,9 @@ const VendorSchema = new mongoose.Schema(
     ownerUser: { 
       type: mongoose.Schema.Types.ObjectId, 
       ref: 'User', 
-      required: true,
-      unique: true,
-      sparse: true, // Allow null values in unique index
+      required: [true, 'Owner user is required'],
       index: true
+      // Note: unique index is created separately to ensure sparse: true works correctly
     },
     storeName: { 
       type: String, 
@@ -220,6 +219,10 @@ const VendorSchema = new mongoose.Schema(
 VendorSchema.index({ status: 1, isFeatured: 1 });
 VendorSchema.index({ 'stats.totalProducts': -1 });
 VendorSchema.index({ totalSales: -1 });
+
+// Unique sparse index on ownerUser (allows null but ensures uniqueness for non-null values)
+// This must be created separately to ensure sparse: true works correctly
+VendorSchema.index({ ownerUser: 1 }, { unique: true, sparse: true });
 
 // Virtual for checking if vendor can withdraw
 VendorSchema.virtual('canWithdraw').get(function() {
