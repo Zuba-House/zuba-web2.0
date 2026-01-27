@@ -7,6 +7,13 @@
  * - Zone-based pricing (Canada, USA, International)
  * - Maximum caps ($30 Standard / $40 Express)
  * - Branded as "Zuba Shipping"
+ * - Progressive quantity discounts (shipping decreases as quantity increases)
+ * 
+ * FUTURE ENHANCEMENT: Vendor-location-based shipping
+ * - Shipping cost and delivery time will be calculated based on vendor's location
+ * - Example: If vendor is in Rwanda and customer is in Ottawa, shipping will use
+ *   international rates and longer delivery times based on Rwanda-to-Ottawa distance
+ * - This will require adding vendor location data to product/vendor models
  */
 
 import EasyPostClient from '@easypost/api';
@@ -176,19 +183,20 @@ const calculateFallbackRates = (items, destination) => {
   }
   
   // Zone-based pricing with product-type differentiation
+  // Updated for Canada (Ottawa/Gatineau area): $5.00 base, 2 days normal, 1 day express
   const zonePricing = {
     canada: {
       // Small items (jewelry, accessories) - cheaper rates
       small: {
-        standard: { base: 6, additional: 1.5, expressBase: 12, expressAdditional: 2.5 },
-        minDays: 4,
-        maxDays: 8
+        standard: { base: 5, additional: 1.5, expressBase: 8, expressAdditional: 2.0 },
+        minDays: 2,
+        maxDays: 2
       },
       // Standard items (decor, large items) - regular rates
       standard: {
-        standard: { base: 10, additional: 3, expressBase: 17, expressAdditional: 5 },
-        minDays: 5,
-        maxDays: 10
+        standard: { base: 5, additional: 2.0, expressBase: 10, expressAdditional: 3.0 },
+        minDays: 2,
+        maxDays: 2
       }
     },
     usa: {
@@ -251,6 +259,29 @@ const calculateFallbackRates = (items, destination) => {
   let totalStandardCost = smallStandardCost + standardCost;
   let totalExpressCost = smallExpressCost + expressCost;
   
+  // Apply progressive quantity discount for Canada (shipping decreases as quantity increases)
+  if (zone === 'canada' && totalItemCount > 1) {
+    // Progressive discount based on total quantity
+    if (totalItemCount >= 15) {
+      totalStandardCost *= 0.80; // 20% discount for 15+ items
+      totalExpressCost *= 0.80;
+    } else if (totalItemCount >= 10) {
+      totalStandardCost *= 0.85; // 15% discount for 10-14 items
+      totalExpressCost *= 0.85;
+    } else if (totalItemCount >= 5) {
+      totalStandardCost *= 0.90; // 10% discount for 5-9 items
+      totalExpressCost *= 0.90;
+    }
+    
+    // Ensure minimum cost of $5.00 for Canada
+    if (totalStandardCost < 5.0) {
+      totalStandardCost = 5.0;
+    }
+    if (totalExpressCost < 5.0) {
+      totalExpressCost = 5.0;
+    }
+  }
+  
   // Apply maximum caps
   const MAX_STANDARD = 30;
   const MAX_EXPRESS = 40;
@@ -277,9 +308,16 @@ const calculateFallbackRates = (items, destination) => {
     maxDays = zoneData.standard.maxDays;
   }
   
-  // Calculate express delivery days (60% of standard, but minimum 2-5 days)
-  const expressMinDays = Math.max(2, Math.ceil(minDays * 0.6));
-  const expressMaxDays = Math.max(5, Math.ceil(maxDays * 0.6));
+  // Calculate express delivery days
+  // For Canada: Express is 1 day, for others: 60% of standard but minimum 2-5 days
+  let expressMinDays, expressMaxDays;
+  if (zone === 'canada') {
+    expressMinDays = 1;
+    expressMaxDays = 1;
+  } else {
+    expressMinDays = Math.max(2, Math.ceil(minDays * 0.6));
+    expressMaxDays = Math.max(5, Math.ceil(maxDays * 0.6));
+  }
   
   return {
     standard: {

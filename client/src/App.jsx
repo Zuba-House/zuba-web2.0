@@ -43,6 +43,7 @@ import PrivacyPolicy from "./Pages/PrivacyPolicy";
 import ConsumerHealthData from "./Pages/ConsumerHealthData";
 import PrivacyChoices from "./Pages/PrivacyChoices";
 import VendorApplication from "./Pages/VendorApplication";
+import ScrollToTop from "./components/ScrollToTop";
 
 import toast, { Toaster } from 'react-hot-toast';
 import { fetchDataFromApi, postData } from "./utils/api";
@@ -792,6 +793,7 @@ function App() {
   return (
     <>
       <BrowserRouter>
+        <ScrollToTop />
         <MyContext.Provider value={values}>
           <React.Suspense fallback={null}>
             <PromoBanner />

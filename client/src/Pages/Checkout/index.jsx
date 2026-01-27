@@ -134,7 +134,13 @@ const Checkout = () => {
       }
     } catch (error) {
       console.error('Phone validation error:', error);
-      setPhoneError('Unable to validate phone number');
+      const errorMsg = error?.response?.data?.message || error?.message || 'Unable to validate phone number';
+      setPhoneError(errorMsg);
+      // Allow phone to proceed if validation service fails (graceful degradation)
+      if (error?.response?.status === 500 || error?.response?.status >= 500) {
+        console.warn('Phone validation service unavailable, allowing phone to proceed');
+        return true; // Allow to proceed if service is down
+      }
       return false;
     }
   };

@@ -30,6 +30,15 @@ import AddAddress from "../../Pages/MyAccount/addAddress";
 const Footer = () => {
   const context = useContext(MyContext);
 
+  // Function to scroll to top when clicking footer links
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: 'smooth'
+    });
+  };
+
   return (
     <>
       <footer className="py-6 bg-[#0b2735]">
@@ -83,22 +92,22 @@ const Footer = () => {
               <h2 className="text-[16px] sm:text-[17px] lg:text-[18px] font-[600] mb-3 lg:mb-4 text-[#efb291] border-b-2 border-[#efb291] pb-2 inline-block">Quick Links</h2>
               <ul className="list mt-4">
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/about" className="link text-[#e5e2db] hover:text-[#efb291]">
+                  <Link to="/about" onClick={scrollToTop} className="link text-[#e5e2db] hover:text-[#efb291]">
                     About Zuba House
                   </Link>
                 </li>
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/products" className="link text-[#e5e2db] hover:text-[#efb291]">
+                  <Link to="/products" onClick={scrollToTop} className="link text-[#e5e2db] hover:text-[#efb291]">
                     Shop
                   </Link>
                 </li>
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/faq" className="link text-[#e5e2db] hover:text-[#efb291]">
+                  <Link to="/faq" onClick={scrollToTop} className="link text-[#e5e2db] hover:text-[#efb291]">
                     FAQs
                   </Link>
                 </li>
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/careers" className="link text-[#e5e2db] hover:text-[#efb291]">
+                  <Link to="/careers" onClick={scrollToTop} className="link text-[#e5e2db] hover:text-[#efb291]">
                     Careers
                   </Link>
                 </li>
@@ -113,32 +122,32 @@ const Footer = () => {
               <h2 className="text-[16px] sm:text-[17px] lg:text-[18px] font-[600] mb-3 lg:mb-4 text-[#efb291] border-b-2 border-[#efb291] pb-2 inline-block">Customer Service</h2>
               <ul className="list mt-4">
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/return-refund-policy" className="link text-[#e5e2db] hover:text-[#efb291]">
+                  <Link to="/return-refund-policy" onClick={scrollToTop} className="link text-[#e5e2db] hover:text-[#efb291]">
                     Return & Refund Policy
                   </Link>
                 </li>
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/order-tracking" className="link text-[#e5e2db] hover:text-[#efb291]">
+                  <Link to="/order-tracking" onClick={scrollToTop} className="link text-[#e5e2db] hover:text-[#efb291]">
                     Order Tracking
                   </Link>
                 </li>
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/shipping-info" className="link text-[#e5e2db] hover:text-[#efb291]">
+                  <Link to="/shipping-info" onClick={scrollToTop} className="link text-[#e5e2db] hover:text-[#efb291]">
                     Shipping Info
                   </Link>
                 </li>
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/download-app" className="link text-[#e5e2db] hover:text-[#efb291]">
+                  <Link to="/download-app" onClick={scrollToTop} className="link text-[#e5e2db] hover:text-[#efb291]">
                     Download App
                   </Link>
                 </li>
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/report-suspicious-activity" className="link text-[#e5e2db] hover:text-[#efb291]">
+                  <Link to="/report-suspicious-activity" onClick={scrollToTop} className="link text-[#e5e2db] hover:text-[#efb291]">
                     Report Suspicious Activity
                   </Link>
                 </li>
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/investors" className="link text-[#e5e2db] hover:text-[#efb291]">
+                  <Link to="/investors" onClick={scrollToTop} className="link text-[#e5e2db] hover:text-[#efb291]">
                     Investors
                   </Link>
                 </li>
@@ -150,32 +159,32 @@ const Footer = () => {
               <h2 className="text-[16px] sm:text-[17px] lg:text-[18px] font-[600] mb-3 lg:mb-4 text-[#efb291] border-b-2 border-[#efb291] pb-2 inline-block">Help</h2>
               <ul className="list mt-4">
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/help-center" className="link text-[#e5e2db] hover:text-[#efb291]">
+                  <Link to="/help-center" onClick={scrollToTop} className="link text-[#e5e2db] hover:text-[#efb291]">
                     Support Center & FAQ
                   </Link>
                 </li>
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/sitemap" className="link text-[#e5e2db] hover:text-[#efb291]">
+                  <Link to="/sitemap" onClick={scrollToTop} className="link text-[#e5e2db] hover:text-[#efb291]">
                     Sitemap
                   </Link>
                 </li>
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/how-to-order" className="link text-[#e5e2db] hover:text-[#efb291]">
+                  <Link to="/how-to-order" onClick={scrollToTop} className="link text-[#e5e2db] hover:text-[#efb291]">
                     How to Order
                   </Link>
                 </li>
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/how-to-track" className="link text-[#e5e2db] hover:text-[#efb291]">
+                  <Link to="/how-to-track" onClick={scrollToTop} className="link text-[#e5e2db] hover:text-[#efb291]">
                     How to Track
                   </Link>
                 </li>
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/partner-with-us" className="link text-[#e5e2db] hover:text-[#efb291]">
+                  <Link to="/partner-with-us" onClick={scrollToTop} className="link text-[#e5e2db] hover:text-[#efb291]">
                     Partner with Us
                   </Link>
                 </li>
                 <li className="list-none text-[13px] sm:text-[14px] w-full mb-2">
-                  <Link to="/delete-account" className="link text-[#e5e2db] hover:text-[#efb291]">
+                  <Link to="/delete-account" onClick={scrollToTop} className="link text-[#e5e2db] hover:text-[#efb291]">
                     Delete My Account
                   </Link>
                 </li>
@@ -190,6 +199,7 @@ const Footer = () => {
               <div className="mb-5">
                 <Link 
                   to="/vendor-application"
+                  onClick={scrollToTop}
                   className="inline-block bg-[#efb291] text-[#0b2735] px-6 py-3 rounded-lg font-[600] transition-all hover:bg-[#e5a67d] hover:shadow-lg"
                 >
                   Start Selling to Millions
@@ -339,22 +349,22 @@ const Footer = () => {
               © 2024－2025 Zuba House Inc. All Rights Reserved. <strong className="text-[#efb291]">Secured by ZeroX Intelligence</strong>
             </p>
             <div className="flex flex-wrap justify-center gap-4 text-[12px]">
-              <Link to="/terms-of-use" className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
+              <Link to="/terms-of-use" onClick={scrollToTop} className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
                 Terms of Use
               </Link>
-              <Link to="/faq" className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
+              <Link to="/faq" onClick={scrollToTop} className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
                 FAQs
               </Link>
-              <Link to="/return-refund-policy" className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
+              <Link to="/return-refund-policy" onClick={scrollToTop} className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
                 Return & Refund Policy
               </Link>
-              <Link to="/privacy-policy" className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
+              <Link to="/privacy-policy" onClick={scrollToTop} className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
                 Privacy Policy
               </Link>
-              <Link to="/consumer-health-data-privacy" className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
+              <Link to="/consumer-health-data-privacy" onClick={scrollToTop} className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
                 Consumer Health Data Privacy
               </Link>
-              <Link to="/privacy-choices" className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
+              <Link to="/privacy-choices" onClick={scrollToTop} className="text-[#e5e2db] hover:text-[#efb291] transition-colors">
                 Your Privacy Choices
               </Link>
             </div>

@@ -83,6 +83,33 @@
     .bg-gray-50 p {
         font-size: 13px !important;
     }
+    
+    /* Checkout form inputs - mobile friendly */
+    .card input,
+    .card textarea,
+    .card select {
+        font-size: 16px !important; /* Prevents zoom on iOS */
+        min-height: 44px !important;
+        padding: 12px !important;
+    }
+    
+    /* Checkout buttons - mobile */
+    .card button {
+        min-height: 48px !important;
+        font-size: 16px !important;
+        padding: 12px 20px !important;
+    }
+    
+    /* Payment form - mobile */
+    .StripeElement {
+        min-height: 44px !important;
+        padding: 12px !important;
+    }
+    
+    /* Order summary - mobile */
+    .rightCol .card {
+        margin-top: 20px !important;
+    }
 }
 @media only screen and (min-width:320px) and (max-width:992px){
     /* Product Detail Page - Mobile Optimization */

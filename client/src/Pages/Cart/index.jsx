@@ -145,6 +145,14 @@ const CartPage = () => {
       console.error('Shipping calculation error:', error);
       setShippingOptions([]);
       setSelectedShippingRate(null);
+      // Show user-friendly error message
+      if (error?.response?.data?.message) {
+        context?.alertBox("error", `Shipping calculation failed: ${error.response.data.message}`);
+      } else if (error?.message) {
+        context?.alertBox("error", `Shipping calculation failed: ${error.message}`);
+      } else {
+        context?.alertBox("error", "Unable to calculate shipping. Please check your address and try again.");
+      }
     } finally {
       setLoadingShipping(false);
     }
@@ -173,7 +181,14 @@ const CartPage = () => {
       }
     } catch (error) {
       console.error('Phone validation error:', error);
-      setPhoneError('Failed to validate phone number');
+      // Allow phone to proceed if validation service fails (graceful degradation)
+      const errorMsg = error?.response?.data?.message || error?.message || 'Failed to validate phone number';
+      setPhoneError(errorMsg);
+      // Don't block checkout if validation service is down - just warn user
+      if (error?.response?.status === 500 || error?.response?.status >= 500) {
+        console.warn('Phone validation service unavailable, allowing phone to proceed');
+        return true; // Allow to proceed if service is down
+      }
       return false;
     }
   };
@@ -240,7 +255,8 @@ const CartPage = () => {
     } catch (error) {
       console.error('Error saving address:', error);
       if (!silent) {
-        context?.alertBox("error", "Failed to save address. Please try again.");
+        const errorMsg = error?.response?.data?.message || error?.message || "Failed to save address";
+        context?.alertBox("warning", `${errorMsg}. You can still proceed to checkout.`);
       }
       return false;
     } finally {
