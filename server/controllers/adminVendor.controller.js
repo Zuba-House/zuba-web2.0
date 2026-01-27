@@ -498,6 +498,100 @@ export const createVendor = async (req, res) => {
     
     // Handle duplicate key errors
     if (error.code === 11000) {
+      // Check for old shopName index error (legacy issue - field was renamed to storeName)
+      if (error.message && (error.message.includes('shopName') || error.message.includes('shopName_1'))) {
+        console.log('🔧 Auto-fixing shopName index error...');
+        
+        // Try to automatically fix the index
+        try {
+          const db = mongoose.connection.db;
+          if (db) {
+            const vendorsCollection = db.collection('vendors');
+            const indexes = await vendorsCollection.indexes();
+            
+            // Find and drop old shopName index
+            const shopNameIndex = indexes.find(idx => idx.name === 'shopName_1' || (idx.key && idx.key.shopName));
+            if (shopNameIndex) {
+              try {
+                await vendorsCollection.dropIndex(shopNameIndex.name);
+                console.log(`✅ Auto-dropped old shopName index: ${shopNameIndex.name}`);
+              } catch (dropError) {
+                console.error('⚠️ Could not drop shopName index:', dropError.message);
+              }
+            }
+            
+            // Retry vendor creation after fixing index
+            console.log('🔄 Retrying vendor creation after shopName index fix...');
+            try {
+              const vendor = await VendorModel.create({
+                ownerUser: user._id,
+                storeName: storeName.trim(),
+                storeSlug: storeSlug.toLowerCase().trim(),
+                description: description || '',
+                email: normalizedEmail,
+                phone: phone || '',
+                whatsapp: whatsapp || '',
+                country: country || '',
+                city: city || '',
+                addressLine1: addressLine1 || '',
+                addressLine2: addressLine2 || '',
+                postalCode: postalCode || '',
+                categories: categories || [],
+                status: status
+              });
+
+              // Link vendor to user
+              user.vendor = vendor._id;
+              user.vendorId = vendor._id;
+              await user.save();
+
+              // Send welcome email if approved
+              if (status === 'APPROVED') {
+                try {
+                  const tempPassword = password || null;
+                  await sendVendorWelcome(vendor, user, tempPassword);
+                } catch (emailError) {
+                  console.error('Failed to send welcome email:', emailError);
+                }
+              }
+
+              console.log('✅ Vendor created successfully after shopName index fix!');
+              return res.status(201).json({
+                error: false,
+                success: true,
+                message: `Vendor "${vendor.storeName}" created successfully! (Database indexes were automatically fixed)`,
+                data: {
+                  vendorId: vendor._id,
+                  storeName: vendor.storeName,
+                  storeSlug: vendor.storeSlug,
+                  email: normalizedEmail,
+                  status: vendor.status,
+                  userId: user._id,
+                  indexFixed: true
+                }
+              });
+            } catch (retryError) {
+              console.error('❌ Retry failed after shopName index fix:', retryError);
+              // Fall through to return error
+            }
+          }
+        } catch (fixError) {
+          console.error('❌ Failed to auto-fix shopName index:', fixError);
+        }
+        
+        // If auto-fix didn't work, return error with instructions
+        return res.status(500).json({
+          error: true,
+          success: false,
+          message: 'Database index error detected. Auto-fix attempted but failed. Please use the fix-indexes endpoint.',
+          details: {
+            issue: 'Old shopName index exists in database',
+            solution: 'Call POST /api/admin/vendors/fix-indexes to fix manually',
+            errorMessage: error.message
+          }
+        });
+      }
+      
       // Check for old userId index error (legacy issue)
       if (error.message && (error.message.includes('userId') || error.message.includes('userId_1'))) {
         console.log('🔧 Auto-fixing database index error...');
@@ -517,6 +611,17 @@ export const createVendor = async (req, res) => {
                 console.log(`✅ Auto-dropped old index: ${userIdIndex.name}`);
               } catch (dropError) {
                 console.error('⚠️ Could not drop userId index:', dropError.message);
+              }
+            }
+            
+            // Also drop shopName index if it exists (field was renamed to storeName)
+            const shopNameIndex = indexes.find(idx => idx.name === 'shopName_1' || (idx.key && idx.key.shopName));
+            if (shopNameIndex) {
+              try {
+                await vendorsCollection.dropIndex(shopNameIndex.name);
+                console.log(`✅ Auto-dropped old shopName index: ${shopNameIndex.name}`);
+              } catch (dropError) {
+                console.error('⚠️ Could not drop shopName index:', dropError.message);
               }
             }
             
@@ -1132,6 +1237,20 @@ export const fixVendorIndexes = async (req, res) => {
       } catch (error) {
         results.errors.push(`Failed to drop ${userIdIndex.name}: ${error.message}`);
         console.error(`⚠️ Error dropping index ${userIdIndex.name}:`, error.message);
+      }
+    }
+
+    // Check for old shopName index (field was renamed to storeName)
+    const shopNameIndex = indexes.find(idx => idx.name === 'shopName_1' || (idx.key && idx.key.shopName));
+    
+    if (shopNameIndex) {
+      try {
+        await vendorsCollection.dropIndex(shopNameIndex.name);
+        results.indexesRemoved.push(shopNameIndex.name);
+        console.log(`✅ Dropped old shopName index: ${shopNameIndex.name}`);
+      } catch (error) {
+        results.errors.push(`Failed to drop ${shopNameIndex.name}: ${error.message}`);
+        console.error(`⚠️ Error dropping shopName index ${shopNameIndex.name}:`, error.message);
       }
     }
 

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import auth, { optionalAuth } from "../middlewares/auth.js";
+import requireAdminEmail from "../middlewares/adminEmailCheck.js";
 import { 
     createOrderController, 
     deleteOrder, 
@@ -15,12 +16,13 @@ const orderRouter = Router();
 
 // Guest checkout - use optionalAuth (allows both guests and logged-in users)
 orderRouter.post('/create', optionalAuth, createOrderController)
-orderRouter.get("/order-list", auth, getOrderDetailsController)
-orderRouter.put('/order-status/:id', auth, updateOrderStatusController)
-orderRouter.get('/count', auth, getTotalOrdersCountController)
-orderRouter.get('/sales', auth, totalSalesController)
-orderRouter.get('/users', auth, totalUsersController)
-orderRouter.get('/order-list/orders', auth, getUserOrderDetailsController)
-orderRouter.delete('/deleteOrder/:id', auth, deleteOrder)
+// Admin-only routes - require full admin access
+orderRouter.get("/order-list", auth, requireAdminEmail, getOrderDetailsController)
+orderRouter.put('/order-status/:id', auth, requireAdminEmail, updateOrderStatusController)
+orderRouter.get('/count', auth, requireAdminEmail, getTotalOrdersCountController)
+orderRouter.get('/sales', auth, requireAdminEmail, totalSalesController)
+orderRouter.get('/users', auth, requireAdminEmail, totalUsersController)
+orderRouter.get('/order-list/orders', auth, requireAdminEmail, getUserOrderDetailsController)
+orderRouter.delete('/deleteOrder/:id', auth, requireAdminEmail, deleteOrder)
 
 export default orderRouter;

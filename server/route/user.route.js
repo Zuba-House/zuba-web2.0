@@ -25,15 +25,15 @@ userRouter.get('/user-details',auth,userDetails);
 // Allow both guests and logged-in users to add reviews
 userRouter.post('/addReview', optionalAuth, addReview);
 userRouter.get('/getReviews',getReviews);
-userRouter.get('/getAllReviews',auth, getAllReviews); // Admin only
-userRouter.get('/getProductReviewsAdmin/:productId', auth, getProductReviewsAdmin); // Admin only - get reviews for specific product
-userRouter.get('/getAllUsers',getAllUsers);
-userRouter.delete('/deleteMultiple',deleteMultiple);
-userRouter.delete('/deleteUser/:id',deleteUser);
+userRouter.get('/getAllReviews',auth, requireAdminEmail, getAllReviews); // Admin only
+userRouter.get('/getProductReviewsAdmin/:productId', auth, requireAdminEmail, getProductReviewsAdmin); // Admin only - get reviews for specific product
+userRouter.get('/getAllUsers',auth, requireAdminEmail, getAllUsers);
+userRouter.delete('/deleteMultiple',auth, requireAdminEmail, deleteMultiple);
+userRouter.delete('/deleteUser/:id',auth, requireAdminEmail, deleteUser);
 // Admin review management routes
-userRouter.post('/reviews/:reviewId/approve', auth, approveReview);
-userRouter.post('/reviews/:reviewId/reject', auth, rejectReview);
-userRouter.post('/reviews/:reviewId/spam', auth, markReviewAsSpam);
+userRouter.post('/reviews/:reviewId/approve', auth, requireAdminEmail, approveReview);
+userRouter.post('/reviews/:reviewId/reject', auth, requireAdminEmail, rejectReview);
+userRouter.post('/reviews/:reviewId/spam', auth, requireAdminEmail, markReviewAsSpam);
 
 
 export default userRouter

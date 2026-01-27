@@ -412,7 +412,8 @@ export async function createProduct(request, response) {
 
         // Determine product ownership and approval status based on user role
         const userRole = request.userRole || (request.user?.role || 'USER').toUpperCase();
-        const isAdmin = userRole === 'ADMIN';
+        // Treat both ADMIN and MARKETING_MANAGER as admin for product creation/publishing
+        const isAdmin = userRole === 'ADMIN' || userRole === 'MARKETING_MANAGER';
         const isVendor = userRole === 'VENDOR' || request.vendorId;
         
         // Set product ownership and approval status
@@ -424,7 +425,7 @@ export async function createProduct(request, response) {
             productOwnerType = 'VENDOR';
             approvalStatus = 'PENDING_REVIEW';
         } else if (isAdmin) {
-            // Admin products are automatically approved
+            // Admin and Marketing Manager products are automatically approved
             productOwnerType = 'PLATFORM';
             approvalStatus = 'APPROVED';
         }
@@ -675,10 +676,10 @@ export async function getAllProducts(request, response) {
         // Build query filters
         const query = {};
         
-        // Filter by status (default to published for public, allow all for admin)
+        // Filter by status (default to published for public, allow all for admin and marketing manager)
         if (status) {
             query.status = status;
-        } else if (!request.userId || request.user?.role !== 'ADMIN') {
+        } else if (!request.userId || (request.user?.role?.toUpperCase() !== 'ADMIN' && request.user?.role?.toUpperCase() !== 'MARKETING_MANAGER')) {
             // Public users only see published products
             query.status = 'published';
         }
