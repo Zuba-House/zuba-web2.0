@@ -681,12 +681,27 @@ export async function getAllProducts(request, response) {
         // Build query filters
         const query = {};
         
+        // Check if user is admin or marketing manager
+        const isAdminOrMarketingManager = request.userId && 
+            (request.user?.role?.toUpperCase() === 'ADMIN' || request.user?.role?.toUpperCase() === 'MARKETING_MANAGER');
+        
         // Filter by status (default to published for public, allow all for admin and marketing manager)
         if (status) {
             query.status = status;
-        } else if (!request.userId || (request.user?.role?.toUpperCase() !== 'ADMIN' && request.user?.role?.toUpperCase() !== 'MARKETING_MANAGER')) {
+        } else if (!isAdminOrMarketingManager) {
             // Public users only see published products
             query.status = 'published';
+            
+            // Also filter by approval status - only show approved products to public
+            // Products without approvalStatus field are considered approved (legacy products)
+            query.$and = query.$and || [];
+            query.$and.push({
+                $or: [
+                    { approvalStatus: 'APPROVED' },
+                    { approvalStatus: { $exists: false } }, // Legacy products without approvalStatus
+                    { productOwnerType: { $ne: 'VENDOR' } } // Platform products are always visible
+                ]
+            });
         }
 
         const totalProducts = await ProductModel.find(query);
