@@ -235,6 +235,93 @@ export const createOrderController = async (request, response) => {
             // Don't fail order creation if commission calculation fails
         }
 
+        // ========================================
+        // VALIDATE STOCK AVAILABILITY BEFORE ORDER CREATION
+        // ========================================
+        // Critical: Validate stock BEFORE creating order to prevent overselling
+        for (let i = 0; i < request.body.products.length; i++) {
+            const orderProduct = request.body.products[i];
+            
+            // Get product from database
+            const product = await ProductModel.findById(orderProduct.productId);
+            
+            if (!product) {
+                console.error(`❌ Order creation failed: Product not found: ${orderProduct.productId}`);
+                return response.status(400).json({
+                    error: true,
+                    success: false,
+                    message: `Product "${orderProduct.productTitle || orderProduct.name || 'Unknown'}" is no longer available. Please remove it from your cart.`
+                });
+            }
+
+            // Check if product is published/active
+            if (product.status !== 'published') {
+                console.error(`❌ Order creation failed: Product not published: ${orderProduct.productId}`);
+                return response.status(400).json({
+                    error: true,
+                    success: false,
+                    message: `Product "${orderProduct.productTitle || orderProduct.name || 'Unknown'}" is no longer available for purchase.`
+                });
+            }
+
+            // Validate stock for variable products
+            if (orderProduct.productType === 'variable' && orderProduct.variationId) {
+                const variation = product.variations?.find(
+                    v => v._id && v._id.toString() === orderProduct.variationId.toString()
+                );
+                
+                if (!variation) {
+                    console.error(`❌ Order creation failed: Variation not found: ${orderProduct.variationId}`);
+                    return response.status(400).json({
+                        error: true,
+                        success: false,
+                        message: `Product variation for "${orderProduct.productTitle || orderProduct.name || 'Unknown'}" is no longer available.`
+                    });
+                }
+
+                const variationStock = variation.stock || 0;
+                if (variationStock < orderProduct.quantity) {
+                    console.error(`❌ Order creation failed: Insufficient stock for variation: ${orderProduct.variationId}, requested: ${orderProduct.quantity}, available: ${variationStock}`);
+                    return response.status(400).json({
+                        error: true,
+                        success: false,
+                        message: `Insufficient stock for "${orderProduct.productTitle || orderProduct.name || 'Unknown'}". Only ${variationStock} item(s) available.`
+                    });
+                }
+
+                if (variation.stockStatus === 'out_of_stock') {
+                    console.error(`❌ Order creation failed: Variation out of stock: ${orderProduct.variationId}`);
+                    return response.status(400).json({
+                        error: true,
+                        success: false,
+                        message: `"${orderProduct.productTitle || orderProduct.name || 'Unknown'}" is out of stock. Please remove it from your cart.`
+                    });
+                }
+            }
+            // Validate stock for simple products
+            else {
+                const productStock = product.countInStock || 0;
+                if (productStock < orderProduct.quantity) {
+                    console.error(`❌ Order creation failed: Insufficient stock for product: ${orderProduct.productId}, requested: ${orderProduct.quantity}, available: ${productStock}`);
+                    return response.status(400).json({
+                        error: true,
+                        success: false,
+                        message: `Insufficient stock for "${orderProduct.productTitle || orderProduct.name || 'Unknown'}". Only ${productStock} item(s) available.`
+                    });
+                }
+
+                // Check stock status for simple products
+                if (product.inventory?.stockStatus === 'out_of_stock' || product.stockStatus === 'out_of_stock') {
+                    console.error(`❌ Order creation failed: Product out of stock: ${orderProduct.productId}`);
+                    return response.status(400).json({
+                        error: true,
+                        success: false,
+                        message: `"${orderProduct.productTitle || orderProduct.name || 'Unknown'}" is out of stock. Please remove it from your cart.`
+                    });
+                }
+            }
+        }
+
         // Update inventory only for successful or COD orders
         const paymentStatus = (request.body.payment_status || '').toUpperCase();
         const shouldAffectInventory = paymentStatus !== 'FAILED';
@@ -243,11 +330,11 @@ export const createOrderController = async (request, response) => {
             for (let i = 0; i < request.body.products.length; i++) {
                 const orderProduct = request.body.products[i];
                 
-                // Get product from database
+                // Get product from database (already validated above, but fetch again for update)
                 const product = await ProductModel.findById(orderProduct.productId);
                 
                 if (!product) {
-                    console.error(`Product not found: ${orderProduct.productId}`);
+                    console.error(`Product not found during stock update: ${orderProduct.productId}`);
                     continue;
                 }
                 
