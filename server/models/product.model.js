@@ -814,19 +814,98 @@ ProductSchema.methods.calculatePriceRange = function() {
 };
 
 // ============================================
+// STATIC METHODS
+// ============================================
+
+/**
+ * Generate a unique slug by checking for duplicates
+ * @param {String} baseSlug - The base slug to make unique
+ * @param {String} excludeId - Product ID to exclude from duplicate check (for updates)
+ * @returns {Promise<String>} - A unique slug
+ */
+ProductSchema.statics.generateUniqueSlug = async function(baseSlug, excludeId = null) {
+  if (!baseSlug) return null;
+  
+  // Normalize the base slug
+  let slug = baseSlug
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+  
+  if (!slug) return null;
+  
+  // Check if slug exists
+  const query = { 'seo.slug': slug };
+  if (excludeId) {
+    query._id = { $ne: excludeId };
+  }
+  
+  const existing = await this.findOne(query);
+  
+  // If slug doesn't exist, return it
+  if (!existing) {
+    return slug;
+  }
+  
+  // If slug exists, append a number and try again
+  let counter = 2;
+  let uniqueSlug = `${slug}-${counter}`;
+  
+  while (true) {
+    const checkQuery = { 'seo.slug': uniqueSlug };
+    if (excludeId) {
+      checkQuery._id = { $ne: excludeId };
+    }
+    
+    const exists = await this.findOne(checkQuery);
+    if (!exists) {
+      return uniqueSlug;
+    }
+    
+    counter++;
+    uniqueSlug = `${slug}-${counter}`;
+    
+    // Safety limit to prevent infinite loops
+    if (counter > 1000) {
+      // Fallback to timestamp-based slug
+      return `${slug}-${Date.now().toString().slice(-8)}`;
+    }
+  }
+};
+
+// ============================================
 // MIDDLEWARE
 // ============================================
 
-ProductSchema.pre('save', function(next) {
-  // Generate slug if not exists
-  if (this.isModified('name') && (!this.seo || !this.seo.slug)) {
-    const baseSlug = this.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
+ProductSchema.pre('save', async function(next) {
+  try {
+    // Generate or ensure unique slug
+    if (!this.seo) {
+      this.seo = {};
+    }
     
-    if (!this.seo) this.seo = {};
-    this.seo.slug = `${baseSlug}-${this._id.toString().slice(-6)}`;
+    // If slug is being set or modified, ensure it's unique
+    if (this.isModified('seo.slug') || this.isModified('name')) {
+      let slugToUse = this.seo?.slug;
+      
+      // If no slug provided, generate from name
+      if (!slugToUse && this.name) {
+        const baseSlug = this.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '');
+        slugToUse = baseSlug;
+      }
+      
+      // Ensure slug is unique
+      if (slugToUse) {
+        const excludeId = this.isNew ? null : this._id;
+        this.seo.slug = await this.constructor.generateUniqueSlug(slugToUse, excludeId);
+      }
+    }
+  } catch (error) {
+    return next(error);
   }
   
   // Set featured image

@@ -409,6 +409,23 @@ export async function createProduct(request, response) {
                 slug: request.body.slug || null
             };
         }
+        
+        // Ensure slug is unique if provided
+        if (seoData.slug) {
+            try {
+                seoData.slug = await ProductModel.generateUniqueSlug(seoData.slug);
+            } catch (error) {
+                console.error('Error generating unique slug:', error);
+                // Fallback: generate from name if slug generation fails
+                if (request.body.name) {
+                    const baseSlug = request.body.name
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/(^-|-$)/g, '');
+                    seoData.slug = await ProductModel.generateUniqueSlug(baseSlug);
+                }
+            }
+        }
 
         // Determine product ownership and approval status based on user role
         const userRole = request.userRole || (request.user?.role || 'USER').toUpperCase();
@@ -2056,11 +2073,24 @@ export async function updateProduct(request, response) {
 
         // Update SEO structure
         if (request.body.seo) {
+            let slugToUse = request.body.seo.slug || request.body.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || existingProduct.seo?.slug || '';
+            
+            // Ensure slug is unique (exclude current product from duplicate check)
+            if (slugToUse && slugToUse !== existingProduct.seo?.slug) {
+                try {
+                    slugToUse = await ProductModel.generateUniqueSlug(slugToUse, existingProduct._id);
+                } catch (error) {
+                    console.error('Error generating unique slug during update:', error);
+                    // Keep existing slug if generation fails
+                    slugToUse = existingProduct.seo?.slug || slugToUse;
+                }
+            }
+            
             updateData.seo = {
-                metaTitle: request.body.seo.metaTitle || '',
-                metaDescription: request.body.seo.metaDescription || '',
-                metaKeywords: request.body.seo.metaKeywords || [],
-                slug: request.body.seo.slug || request.body.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || existingProduct.seo?.slug || ''
+                metaTitle: request.body.seo.metaTitle || existingProduct.seo?.metaTitle || '',
+                metaDescription: request.body.seo.metaDescription || existingProduct.seo?.metaDescription || '',
+                metaKeywords: request.body.seo.metaKeywords || existingProduct.seo?.metaKeywords || [],
+                slug: slugToUse
             };
         }
 
