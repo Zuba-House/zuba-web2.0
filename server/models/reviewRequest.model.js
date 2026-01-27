@@ -144,9 +144,9 @@ const reviewRequestSchema = new mongoose.Schema({
 // Indexes for efficient queries
 reviewRequestSchema.index({ orderId: 1, productId: 1 });
 reviewRequestSchema.index({ customerEmail: 1, status: 1 });
-reviewRequestSchema.index({ reviewToken: 1 });
+// reviewToken already has index: true in field definition, no need for separate index
 reviewRequestSchema.index({ status: 1, adminStatus: 1 });
-reviewRequestSchema.index({ expiresAt: 1 });
+// expiresAt already has index: true in field definition, no need for separate index
 
 // Method to check if request is expired
 reviewRequestSchema.methods.isExpired = function() {
