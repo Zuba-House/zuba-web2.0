@@ -42,6 +42,7 @@ import TermsOfUse from "./Pages/TermsOfUse";
 import PrivacyPolicy from "./Pages/PrivacyPolicy";
 import ConsumerHealthData from "./Pages/ConsumerHealthData";
 import PrivacyChoices from "./Pages/PrivacyChoices";
+import VendorApplication from "./Pages/VendorApplication";
 
 import toast, { Toaster } from 'react-hot-toast';
 import { fetchDataFromApi, postData } from "./utils/api";
@@ -873,6 +874,7 @@ function App() {
             <Route path={"/how-to-order"} exact={true} element={<HowToOrder />} />
             <Route path={"/how-to-track"} exact={true} element={<HowToTrack />} />
             <Route path={"/partner-with-us"} exact={true} element={<PartnerWithUs />} />
+            <Route path={"/vendor-application"} exact={true} element={<VendorApplication />} />
             <Route path={"/delete-account"} exact={true} element={<DeleteAccount />} />
             <Route path={"/terms"} exact={true} element={<TermsOfUse />} />
             <Route path={"/terms-of-use"} exact={true} element={<TermsOfUse />} />
