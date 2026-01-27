@@ -125,6 +125,7 @@ export const sendReviewRequests = async (req, res) => {
                         // Create review request
                         const reviewToken = generateReviewToken();
                         const reviewLink = `${CLIENT_URL}/review/${reviewToken}?orderId=${order._id}&productId=${orderItem.productId}`;
+                        const productLink = `${CLIENT_URL}/product/${orderItem.productId}`;
 
                         const reviewRequest = new ReviewRequestModel({
                             orderId: order._id,
@@ -148,6 +149,7 @@ export const sendReviewRequests = async (req, res) => {
                             productName: product.name,
                             productImage: orderItem.image || product.featuredImage || product.images?.[0]?.url || '',
                             reviewLink: reviewLink,
+                            productLink: productLink,
                             orderNumber: reviewRequest.orderNumber
                         });
 

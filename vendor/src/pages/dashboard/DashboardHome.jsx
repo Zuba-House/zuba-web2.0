@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast';
 import { vendorApi } from '../../utils/api';
 import { 
   Package, ShoppingCart, DollarSign, TrendingUp, 
-  Clock, CheckCircle, Truck, AlertCircle, XCircle, Eye 
+  Clock, CheckCircle, Truck, AlertCircle, XCircle, Eye, Search
 } from 'lucide-react';
 
 const DashboardHome = () => {
@@ -182,7 +182,16 @@ const DashboardHome = () => {
       {/* Quick Actions - Mobile Scrollable */}
       <div className="mb-4 md:mb-8">
         <h2 className="text-base md:text-lg font-semibold text-gray-800 mb-3 md:hidden">Quick Actions</h2>
-        <div className="flex md:grid md:grid-cols-3 gap-3 md:gap-4 lg:gap-6 overflow-x-auto pb-2 md:pb-0 -mx-3 px-3 md:mx-0 md:px-0 snap-x snap-mandatory md:snap-none">
+        <div className="flex md:grid md:grid-cols-4 gap-3 md:gap-4 lg:gap-6 overflow-x-auto pb-2 md:pb-0 -mx-3 px-3 md:mx-0 md:px-0 snap-x snap-mandatory md:snap-none">
+          <Link 
+            to="/products/browse" 
+            className="min-w-[200px] md:min-w-0 flex-shrink-0 md:flex-shrink bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl p-4 md:p-5 lg:p-6 hover:opacity-90 transition-opacity snap-start"
+          >
+            <Search className="w-6 h-6 md:w-8 md:h-8 mb-2 md:mb-3" />
+            <h3 className="font-semibold text-sm md:text-base lg:text-lg mb-0.5 md:mb-1">Browse & Add Products</h3>
+            <p className="text-blue-100 text-xs md:text-sm">Add existing products to your store</p>
+          </Link>
+
           <Link 
             to="/products/new" 
             className="min-w-[200px] md:min-w-0 flex-shrink-0 md:flex-shrink bg-gradient-to-r from-[#0b2735] to-[#1a3d52] text-white rounded-xl p-4 md:p-5 lg:p-6 hover:opacity-90 transition-opacity snap-start"

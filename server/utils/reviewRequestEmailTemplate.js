@@ -13,7 +13,8 @@ export const ReviewRequestEmailTemplate = ({
     productName,
     productImage,
     reviewLink,
-    orderNumber
+    orderNumber,
+    productLink
 }) => {
     const baseUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
     
@@ -209,9 +210,11 @@ export const ReviewRequestEmailTemplate = ({
             </div>
             
             <div class="product-section">
-                ${productImage ? `<img src="${productImage}" alt="${productName}" class="product-image" />` : ''}
+                ${productImage ? `<a href="${productLink || '#'}" style="text-decoration: none; display: block;"><img src="${productImage}" alt="${productName}" class="product-image" /></a>` : ''}
                 <div class="product-info">
-                    <div class="product-name">${productName}</div>
+                    <a href="${productLink || '#'}" style="text-decoration: none; color: inherit;">
+                        <div class="product-name">${productName}</div>
+                    </a>
                     ${orderNumber ? `<div class="order-number">Order #${orderNumber}</div>` : ''}
                 </div>
             </div>

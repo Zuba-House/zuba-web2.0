@@ -140,16 +140,56 @@ export const ReviewPage = () => {
                     {/* Product Info */}
                     <div className="bg-gray-50 rounded-lg p-6 mb-8">
                         <div className="flex items-center gap-6">
-                            <LazyLoadImage
-                                src={productImage}
-                                alt={reviewRequest.productName}
-                                effect="blur"
-                                className="w-24 h-24 object-cover rounded-lg border-2 border-gray-200"
-                            />
+                            {(() => {
+                                const productId = reviewRequest.productId?._id || reviewRequest.productId;
+                                const ProductImage = (
+                                    <LazyLoadImage
+                                        src={productImage}
+                                        alt={reviewRequest.productName}
+                                        effect="blur"
+                                        className="w-24 h-24 object-cover rounded-lg border-2 border-gray-200"
+                                    />
+                                );
+                                
+                                if (productId) {
+                                    return (
+                                        <a 
+                                            href={`/product/${productId}`}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                navigate(`/product/${productId}`);
+                                            }}
+                                            className="cursor-pointer hover:opacity-80 transition-opacity"
+                                        >
+                                            {ProductImage}
+                                        </a>
+                                    );
+                                }
+                                return ProductImage;
+                            })()}
                             <div>
-                                <h3 className="text-xl font-semibold text-gray-800 mb-1">
-                                    {reviewRequest.productName}
-                                </h3>
+                                {(() => {
+                                    const productId = reviewRequest.productId?._id || reviewRequest.productId;
+                                    if (productId) {
+                                        return (
+                                            <a 
+                                                href={`/product/${productId}`}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    navigate(`/product/${productId}`);
+                                                }}
+                                                className="text-xl font-semibold text-gray-800 mb-1 hover:text-blue-600 cursor-pointer transition-colors block"
+                                            >
+                                                {reviewRequest.productName}
+                                            </a>
+                                        );
+                                    }
+                                    return (
+                                        <h3 className="text-xl font-semibold text-gray-800 mb-1">
+                                            {reviewRequest.productName}
+                                        </h3>
+                                    );
+                                })()}
                                 {reviewRequest.orderNumber && (
                                     <p className="text-sm text-gray-500">
                                         Order #{reviewRequest.orderNumber}
