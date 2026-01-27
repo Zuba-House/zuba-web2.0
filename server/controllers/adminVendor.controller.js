@@ -152,6 +152,10 @@ export const getAllVendors = async (req, res) => {
  * Create a new vendor (Admin only - bypasses email verification)
  */
 export const createVendor = async (req, res) => {
+  // Track if we created a new user (for rollback on failure)
+  let newlyCreatedUser = null;
+  let userWasNew = false;
+  
   try {
     // Log admin action
     console.log('🔧 Admin creating vendor:', {
@@ -249,6 +253,7 @@ export const createVendor = async (req, res) => {
       const salt = await bcryptjs.default.genSalt(10);
       const hashedPassword = await bcryptjs.default.hash(password, salt);
 
+      // Create new user - track for potential rollback
       user = await UserModel.create({
         name,
         email: normalizedEmail,
@@ -257,11 +262,24 @@ export const createVendor = async (req, res) => {
         status: 'Active',
         verify_email: true // Admin bypasses email verification
       });
+      
+      newlyCreatedUser = user._id;
+      userWasNew = true;
+      console.log('✅ New user created for vendor:', user._id);
     }
 
     // Validate store slug format
     const slugRegex = /^[a-z0-9-]+$/;
     if (!slugRegex.test(storeSlug.toLowerCase())) {
+      // Rollback user creation if we created a new user
+      if (userWasNew && newlyCreatedUser) {
+        try {
+          await UserModel.findByIdAndDelete(newlyCreatedUser);
+          console.log('✅ Rolled back user creation due to invalid slug');
+        } catch (rollbackError) {
+          console.error('❌ Failed to rollback user creation:', rollbackError);
+        }
+      }
       return res.status(400).json({
         error: true,
         success: false,
@@ -275,6 +293,15 @@ export const createVendor = async (req, res) => {
     });
     
     if (existingVendorBySlug && existingVendorBySlug.ownerUser?.toString() !== user._id.toString()) {
+      // Rollback user creation if we created a new user
+      if (userWasNew && newlyCreatedUser) {
+        try {
+          await UserModel.findByIdAndDelete(newlyCreatedUser);
+          console.log('✅ Rolled back user creation due to slug conflict');
+        } catch (rollbackError) {
+          console.error('❌ Failed to rollback user creation:', rollbackError);
+        }
+      }
       return res.status(400).json({
         error: true,
         success: false,
@@ -346,27 +373,57 @@ export const createVendor = async (req, res) => {
     }
 
     // Create new vendor - ensure ownerUser is always set
-    const vendor = await VendorModel.create({
-      ownerUser: user._id, // Required field - must always be set
-      storeName: storeName.trim(),
-      storeSlug: storeSlug.toLowerCase().trim(),
-      description: description || '',
-      email: normalizedEmail,
-      phone: phone || '',
-      whatsapp: whatsapp || '',
-      country: country || '',
-      city: city || '',
-      addressLine1: addressLine1 || '',
-      addressLine2: addressLine2 || '',
-      postalCode: postalCode || '',
-      categories: categories || [],
-      status: status // Admin can set status directly
-    });
+    let vendor;
+    try {
+      vendor = await VendorModel.create({
+        ownerUser: user._id, // Required field - must always be set
+        storeName: storeName.trim(),
+        storeSlug: storeSlug.toLowerCase().trim(),
+        description: description || '',
+        email: normalizedEmail,
+        phone: phone || '',
+        whatsapp: whatsapp || '',
+        country: country || '',
+        city: city || '',
+        addressLine1: addressLine1 || '',
+        addressLine2: addressLine2 || '',
+        postalCode: postalCode || '',
+        categories: categories || [],
+        status: status // Admin can set status directly
+      });
+    } catch (vendorCreateError) {
+      // If vendor creation fails and we created a new user, rollback user creation
+      if (userWasNew && newlyCreatedUser) {
+        console.error('❌ Vendor creation failed, rolling back user creation:', newlyCreatedUser);
+        try {
+          await UserModel.findByIdAndDelete(newlyCreatedUser);
+          console.log('✅ Rolled back user creation');
+        } catch (rollbackError) {
+          console.error('❌ Failed to rollback user creation:', rollbackError);
+        }
+      }
+      // Re-throw to be handled by outer catch
+      throw vendorCreateError;
+    }
 
     // Link vendor to user
-    user.vendor = vendor._id;
-    user.vendorId = vendor._id;
-    await user.save();
+    try {
+      user.vendor = vendor._id;
+      user.vendorId = vendor._id;
+      await user.save();
+    } catch (userUpdateError) {
+      // If linking fails, try to clean up vendor and user
+      console.error('❌ Failed to link vendor to user, cleaning up...');
+      try {
+        await VendorModel.findByIdAndDelete(vendor._id);
+        if (userWasNew && newlyCreatedUser) {
+          await UserModel.findByIdAndDelete(newlyCreatedUser);
+        }
+      } catch (cleanupError) {
+        console.error('❌ Failed to cleanup after linking error:', cleanupError);
+      }
+      throw userUpdateError;
+    }
 
     // Send welcome email with temporary password if approved
     if (status === 'APPROVED') {
@@ -412,8 +469,31 @@ export const createVendor = async (req, res) => {
       keyPattern: error.keyPattern,
       adminId: req.userId,
       adminEmail: req.user?.email,
-      vendorEmail: req.body?.email
+      vendorEmail: req.body?.email,
+      userWasNew,
+      newlyCreatedUserId: newlyCreatedUser
     });
+    
+    // CRITICAL: Rollback user creation if vendor creation failed
+    if (userWasNew && newlyCreatedUser) {
+      console.error('🔄 Rolling back user creation due to vendor creation failure...');
+      try {
+        const userToDelete = await UserModel.findById(newlyCreatedUser);
+        if (userToDelete) {
+          // Only delete if user doesn't have a vendor linked (safety check)
+          if (!userToDelete.vendor && !userToDelete.vendorId) {
+            await UserModel.findByIdAndDelete(newlyCreatedUser);
+            console.log('✅ Successfully rolled back user creation');
+          } else {
+            console.warn('⚠️ User has vendor linked, skipping rollback');
+          }
+        }
+      } catch (rollbackError) {
+        console.error('❌ Failed to rollback user creation:', rollbackError);
+        // Log for manual cleanup
+        console.error('⚠️ MANUAL CLEANUP REQUIRED: User ID', newlyCreatedUser, 'may be orphaned');
+      }
+    }
     
     // Handle duplicate key errors
     if (error.code === 11000) {
