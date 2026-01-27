@@ -412,29 +412,34 @@ export async function createProduct(request, response) {
 
         // Determine product ownership and approval status based on user role
         const userRole = request.userRole || (request.user?.role || 'USER').toUpperCase();
-        // Treat both ADMIN and MARKETING_MANAGER as admin for product creation/publishing
-        const isAdmin = userRole === 'ADMIN' || userRole === 'MARKETING_MANAGER';
+        // Check if user is full admin (in email list) - only full admins can auto-approve
+        const isFullAdmin = request.isFullAdmin !== undefined ? request.isFullAdmin : (userRole === 'ADMIN');
+        const isMarketingManager = request.isMarketingManager !== undefined ? request.isMarketingManager : (userRole === 'MARKETING_MANAGER');
         const isVendor = userRole === 'VENDOR' || request.vendorId;
         
         // Set product ownership and approval status
         let productOwnerType = 'PLATFORM';
         let approvalStatus = 'APPROVED';
         
-        if (isVendor && !isAdmin) {
+        if (isVendor && !isFullAdmin && !isMarketingManager) {
             // Vendor products need approval
             productOwnerType = 'VENDOR';
             approvalStatus = 'PENDING_REVIEW';
-        } else if (isAdmin) {
-            // Admin and Marketing Manager products are automatically approved
+        } else if (isFullAdmin) {
+            // Full admin products are automatically approved
             productOwnerType = 'PLATFORM';
             approvalStatus = 'APPROVED';
+        } else if (isMarketingManager) {
+            // Marketing Manager products need approval (not full admin)
+            productOwnerType = 'PLATFORM';
+            approvalStatus = 'PENDING_REVIEW';
         }
         
-        // Override if explicitly provided in request body
-        if (request.body.productOwnerType) {
+        // Override if explicitly provided in request body (only full admins can override)
+        if (request.body.productOwnerType && isFullAdmin) {
             productOwnerType = request.body.productOwnerType;
         }
-        if (request.body.approvalStatus) {
+        if (request.body.approvalStatus && isFullAdmin) {
             approvalStatus = request.body.approvalStatus;
         }
 
@@ -2036,6 +2041,33 @@ export async function updateProduct(request, response) {
                 metaKeywords: request.body.seo.metaKeywords || [],
                 slug: request.body.seo.slug || request.body.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || existingProduct.seo?.slug || ''
             };
+        }
+
+        // Handle approval status based on user role
+        // Only full admins can auto-approve products
+        const userRole = request.userRole || (request.user?.role || 'USER').toUpperCase();
+        const isFullAdmin = request.isFullAdmin !== undefined ? request.isFullAdmin : (userRole === 'ADMIN');
+        const isMarketingManager = request.isMarketingManager !== undefined ? request.isMarketingManager : (userRole === 'MARKETING_MANAGER');
+        
+        // If status is being changed to 'published' by non-full-admin, require approval
+        if (request.body.status === 'published' && existingProduct.status !== 'published') {
+            if (!isFullAdmin) {
+                // Non-full-admins (marketing managers) need approval when publishing
+                updateData.approvalStatus = 'PENDING_REVIEW';
+                console.log('📋 Product status changed to published by non-full-admin, setting approvalStatus to PENDING_REVIEW');
+            } else if (request.body.approvalStatus) {
+                // Full admin can explicitly set approval status
+                updateData.approvalStatus = request.body.approvalStatus;
+            } else {
+                // Full admin publishing - auto-approve
+                updateData.approvalStatus = 'APPROVED';
+            }
+        } else if (request.body.approvalStatus && isFullAdmin) {
+            // Only full admins can change approval status directly
+            updateData.approvalStatus = request.body.approvalStatus;
+        } else if (request.body.status && request.body.status !== 'published' && existingProduct.approvalStatus === 'PENDING_REVIEW') {
+            // If changing from published to draft, keep approval status as is
+            // Don't override approvalStatus
         }
 
         // Handle attributes and variations for variable products

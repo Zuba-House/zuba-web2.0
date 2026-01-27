@@ -89,8 +89,25 @@ export const createOrderController = async (request, response) => {
             shippingCost,
             providedTotalAmt: request.body.totalAmt,
             calculatedTotal,
-            finalTotal
+            finalTotal,
+            paymentId: request.body.paymentId
         });
+
+        // Optional: Validate payment amount matches order total (if payment ID provided)
+        // This helps catch calculation mismatches between frontend and backend
+        if (request.body.paymentId && request.body.totalAmt) {
+            // Note: We don't have direct access to payment intent amount here
+            // But we can log for debugging if needed
+            const amountDifference = Math.abs(finalTotal - request.body.totalAmt);
+            if (amountDifference > 0.01) {
+                console.warn('⚠️ Order total mismatch detected:', {
+                    providedTotal: request.body.totalAmt,
+                    calculatedTotal: finalTotal,
+                    difference: amountDifference
+                });
+                // Don't fail order - use provided total as it matches payment
+            }
+        }
 
         // Update address with phone number if provided
         if (request.body.phone && request.body.delivery_address) {

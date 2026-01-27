@@ -1,16 +1,16 @@
 import { Router } from 'express'
 import auth from '../middlewares/auth.js';
 import upload from '../middlewares/multer.js';
-import { requireAdminPanelAccess } from '../middlewares/adminEmailCheck.js';
+import { requireAdminPanelAccess, requireProductManagementAccess } from '../middlewares/adminEmailCheck.js';
 import {createProduct, createProductRAMS, deleteMultipleProduct, deleteProduct, deleteProductRAMS, getAllFeaturedProducts, getAllProducts, getAllProductsByCatId, getAllProductsByCatName, getAllProductsByPrice, getAllProductsByRating, getAllProductsBySubCatId, getAllProductsBySubCatName, getAllProductsByThirdLavelCatId, getProduct, getProductRams, getProductsCount, updateProduct, updateProductRam, uploadImages, getProductRamsById, createProductWEIGHT, deleteProductWEIGHT, updateProductWeight, getProductWeight, getProductWeightById, createProductSize, deleteProductSize, updateProductSize, getProductSize, getProductSizeById, uploadBannerImages, getAllProductsBanners, filters, sortBy, searchProductController, getSaleProducts, getActivePromotions} from '../controllers/product.controller.js';
 
 import {removeImageFromCloudinary} from '../controllers/category.controller.js';
 
 const productRouter = Router();
 
-productRouter.post('/uploadImages',auth,requireAdminPanelAccess,upload.array('images'),uploadImages);
-productRouter.post('/uploadBannerImages',auth,requireAdminPanelAccess,upload.array('bannerimages'),uploadBannerImages);
-productRouter.post('/create',auth,requireAdminPanelAccess,createProduct);
+productRouter.post('/uploadImages',auth,requireProductManagementAccess,upload.array('images'),uploadImages);
+productRouter.post('/uploadBannerImages',auth,requireProductManagementAccess,upload.array('bannerimages'),uploadBannerImages);
+productRouter.post('/create',auth,requireProductManagementAccess,createProduct);
 productRouter.get('/getAllProducts',getAllProducts);
 productRouter.get('/getAllProductsBanners',getAllProductsBanners);
 productRouter.get('/getAllProductsByCatId/:id',getAllProductsByCatId);
@@ -25,11 +25,11 @@ productRouter.get('/getAllProductsCount',getProductsCount);
 productRouter.get('/getAllFeaturedProducts',getAllFeaturedProducts);
 productRouter.get('/getSaleProducts',getSaleProducts);
 productRouter.get('/getActivePromotions',getActivePromotions);
-productRouter.delete('/deleteMultiple',auth,requireAdminPanelAccess,deleteMultipleProduct);
-productRouter.delete('/:id',auth,requireAdminPanelAccess,deleteProduct);
+productRouter.delete('/deleteMultiple',auth,requireProductManagementAccess,deleteMultipleProduct);
+productRouter.delete('/:id',auth,requireProductManagementAccess,deleteProduct);
 productRouter.get('/:id',getProduct);
-productRouter.delete('/deteleImage',auth,requireAdminPanelAccess,removeImageFromCloudinary);
-productRouter.put('/updateProduct/:id',auth,requireAdminPanelAccess,updateProduct);
+productRouter.delete('/deteleImage',auth,requireProductManagementAccess,removeImageFromCloudinary);
+productRouter.put('/updateProduct/:id',auth,requireProductManagementAccess,updateProduct);
 
 productRouter.post('/productRAMS/create',auth,createProductRAMS);
 productRouter.delete('/productRAMS/:id',auth,deleteProductRAMS);
