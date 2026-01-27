@@ -69,6 +69,7 @@ export const Vendors = () => {
     const [newStatus, setNewStatus] = useState("");
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [createLoading, setCreateLoading] = useState(false);
+    const [isFixingIndexes, setIsFixingIndexes] = useState(false);
     const [createFormData, setCreateFormData] = useState({
         name: '',
         email: '',
@@ -261,7 +262,53 @@ export const Vendors = () => {
                 // Refresh vendor list
                 getVendors(page, rowsPerPage, statusFilter);
             } else {
-                context.alertBox('error', response?.message || 'Failed to create vendor');
+                // Check if it's a database index error and try to auto-fix
+                if (response?.details?.issue?.includes('userId index') || 
+                    response?.message?.includes('Database index error')) {
+                    context.alertBox('warning', 'Database index issue detected. Attempting to fix automatically...');
+                    
+                    try {
+                        // Try to fix indexes automatically
+                        const fixResponse = await postData('/api/admin/vendors/fix-indexes', {});
+                        
+                        if (fixResponse?.success) {
+                            context.alertBox('success', 'Database indexes fixed! Retrying vendor creation...');
+                            
+                            // Retry vendor creation
+                            const retryResponse = await postData('/api/admin/vendors', createFormData);
+                            
+                            if (retryResponse?.error === false) {
+                                context.alertBox('success', retryResponse?.message || 'Vendor created successfully!');
+                                setShowCreateModal(false);
+                                setCreateFormData({
+                                    name: '',
+                                    email: '',
+                                    password: '',
+                                    storeName: '',
+                                    storeSlug: '',
+                                    description: '',
+                                    phone: '',
+                                    whatsapp: '',
+                                    country: '',
+                                    city: '',
+                                    addressLine1: '',
+                                    addressLine2: '',
+                                    postalCode: '',
+                                    status: 'APPROVED'
+                                });
+                                getVendors(page, rowsPerPage, statusFilter);
+                            } else {
+                                context.alertBox('error', retryResponse?.message || 'Failed to create vendor after fix');
+                            }
+                        } else {
+                            context.alertBox('error', fixResponse?.message || 'Failed to fix database indexes. Please contact support.');
+                        }
+                    } catch (fixError) {
+                        context.alertBox('error', 'Failed to fix database indexes. Please use the "Fix Database Indexes" button or contact support.');
+                    }
+                } else {
+                    context.alertBox('error', response?.message || 'Failed to create vendor');
+                }
             }
         } catch (error) {
             console.error('Create vendor error:', error);
@@ -276,6 +323,24 @@ export const Vendors = () => {
             }
         } finally {
             setCreateLoading(false);
+        }
+    };
+
+    const handleFixIndexes = async () => {
+        setIsFixingIndexes(true);
+        try {
+            const response = await postData('/api/admin/vendors/fix-indexes', {});
+            
+            if (response?.success) {
+                context.alertBox('success', 'Database indexes fixed successfully! You can now create vendors.');
+            } else {
+                context.alertBox('error', response?.message || 'Failed to fix database indexes');
+            }
+        } catch (error) {
+            console.error('Fix indexes error:', error);
+            context.alertBox('error', 'Failed to fix database indexes. Please try again or contact support.');
+        } finally {
+            setIsFixingIndexes(false);
         }
     };
 
@@ -312,6 +377,14 @@ export const Vendors = () => {
                         style={{ backgroundColor: '#efb291', color: '#0b2735' }}
                     >
                         Create Vendor
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        onClick={handleFixIndexes}
+                        disabled={isFixingIndexes}
+                        style={{ borderColor: '#efb291', color: '#0b2735' }}
+                    >
+                        {isFixingIndexes ? 'Fixing...' : 'Fix Database Indexes'}
                     </Button>
                     <select
                         value={statusFilter}

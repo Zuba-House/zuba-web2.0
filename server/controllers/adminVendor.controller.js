@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import VendorModel from '../models/vendor.model.js';
 import UserModel from '../models/user.model.js';
 import ProductModel from '../models/product.model.js';
@@ -499,13 +500,107 @@ export const createVendor = async (req, res) => {
     if (error.code === 11000) {
       // Check for old userId index error (legacy issue)
       if (error.message && (error.message.includes('userId') || error.message.includes('userId_1'))) {
+        console.log('🔧 Auto-fixing database index error...');
+        
+        // Try to automatically fix the index
+        try {
+          const db = mongoose.connection.db;
+          if (db) {
+            const vendorsCollection = db.collection('vendors');
+            const indexes = await vendorsCollection.indexes();
+            
+            // Find and drop old userId index
+            const userIdIndex = indexes.find(idx => idx.name === 'userId_1' || (idx.key && idx.key.userId));
+            if (userIdIndex) {
+              try {
+                await vendorsCollection.dropIndex(userIdIndex.name);
+                console.log(`✅ Auto-dropped old index: ${userIdIndex.name}`);
+              } catch (dropError) {
+                console.error('⚠️ Could not drop userId index:', dropError.message);
+              }
+            }
+            
+            // Ensure ownerUser index exists
+            const ownerUserIndex = indexes.find(idx => idx.name === 'ownerUser_1' || (idx.key && idx.key.ownerUser));
+            if (!ownerUserIndex) {
+              try {
+                await vendorsCollection.createIndex(
+                  { ownerUser: 1 },
+                  { unique: true, sparse: true, name: 'ownerUser_1' }
+                );
+                console.log('✅ Auto-created ownerUser_1 index');
+              } catch (createError) {
+                console.error('⚠️ Could not create ownerUser index:', createError.message);
+              }
+            }
+            
+            // Retry vendor creation after fixing index
+            console.log('🔄 Retrying vendor creation after index fix...');
+            try {
+              const vendor = await VendorModel.create({
+                ownerUser: user._id,
+                storeName: storeName.trim(),
+                storeSlug: storeSlug.toLowerCase().trim(),
+                description: description || '',
+                email: normalizedEmail,
+                phone: phone || '',
+                whatsapp: whatsapp || '',
+                country: country || '',
+                city: city || '',
+                addressLine1: addressLine1 || '',
+                addressLine2: addressLine2 || '',
+                postalCode: postalCode || '',
+                categories: categories || [],
+                status: status
+              });
+
+              // Link vendor to user
+              user.vendor = vendor._id;
+              user.vendorId = vendor._id;
+              await user.save();
+
+              // Send welcome email if approved
+              if (status === 'APPROVED') {
+                try {
+                  const tempPassword = password || null;
+                  await sendVendorWelcome(vendor, user, tempPassword);
+                } catch (emailError) {
+                  console.error('Failed to send welcome email:', emailError);
+                }
+              }
+
+              console.log('✅ Vendor created successfully after auto-fix!');
+              return res.status(201).json({
+                error: false,
+                success: true,
+                message: `Vendor "${vendor.storeName}" created successfully! (Database indexes were automatically fixed)`,
+                data: {
+                  vendorId: vendor._id,
+                  storeName: vendor.storeName,
+                  storeSlug: vendor.storeSlug,
+                  email: normalizedEmail,
+                  status: vendor.status,
+                  userId: user._id,
+                  indexFixed: true
+                }
+              });
+            } catch (retryError) {
+              console.error('❌ Retry failed after index fix:', retryError);
+              // Fall through to return error
+            }
+          }
+        } catch (fixError) {
+          console.error('❌ Failed to auto-fix index:', fixError);
+        }
+        
+        // If auto-fix didn't work, return error with instructions
         return res.status(500).json({
           error: true,
           success: false,
-          message: 'Database index error detected. The system needs to be updated. Please contact support.',
+          message: 'Database index error detected. Auto-fix attempted but failed. Please use the fix-indexes endpoint.',
           details: {
             issue: 'Old userId index exists in database',
-            solution: 'Run the index fix script: node server/scripts/fixVendorIndexes.js',
+            solution: 'Call POST /api/admin/vendors/fix-indexes to fix manually',
             errorMessage: error.message
           }
         });
@@ -993,6 +1088,123 @@ export const deleteVendorPermanent = async (req, res) => {
  * - Update user roles back to USER
  * - Remove vendor references from users
  */
+/**
+ * POST /api/admin/vendors/fix-indexes
+ * Fix vendor collection database indexes (Admin only)
+ * Removes old userId index and creates correct ownerUser index
+ */
+export const fixVendorIndexes = async (req, res) => {
+  try {
+    console.log('🔧 Admin fixing vendor indexes:', {
+      adminId: req.userId,
+      adminEmail: req.user?.email,
+      timestamp: new Date().toISOString()
+    });
+
+    const db = mongoose.connection.db;
+    if (!db) {
+      return res.status(500).json({
+        error: true,
+        success: false,
+        message: 'Database connection not available'
+      });
+    }
+
+    const vendorsCollection = db.collection('vendors');
+
+    // Get all indexes
+    const indexes = await vendorsCollection.indexes();
+    const results = {
+      indexesBefore: indexes.length,
+      indexesRemoved: [],
+      indexesCreated: [],
+      errors: []
+    };
+
+    // Check for old userId index
+    const userIdIndex = indexes.find(idx => idx.name === 'userId_1' || (idx.key && idx.key.userId));
+    
+    if (userIdIndex) {
+      try {
+        await vendorsCollection.dropIndex(userIdIndex.name);
+        results.indexesRemoved.push(userIdIndex.name);
+        console.log(`✅ Dropped old index: ${userIdIndex.name}`);
+      } catch (error) {
+        results.errors.push(`Failed to drop ${userIdIndex.name}: ${error.message}`);
+        console.error(`⚠️ Error dropping index ${userIdIndex.name}:`, error.message);
+      }
+    }
+
+    // Check for any vendors with null ownerUser
+    const vendorsWithNullOwner = await vendorsCollection.countDocuments({ ownerUser: null });
+    if (vendorsWithNullOwner > 0) {
+      results.warnings = [`Found ${vendorsWithNullOwner} vendor(s) with null ownerUser`];
+    }
+
+    // Ensure ownerUser index exists and is correct
+    try {
+      // Drop existing ownerUser index if it exists (to recreate with correct options)
+      const ownerUserIndex = indexes.find(idx => idx.name === 'ownerUser_1' || (idx.key && idx.key.ownerUser));
+      if (ownerUserIndex) {
+        try {
+          await vendorsCollection.dropIndex(ownerUserIndex.name);
+          results.indexesRemoved.push(ownerUserIndex.name);
+          console.log('✅ Dropped existing ownerUser index');
+        } catch (error) {
+          // Index might not exist or already dropped
+          console.log('ℹ️ Could not drop ownerUser index (may not exist):', error.message);
+        }
+      }
+
+      // Create new sparse unique index on ownerUser
+      await vendorsCollection.createIndex(
+        { ownerUser: 1 },
+        { 
+          unique: true, 
+          sparse: true,
+          name: 'ownerUser_1'
+        }
+      );
+      results.indexesCreated.push('ownerUser_1');
+      console.log('✅ Created ownerUser_1 index (unique, sparse)');
+    } catch (error) {
+      results.errors.push(`Failed to create ownerUser index: ${error.message}`);
+      console.error('⚠️ Error creating ownerUser index:', error.message);
+    }
+
+    // Get final indexes
+    const finalIndexes = await vendorsCollection.indexes();
+    results.indexesAfter = finalIndexes.length;
+    results.finalIndexes = finalIndexes.map(idx => ({
+      name: idx.name,
+      key: idx.key
+    }));
+
+    console.log('✅ Index fix completed:', results);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message: 'Vendor indexes fixed successfully',
+      data: results
+    });
+
+  } catch (error) {
+    console.error('❌ Fix indexes error:', {
+      message: error.message,
+      stack: error.stack,
+      adminId: req.userId
+    });
+
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: 'Failed to fix indexes',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 export const deleteAllVendors = async (req, res) => {
   try {
     const adminId = req.userId;
