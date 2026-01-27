@@ -1702,7 +1702,7 @@ export async function getProduct(request, response) {
         // Variations and attributes are embedded documents, so they're automatically included
         const product = await ProductModel.findById(request.params.id)
             .populate("category")
-            .populate("vendor", "storeName storeSlug");
+            .populate("vendor", "storeName storeSlug isVerified");
 
         if (!product) {
             return response.status(404).json({
