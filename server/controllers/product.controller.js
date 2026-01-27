@@ -706,6 +706,7 @@ export async function getAllProducts(request, response) {
 
         const totalProducts = await ProductModel.find(query);
         const products = await ProductModel.find(query)
+            .populate("vendor", "storeName storeSlug isVerified status")
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
             .limit(parseInt(limit));
@@ -798,6 +799,7 @@ export async function getAllProductsByCatId(request, response) {
         const products = await ProductModel.find(query)
             .populate("category")
             .populate("categories")
+            .populate("vendor", "storeName storeSlug isVerified status")
             .skip((page - 1) * perPage)
             .limit(perPage)
             .exec();
@@ -907,7 +909,9 @@ export async function getAllProductsBySubCatId(request, response) {
             );
         }
 
-        const products = await ProductModel.find(query).populate("category")
+        const products = await ProductModel.find(query)
+            .populate("category")
+            .populate("vendor", "storeName storeSlug isVerified status")
             .skip((page - 1) * perPage)
             .limit(perPage)
             .exec();
@@ -1284,7 +1288,9 @@ export async function getAllFeaturedProducts(request, response) {
                 { approvalStatus: { $exists: false } },
                 { productOwnerType: { $ne: 'VENDOR' } }
             ]
-        }).populate("category");
+        })
+            .populate("category")
+            .populate("vendor", "storeName storeSlug isVerified status");
 
         if (!products) {
             response.status(500).json({
@@ -2882,7 +2888,12 @@ export async function filters(request, response) {
     });
 
     try {
-        const products = await ProductModel.find(filters).populate("category").populate("categories").skip((page - 1) * limit).limit(parseInt(limit));
+        const products = await ProductModel.find(filters)
+            .populate("category")
+            .populate("categories")
+            .populate("vendor", "storeName storeSlug isVerified status")
+            .skip((page - 1) * limit)
+            .limit(parseInt(limit));
 
         const total = await ProductModel.countDocuments(filters);
 
