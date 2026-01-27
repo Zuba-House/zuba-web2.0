@@ -3,7 +3,7 @@ import OrderModel from '../models/order.model.js';
 import ProductModel from '../models/product.model.js';
 import ReviewModel from '../models/reviews.model.js.js';
 import UserModel from '../models/user.model.js';
-import { sendEmailFun } from '../config/sendEmail.js';
+import sendEmailFun from '../config/sendEmail.js';
 import { ReviewRequestEmailTemplate } from '../utils/reviewRequestEmailTemplate.js';
 import crypto from 'crypto';
 
