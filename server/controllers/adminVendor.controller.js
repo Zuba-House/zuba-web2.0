@@ -192,6 +192,16 @@ export const createVendor = async (req, res) => {
       });
     }
 
+    // Ensure storeSlug is not empty or null after trimming
+    const trimmedSlug = storeSlug?.toString().trim();
+    if (!trimmedSlug || trimmedSlug.length === 0) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Store URL slug cannot be empty'
+      });
+    }
+
     const normalizedEmail = email.toLowerCase().trim();
 
     // Note: Vendor email does NOT need to be an admin email
@@ -199,7 +209,7 @@ export const createVendor = async (req, res) => {
     console.log('📝 Creating vendor account for:', {
       vendorEmail: normalizedEmail.substring(0, 10) + '...',
       storeName,
-      storeSlug,
+      storeSlug: trimmedSlug,
       createdBy: req.user?.email
     });
 
@@ -269,9 +279,9 @@ export const createVendor = async (req, res) => {
       console.log('✅ New user created for vendor:', user._id);
     }
 
-    // Validate store slug format
+    // Validate store slug format (use trimmedSlug from earlier validation)
     const slugRegex = /^[a-z0-9-]+$/;
-    if (!slugRegex.test(storeSlug.toLowerCase())) {
+    if (!slugRegex.test(trimmedSlug.toLowerCase())) {
       // Rollback user creation if we created a new user
       if (userWasNew && newlyCreatedUser) {
         try {
@@ -290,7 +300,7 @@ export const createVendor = async (req, res) => {
 
     // Check if slug is already taken (but allow if it's the same user's vendor)
     const existingVendorBySlug = await VendorModel.findOne({ 
-      storeSlug: storeSlug.toLowerCase().trim() 
+      storeSlug: trimmedSlug.toLowerCase() 
     });
     
     if (existingVendorBySlug && existingVendorBySlug.ownerUser?.toString() !== user._id.toString()) {
@@ -373,13 +383,16 @@ export const createVendor = async (req, res) => {
       });
     }
 
-    // Create new vendor - ensure ownerUser is always set
+    // Create new vendor - ensure ownerUser and storeSlug are always set
     let vendor;
     try {
+      // Ensure storeSlug is never null or empty
+      const finalStoreSlug = trimmedSlug.toLowerCase();
+      
       vendor = await VendorModel.create({
         ownerUser: user._id, // Required field - must always be set
         storeName: storeName.trim(),
-        storeSlug: storeSlug.toLowerCase().trim(),
+        storeSlug: finalStoreSlug, // Always set, never null
         description: description || '',
         email: normalizedEmail,
         phone: phone || '',
@@ -498,6 +511,124 @@ export const createVendor = async (req, res) => {
     
     // Handle duplicate key errors
     if (error.code === 11000) {
+      // Check for old shopSlug index error (legacy issue - field was renamed to storeSlug)
+      if (error.message && (error.message.includes('shopSlug') || error.message.includes('shopSlug_1') || 
+          (error.message.includes('dup key') && error.message.includes('shopSlug')))) {
+        console.log('🔧 Auto-fixing shopSlug index error...');
+        
+        // Try to automatically fix the index
+        try {
+          const db = mongoose.connection.db;
+          if (db) {
+            const vendorsCollection = db.collection('vendors');
+            const indexes = await vendorsCollection.indexes();
+            
+            // Find and drop old shopSlug index
+            const shopSlugIndex = indexes.find(idx => idx.name === 'shopSlug_1' || (idx.key && idx.key.shopSlug));
+            if (shopSlugIndex) {
+              try {
+                await vendorsCollection.dropIndex(shopSlugIndex.name);
+                console.log(`✅ Auto-dropped old shopSlug index: ${shopSlugIndex.name}`);
+              } catch (dropError) {
+                console.error('⚠️ Could not drop shopSlug index:', dropError.message);
+              }
+            }
+            
+            // Ensure storeSlug index exists with correct sparse setting
+            const storeSlugIndex = indexes.find(idx => idx.name === 'storeSlug_1' || (idx.key && idx.key.storeSlug));
+            if (storeSlugIndex && (!storeSlugIndex.sparse || storeSlugIndex.unique !== true)) {
+              try {
+                await vendorsCollection.dropIndex(storeSlugIndex.name);
+                console.log('✅ Dropped existing storeSlug index to recreate with sparse: true');
+              } catch (dropError) {
+                console.error('⚠️ Could not drop storeSlug index:', dropError.message);
+              }
+            }
+            
+            if (!storeSlugIndex || (!storeSlugIndex.sparse || storeSlugIndex.unique !== true)) {
+              try {
+                await vendorsCollection.createIndex(
+                  { storeSlug: 1 },
+                  { unique: true, sparse: true, name: 'storeSlug_1' }
+                );
+                console.log('✅ Auto-created storeSlug_1 index (unique, sparse)');
+              } catch (createError) {
+                console.error('⚠️ Could not create storeSlug index:', createError.message);
+              }
+            }
+            
+            // Retry vendor creation after fixing index
+            console.log('🔄 Retrying vendor creation after shopSlug index fix...');
+            try {
+              const vendor = await VendorModel.create({
+                ownerUser: user._id,
+                storeName: storeName.trim(),
+                storeSlug: trimmedSlug.toLowerCase(),
+                description: description || '',
+                email: normalizedEmail,
+                phone: phone || '',
+                whatsapp: whatsapp || '',
+                country: country || '',
+                city: city || '',
+                addressLine1: addressLine1 || '',
+                addressLine2: addressLine2 || '',
+                postalCode: postalCode || '',
+                categories: categories || [],
+                status: status
+              });
+
+              // Link vendor to user
+              user.vendor = vendor._id;
+              user.vendorId = vendor._id;
+              await user.save();
+
+              // Send welcome email if approved
+              if (status === 'APPROVED') {
+                try {
+                  const tempPassword = password || null;
+                  await sendVendorWelcome(vendor, user, tempPassword);
+                } catch (emailError) {
+                  console.error('Failed to send welcome email:', emailError);
+                }
+              }
+
+              console.log('✅ Vendor created successfully after shopSlug index fix!');
+              return res.status(201).json({
+                error: false,
+                success: true,
+                message: `Vendor "${vendor.storeName}" created successfully! (Database indexes were automatically fixed)`,
+                data: {
+                  vendorId: vendor._id,
+                  storeName: vendor.storeName,
+                  storeSlug: vendor.storeSlug,
+                  email: normalizedEmail,
+                  status: vendor.status,
+                  userId: user._id,
+                  indexFixed: true
+                }
+              });
+            } catch (retryError) {
+              console.error('❌ Retry failed after shopSlug index fix:', retryError);
+              // Fall through to return error
+            }
+          }
+        } catch (fixError) {
+          console.error('❌ Failed to auto-fix shopSlug index:', fixError);
+        }
+        
+        // If auto-fix didn't work, return error with instructions
+        return res.status(500).json({
+          error: true,
+          success: false,
+          message: 'Database index error detected. Auto-fix attempted but failed. Please use the fix-indexes endpoint.',
+          details: {
+            issue: 'Old shopSlug index exists in database (not sparse)',
+            solution: 'Call POST /api/admin/vendors/fix-indexes to fix manually',
+            errorMessage: error.message
+          }
+        });
+      }
+      
       // Check for old shopName index error (legacy issue - field was renamed to storeName)
       if (error.message && (error.message.includes('shopName') || error.message.includes('shopName_1'))) {
         console.log('🔧 Auto-fixing shopName index error...');
@@ -526,7 +657,7 @@ export const createVendor = async (req, res) => {
               const vendor = await VendorModel.create({
                 ownerUser: user._id,
                 storeName: storeName.trim(),
-                storeSlug: storeSlug.toLowerCase().trim(),
+                storeSlug: trimmedSlug.toLowerCase(),
                 description: description || '',
                 email: normalizedEmail,
                 phone: phone || '',
@@ -625,6 +756,17 @@ export const createVendor = async (req, res) => {
               }
             }
             
+            // Also drop shopSlug index if it exists (field was renamed to storeSlug)
+            const shopSlugIndex = indexes.find(idx => idx.name === 'shopSlug_1' || (idx.key && idx.key.shopSlug));
+            if (shopSlugIndex) {
+              try {
+                await vendorsCollection.dropIndex(shopSlugIndex.name);
+                console.log(`✅ Auto-dropped old shopSlug index: ${shopSlugIndex.name}`);
+              } catch (dropError) {
+                console.error('⚠️ Could not drop shopSlug index:', dropError.message);
+              }
+            }
+            
             // Ensure ownerUser index exists
             const ownerUserIndex = indexes.find(idx => idx.name === 'ownerUser_1' || (idx.key && idx.key.ownerUser));
             if (!ownerUserIndex) {
@@ -639,13 +781,36 @@ export const createVendor = async (req, res) => {
               }
             }
             
+            // Ensure storeSlug index exists with correct sparse setting
+            const storeSlugIndex = indexes.find(idx => idx.name === 'storeSlug_1' || (idx.key && idx.key.storeSlug));
+            if (storeSlugIndex && (!storeSlugIndex.sparse || storeSlugIndex.unique !== true)) {
+              try {
+                await vendorsCollection.dropIndex(storeSlugIndex.name);
+                console.log('✅ Dropped existing storeSlug index to recreate with sparse: true');
+              } catch (dropError) {
+                console.error('⚠️ Could not drop storeSlug index:', dropError.message);
+              }
+            }
+            
+            if (!storeSlugIndex || (!storeSlugIndex.sparse || storeSlugIndex.unique !== true)) {
+              try {
+                await vendorsCollection.createIndex(
+                  { storeSlug: 1 },
+                  { unique: true, sparse: true, name: 'storeSlug_1' }
+                );
+                console.log('✅ Auto-created storeSlug_1 index (unique, sparse)');
+              } catch (createError) {
+                console.error('⚠️ Could not create storeSlug index:', createError.message);
+              }
+            }
+            
             // Retry vendor creation after fixing index
             console.log('🔄 Retrying vendor creation after index fix...');
             try {
               const vendor = await VendorModel.create({
                 ownerUser: user._id,
                 storeName: storeName.trim(),
-                storeSlug: storeSlug.toLowerCase().trim(),
+                storeSlug: trimmedSlug.toLowerCase(),
                 description: description || '',
                 email: normalizedEmail,
                 phone: phone || '',
@@ -720,7 +885,23 @@ export const createVendor = async (req, res) => {
         });
       }
 
-      if (error.keyPattern?.storeSlug) {
+      // Check for storeSlug or shopSlug index errors (old index name)
+      if (error.keyPattern?.storeSlug || error.keyPattern?.shopSlug || 
+          (error.message && (error.message.includes('storeSlug') || error.message.includes('shopSlug')))) {
+        // Check if it's a duplicate key error with null (indicates old non-sparse index)
+        if (error.message && error.message.includes('dup key: { shopSlug: null }')) {
+          // This is the old shopSlug_1 index issue - suggest running fix-indexes
+          return res.status(500).json({
+            error: true,
+            success: false,
+            message: 'Database index error detected. The old shopSlug index needs to be fixed.',
+            details: {
+              issue: 'Old shopSlug_1 index exists in database (not sparse)',
+              solution: 'Call POST /api/admin/vendors/fix-indexes to fix the index',
+              errorMessage: error.message
+            }
+          });
+        }
         return res.status(400).json({
           error: true,
           success: false,
@@ -1254,6 +1435,20 @@ export const fixVendorIndexes = async (req, res) => {
       }
     }
 
+    // Check for old shopSlug index (field was renamed to storeSlug)
+    const shopSlugIndex = indexes.find(idx => idx.name === 'shopSlug_1' || (idx.key && idx.key.shopSlug));
+    
+    if (shopSlugIndex) {
+      try {
+        await vendorsCollection.dropIndex(shopSlugIndex.name);
+        results.indexesRemoved.push(shopSlugIndex.name);
+        console.log(`✅ Dropped old shopSlug index: ${shopSlugIndex.name}`);
+      } catch (error) {
+        results.errors.push(`Failed to drop ${shopSlugIndex.name}: ${error.message}`);
+        console.error(`⚠️ Error dropping shopSlug index ${shopSlugIndex.name}:`, error.message);
+      }
+    }
+
     // Check for any vendors with null ownerUser
     const vendorsWithNullOwner = await vendorsCollection.countDocuments({ ownerUser: null });
     if (vendorsWithNullOwner > 0) {
@@ -1289,6 +1484,37 @@ export const fixVendorIndexes = async (req, res) => {
     } catch (error) {
       results.errors.push(`Failed to create ownerUser index: ${error.message}`);
       console.error('⚠️ Error creating ownerUser index:', error.message);
+    }
+
+    // Ensure storeSlug index exists and is correct (sparse to allow null values)
+    try {
+      // Drop existing storeSlug index if it exists (to recreate with correct options)
+      const storeSlugIndex = indexes.find(idx => idx.name === 'storeSlug_1' || (idx.key && idx.key.storeSlug));
+      if (storeSlugIndex) {
+        try {
+          await vendorsCollection.dropIndex(storeSlugIndex.name);
+          results.indexesRemoved.push(storeSlugIndex.name);
+          console.log('✅ Dropped existing storeSlug index');
+        } catch (error) {
+          // Index might not exist or already dropped
+          console.log('ℹ️ Could not drop storeSlug index (may not exist):', error.message);
+        }
+      }
+
+      // Create new sparse unique index on storeSlug (allows multiple nulls, but unique for non-null values)
+      await vendorsCollection.createIndex(
+        { storeSlug: 1 },
+        { 
+          unique: true, 
+          sparse: true,
+          name: 'storeSlug_1'
+        }
+      );
+      results.indexesCreated.push('storeSlug_1');
+      console.log('✅ Created storeSlug_1 index (unique, sparse)');
+    } catch (error) {
+      results.errors.push(`Failed to create storeSlug index: ${error.message}`);
+      console.error('⚠️ Error creating storeSlug index:', error.message);
     }
 
     // Get final indexes

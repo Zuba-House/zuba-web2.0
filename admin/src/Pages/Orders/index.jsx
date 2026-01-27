@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from "@mui/material";
+import { Button, Switch, FormControlLabel } from "@mui/material";
 import { FaAngleDown } from "react-icons/fa6";
 import Badge from "../../Components/Badge";
 import SearchBox from '../../Components/SearchBox';
@@ -359,6 +359,39 @@ export const Orders = () => {
                             <MenuItem value={'Out for Delivery'}>Out for Delivery</MenuItem>
                             <MenuItem value={'Delivered'}>Delivered</MenuItem>
                           </Select>
+                          {/* Review Request Toggle - Only show for delivered orders */}
+                          {(order?.status === 'Delivered' || order?.order_status === 'delivered') && (
+                            <FormControlLabel
+                              control={
+                                <Switch
+                                  checked={order?.reviewRequestEnabled !== false}
+                                  onChange={(e) => {
+                                    editData(`/api/order/${order?._id}/review-request-toggle`, {
+                                      enabled: e.target.checked
+                                    }).then((res) => {
+                                      if (res?.error === false) {
+                                        context.alertBox("success", res?.message || "Review request setting updated");
+                                        // Refresh orders
+                                        fetchDataFromApi(`/api/order/order-list?page=${pageOrder}&limit=5`).then((res) => {
+                                          if (res?.error === false && res?.data) {
+                                            setOrdersData(res.data);
+                                          }
+                                        });
+                                      } else {
+                                        context.alertBox("error", res?.message || "Failed to update review request setting");
+                                      }
+                                    }).catch((error) => {
+                                      console.error("Error toggling review request:", error);
+                                      context.alertBox("error", "Failed to update review request setting");
+                                    });
+                                  }}
+                                  size="small"
+                                />
+                              }
+                              label={<span className="text-xs">Review Request</span>}
+                              style={{ marginTop: '4px' }}
+                            />
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 font-[500] whitespace-nowrap">

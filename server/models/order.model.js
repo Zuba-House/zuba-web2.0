@@ -328,6 +328,19 @@ const orderSchema = new mongoose.Schema({
             type: Number,
             default: 0
         }
+    },
+    // Review request settings
+    reviewRequestEnabled: {
+        type: Boolean,
+        default: true  // Enable review requests by default for delivered orders
+    },
+    reviewRequestsSent: {
+        type: Boolean,
+        default: false
+    },
+    reviewRequestsSentAt: {
+        type: Date,
+        default: null
     }
 }, {
     timestamps: true

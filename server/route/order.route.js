@@ -11,6 +11,7 @@ import {
     totalUsersController, 
     updateOrderStatusController 
 } from "../controllers/order.controller.js";
+import { toggleReviewRequest } from "../controllers/reviewRequest.controller.js";
 
 const orderRouter = Router();
 
@@ -24,5 +25,6 @@ orderRouter.get('/sales', auth, requireAdminEmail, totalSalesController)
 orderRouter.get('/users', auth, requireAdminEmail, totalUsersController)
 orderRouter.get('/order-list/orders', auth, requireAdminEmail, getUserOrderDetailsController)
 orderRouter.delete('/deleteOrder/:id', auth, requireAdminEmail, deleteOrder)
+orderRouter.put('/:id/review-request-toggle', auth, requireAdminEmail, toggleReviewRequest)
 
 export default orderRouter;

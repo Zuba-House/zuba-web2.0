@@ -52,6 +52,7 @@ import { OrderFailed } from "./Pages/Orders/failed";
 import SearchPage from "./Pages/Search";
 import BlogDetail from "./Pages/BlogDetail";
 import Sales from "./Pages/Sales";
+import ReviewPage from "./Pages/Review";
 // Lazy load promotional components for performance
 const PromoPopup = React.lazy(() => import("./components/PromoPopup/PromoPopup"));
 const PromoBanner = React.lazy(() => import("./components/PromoBanner/PromoBanner"));
@@ -884,6 +885,7 @@ function App() {
             <Route path={"/address"} exact={true} element={<Address />} />
             <Route path={"/search"} exact={true} element={<SearchPage />} />
             <Route path={"/blog/:id"} exact={true} element={<BlogDetail />} />
+            <Route path={"/review/:token"} exact={true} element={<ReviewPage />} />
             
             
             {/* Catch-all route for 404 - must be last */}

@@ -325,6 +325,21 @@ const Sidebar = () => {
 
           {isFullAdmin && (
             <li>
+              <Link to="/review-requests"
+                onClick={() => {
+                  context?.windowWidth < 992 && context?.setisSidebarOpen(false)
+                  setSubmenuIndex(null)
+                }}
+              >
+                <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(255,255,255,0.9)] !font-[500] items-center !py-2 hover:!bg-[rgba(255,255,255,0.1)]">
+                  <IoBagCheckOutline className="text-[20px] text-[#efb291]" /> <span>Review Requests</span>
+                </Button>
+              </Link>
+            </li>
+          )}
+
+          {isFullAdmin && (
+            <li>
               <Link to="/analytics"
                 onClick={() => {
                   context?.windowWidth < 992 && context?.setisSidebarOpen(false)

@@ -1,7 +1,12 @@
 # Fix Database Index via API
 
 ## Problem
-The database still has the old `userId_1` index causing errors when creating vendors. The fix script needs to be run on the production database.
+The database still has old indexes causing errors when creating vendors:
+- Old `userId_1` index (should be `ownerUser_1`)
+- Old `shopSlug_1` index (should be `storeSlug_1` with sparse: true)
+- Old `shopName_1` index (field renamed to `storeName`)
+
+The fix script needs to be run on the production database.
 
 ## Solution
 Created an admin API endpoint that can fix the indexes directly from the admin panel.
@@ -10,7 +15,7 @@ Created an admin API endpoint that can fix the indexes directly from the admin p
 
 ### POST `/api/admin/vendors/fix-indexes`
 
-**Description:** Fixes vendor collection database indexes. Removes old `userId_1` index and creates correct `ownerUser_1` index.
+**Description:** Fixes vendor collection database indexes. Removes old indexes (`userId_1`, `shopSlug_1`, `shopName_1`) and creates correct indexes (`ownerUser_1`, `storeSlug_1`) with proper sparse settings.
 
 **Authentication:** Requires admin authentication
 
@@ -29,8 +34,8 @@ Authorization: Bearer <admin_token>
   "data": {
     "indexesBefore": 5,
     "indexesAfter": 4,
-    "indexesRemoved": ["userId_1"],
-    "indexesCreated": ["ownerUser_1"],
+    "indexesRemoved": ["userId_1", "shopSlug_1", "shopName_1"],
+    "indexesCreated": ["ownerUser_1", "storeSlug_1"],
     "finalIndexes": [
       {
         "name": "_id_",
@@ -86,17 +91,19 @@ fetch('/api/admin/vendors/fix-indexes', {
 
 ## What It Does
 
-1. **Checks for old `userId_1` index**
-   - If found, removes it
-   - Logs the removal
+1. **Checks for old indexes and removes them:**
+   - `userId_1` (should be `ownerUser_1`)
+   - `shopSlug_1` (should be `storeSlug_1` with sparse: true)
+   - `shopName_1` (field renamed to `storeName`)
+   - Logs all removals
 
 2. **Checks for vendors with null ownerUser**
    - Counts them
    - Reports as warning (doesn't delete them)
 
-3. **Creates correct `ownerUser_1` index**
-   - Drops existing `ownerUser_1` if it exists
-   - Creates new index with `unique: true, sparse: true`
+3. **Creates correct indexes:**
+   - `ownerUser_1`: Drops existing if present, creates with `unique: true, sparse: true`
+   - `storeSlug_1`: Drops existing if present, creates with `unique: true, sparse: true` (allows multiple nulls)
 
 4. **Returns summary**
    - Lists all indexes before and after

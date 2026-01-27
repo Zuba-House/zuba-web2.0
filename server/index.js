@@ -38,6 +38,7 @@ import couponRouter from './route/coupon.route.js';
 import giftCardRouter from './route/giftCard.route.js';
 import discountRouter from './route/discount.route.js';
 import jobApplicationRouter from './route/jobApplication.route.js';
+import reviewRequestRouter from './route/reviewRequest.route.js';
 import { expireSales, activateScheduledSales } from './utils/expireSales.js';
 
 // Validate environment variables at startup
@@ -363,6 +364,7 @@ app.use("/api/bannerList2", bannerList2Router);
 app.use("/api/blog", blogRouter);
 app.use("/api/order", orderRouter);
 app.use("/api/orders", orderTrackingRouter);
+app.use("/api/review-requests", reviewRequestRouter);
 app.use("/api/logo", logoRouter);
 app.use("/api/stripe", stripeRoute);
 app.use("/api/attributes", attributeRouter);
