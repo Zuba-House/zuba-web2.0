@@ -47,6 +47,9 @@ export const ProductDetails = () => {
           variationsCount: res?.product?.variations?.length || 0,
           hasAttributes: !!res?.product?.attributes,
           attributesCount: res?.product?.attributes?.length || 0,
+          vendor: res?.product?.vendor,
+          vendorIsVerified: res?.product?.vendor?.isVerified,
+          vendorStatus: res?.product?.vendor?.status,
           variations: res?.product?.variations,
           attributes: res?.product?.attributes
         });
@@ -63,6 +66,9 @@ export const ProductDetails = () => {
           variationsCount: normalizedProduct?.variations?.length || 0,
           hasAttributes: !!normalizedProduct?.attributes,
           attributesCount: normalizedProduct?.attributes?.length || 0,
+          vendor: normalizedProduct?.vendor,
+          vendorIsVerified: normalizedProduct?.vendor?.isVerified,
+          vendorStatus: normalizedProduct?.vendor?.status,
           variations: normalizedProduct?.variations,
           attributes: normalizedProduct?.attributes
         });

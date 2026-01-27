@@ -166,7 +166,10 @@ export const normalizeProduct = (product) => {
     attributes: product.attributes || [],
     // Rating
     rating: product.rating || product.ratingSummary?.average || 0,
-    reviewsCount: product.reviewsCount || 0
+    reviewsCount: product.reviewsCount || 0,
+    // Vendor data (preserve vendor object with isVerified)
+    vendor: product.vendor || null,
+    vendorShopName: product.vendorShopName || product.vendor?.storeName || ''
   };
 };
 

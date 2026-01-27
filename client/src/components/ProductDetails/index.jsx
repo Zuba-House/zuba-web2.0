@@ -253,15 +253,36 @@ export const ProductDetailsComponent = (props) => {
             <span className="text-gray-600 text-[14px]">
               <span className="font-[500] text-gray-800">Brand:</span> {product?.brand}
             </span>
-            {/* Verified Badge - Only show if vendor is verified */}
-            {product?.vendor?.isVerified && (
-              <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded-md text-[12px] font-[600] border border-green-200">
-                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                Verified
-              </span>
-            )}
+            {/* Verified Badge - Only show if vendor is verified and approved */}
+            {(() => {
+              // Check if vendor exists and is verified
+              const vendor = product?.vendor;
+              const isVendorVerified = vendor && (vendor.isVerified === true || vendor.isVerified === 'true');
+              const isVendorApproved = vendor && (vendor.status === 'APPROVED' || !vendor.status);
+              
+              // Debug logging (remove in production if needed)
+              if (process.env.NODE_ENV === 'development' && vendor) {
+                console.log('Vendor verification check:', {
+                  vendor: vendor,
+                  isVerified: vendor.isVerified,
+                  status: vendor.status,
+                  willShow: isVendorVerified && isVendorApproved
+                });
+              }
+              
+              // Show badge if vendor is verified (and optionally approved)
+              if (isVendorVerified) {
+                return (
+                  <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded-md text-[12px] font-[600] border border-green-200">
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Verified
+                  </span>
+                );
+              }
+              return null;
+            })()}
           </div>
         )}
         <div className="flex items-center gap-2">
