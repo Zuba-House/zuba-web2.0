@@ -621,27 +621,6 @@ const CartPage = () => {
               // Check if customer name is provided
               const hasCustomerName = customerName && customerName.trim() !== '';
               
-              // If not logged in, show login prompt
-              if (!isLoggedIn) {
-                return (
-                  <div className="flex flex-col gap-3">
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-center">
-                      <p className="text-[13px] text-blue-800 mb-2">
-                        🔐 Please login or create an account to proceed to checkout
-                      </p>
-                    </div>
-                    <Link to="/login">
-                      <Button className="btn-org btn-lg w-full flex gap-2">
-                        <BsFillBagCheckFill className="text-[20px]" /> Login to Checkout
-                      </Button>
-                    </Link>
-                    <p className="text-center text-[12px] text-gray-600">
-                      Don't have an account? <Link to="/register" className="text-primary font-[600]">Sign Up</Link>
-                    </p>
-                  </div>
-                );
-              }
-              
               // Disable checkout if required fields are missing
               if (!hasCustomerName || !hasValidAddress || !hasPhone) {
                 return (
@@ -657,13 +636,23 @@ const CartPage = () => {
                 );
               }
               
+              // Show checkout button - allow guest checkout
               return (
-                <Button 
-                  className="btn-org btn-lg w-full flex gap-2"
-                  onClick={handleCheckoutClick}
-                >
-                  <BsFillBagCheckFill className="text-[20px]" /> Proceed to Checkout
-                </Button>
+                <div className="flex flex-col gap-3">
+                  {!isLoggedIn && (
+                    <div className="p-2 bg-blue-50 border border-blue-200 rounded-md text-center">
+                      <p className="text-[12px] text-blue-800">
+                        💡 <Link to="/login" className="text-primary font-[600] underline">Login</Link> to save your cart and track orders, or continue as guest
+                      </p>
+                    </div>
+                  )}
+                  <Button 
+                    className="btn-org btn-lg w-full flex gap-2"
+                    onClick={handleCheckoutClick}
+                  >
+                    <BsFillBagCheckFill className="text-[20px]" /> Proceed to Checkout
+                  </Button>
+                </div>
               );
             })()}
           </div>

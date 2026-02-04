@@ -38,14 +38,24 @@ const Checkout = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
     
-    // Check if user is logged in - redirect to login if not
-    if (!context?.isLogin || !context?.userData) {
-      context?.alertBox("error", "Please login to proceed with checkout");
-      history("/login");
+    // Check if cart is empty
+    const cartIsEmpty = !context?.cartData || context.cartData.length === 0;
+    if (cartIsEmpty) {
+      context?.alertBox("error", "Your cart is empty. Please add items before checkout.");
+      setTimeout(() => {
+        history("/cart");
+      }, 2000);
       return;
     }
     
-    setUserData(context?.userData);
+    // Allow guest checkout - don't require login
+    // Guest checkout is supported by the order controller
+    if (context?.isLogin && context?.userData) {
+      setUserData(context?.userData);
+    } else {
+      // Guest user - set userData to null (will use guest customer info)
+      setUserData(null);
+    }
     
     // Get address, phone, and shipping rate from location state (passed from Cart page)
     if (location.state?.shippingAddress) {
@@ -82,7 +92,7 @@ const Checkout = () => {
         history("/cart");
       }, 2000);
     }
-  }, [location.state, context?.isLogin, context?.userData]);
+  }, [location.state, context?.isLogin, context?.userData, context?.cartData]);
 
 
 
@@ -311,8 +321,18 @@ const Checkout = () => {
       return;
     }
 
+    // Prepare guest customer data if user is not logged in
+    const isGuestOrder = !user?._id;
+    const guestCustomer = isGuestOrder ? {
+      name: customerName,
+      phone: phone,
+      email: userData?.email || null // Use email if available, otherwise null (optional for guest)
+    } : null;
+
     const payLoad = {
-      userId: user?._id,
+      userId: user?._id || null,
+      isGuestOrder: isGuestOrder,
+      guestCustomer: guestCustomer,
       products: formattedProducts, // Use formatted products instead of raw cartData
       paymentId: paymentIntent?.id || '',
       payment_status: "COMPLETED",

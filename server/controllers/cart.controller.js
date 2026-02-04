@@ -18,13 +18,17 @@ export const addToCartItemController = async (request, response) => {
             }
         });
         
-        // For guest users, require login for cart functionality
-        // In future, can implement session-based cart for guests
+        // For guest users, allow cart to be stored in localStorage on frontend
+        // Guest checkout is supported at checkout page
+        // Note: Guest cart items are stored client-side and sent to checkout
         if (!userId) {
-            return response.status(401).json({
-                error: true,
-                success: false,
-                message: "Please login to add items to cart. Guest checkout is available at checkout page."
+            // Return success response for guest users (cart stored in localStorage)
+            // Frontend handles guest cart storage
+            return response.status(200).json({
+                error: false,
+                success: true,
+                message: "Item added to guest cart. Please login to save cart to your account, or proceed to checkout as guest.",
+                isGuest: true
             });
         }
         
@@ -279,6 +283,16 @@ export const addToCartItemController = async (request, response) => {
 export const getCartItemController = async (request, response) => {
     try {
         const userId = request.userId;
+
+        // For guest users, return empty cart (frontend uses localStorage)
+        if (!userId) {
+            return response.json({
+                data: [],
+                error: false,
+                success: true,
+                isGuest: true
+            });
+        }
 
         const cartItems = await CartProductModel.find({
             userId: userId
