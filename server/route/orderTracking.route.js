@@ -92,10 +92,23 @@ orderTrackingRouter.get("/track/:orderId", async (req, res) => {
       });
     }
 
-    // Get user email to verify
-    const user = await UserModel.findById(order.userId);
+    // Verify email - handle both logged-in users and guest orders
+    let emailMatches = false;
     
-    if (!user || user.email.toLowerCase() !== email.toLowerCase()) {
+    if (order.userId) {
+      // Logged-in user order - verify against user email
+      const user = await UserModel.findById(order.userId);
+      if (user && user.email.toLowerCase() === email.toLowerCase()) {
+        emailMatches = true;
+      }
+    } else if (order.guestCustomer && order.guestCustomer.email) {
+      // Guest order - verify against guest customer email
+      if (order.guestCustomer.email.toLowerCase() === email.toLowerCase()) {
+        emailMatches = true;
+      }
+    }
+    
+    if (!emailMatches) {
       return res.status(404).json({
         error: true,
         success: false,
@@ -298,7 +311,7 @@ orderTrackingRouter.get("/track/:orderId", async (req, res) => {
       shippingAddress: {
         name: address?.contactInfo?.firstName 
           ? `${address.contactInfo.firstName} ${address.contactInfo.lastName || ''}`.trim()
-          : (user?.name || "Customer"),
+          : (order.customerName || order.guestCustomer?.name || "Customer"),
         street: address?.address?.addressLine1 || address?.address_line1 || "",
         city: address?.address?.city || address?.city || "",
         state: address?.address?.province || address?.state || "",
