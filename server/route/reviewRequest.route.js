@@ -9,12 +9,14 @@ import {
     rejectReviewRequest,
     toggleReviewRequest,
     getReviewRequestByToken,
-    submitReviewFromRequest
+    submitReviewFromRequest,
+    checkReviewLinkConfig
 } from '../controllers/reviewRequest.controller.js';
 
 const router = Router();
 
 // Public routes (for customers)
+router.get('/config/check', checkReviewLinkConfig); // Debug endpoint to check configuration
 router.get('/:token', getReviewRequestByToken);
 router.post('/:token/submit', submitReviewFromRequest);
 

@@ -10,26 +10,52 @@ import crypto from 'crypto';
 /**
  * Get the customer frontend URL (never vendor URL)
  * Ensures review links always point to the customer-facing website
+ * This function is called dynamically to ensure we always get the correct URL
  */
 const getCustomerFrontendUrl = () => {
     const vendorUrl = process.env.VENDOR_URL || 'https://vendor.zubahouse.com';
-    let clientUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+    const productionCustomerUrl = 'https://zubahouse.com';
     
-    // Safety check: If CLIENT_URL is accidentally set to vendor URL, use fallback
-    if (clientUrl.includes('vendor.zubahouse.com') || clientUrl.includes('/vendor')) {
-        console.warn('⚠️ CLIENT_URL appears to be vendor URL, using fallback to customer frontend');
-        clientUrl = process.env.FRONTEND_URL || 'https://zubahouse.com';
+    // Get potential client URL from environment
+    let clientUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL;
+    
+    // If no URL is set, use production customer URL
+    if (!clientUrl) {
+        return process.env.NODE_ENV === 'production' 
+            ? productionCustomerUrl 
+            : 'http://localhost:3000';
     }
     
-    // Additional check: If it's still vendor URL, use production customer URL
-    if (clientUrl.includes('vendor')) {
-        clientUrl = 'https://zubahouse.com';
+    // Normalize URLs for comparison (remove trailing slashes, convert to lowercase)
+    const normalizedClientUrl = clientUrl.toLowerCase().replace(/\/$/, '');
+    const normalizedVendorUrl = vendorUrl.toLowerCase().replace(/\/$/, '');
+    
+    // Critical check: If CLIENT_URL equals or contains vendor URL, reject it
+    if (normalizedClientUrl === normalizedVendorUrl || 
+        normalizedClientUrl.includes('vendor.zubahouse.com') ||
+        normalizedClientUrl.includes('/vendor') ||
+        normalizedClientUrl.startsWith('https://vendor') ||
+        normalizedClientUrl.startsWith('http://vendor')) {
+        console.error('❌ ERROR: CLIENT_URL is set to vendor URL!', clientUrl);
+        console.log('✅ Using fallback to customer frontend URL:', productionCustomerUrl);
+        return productionCustomerUrl;
+    }
+    
+    // Additional safety: If URL contains "vendor" anywhere, reject it
+    if (normalizedClientUrl.includes('vendor')) {
+        console.warn('⚠️ WARNING: CLIENT_URL contains "vendor", using fallback');
+        return productionCustomerUrl;
     }
     
     return clientUrl;
 };
 
-const CLIENT_URL = getCustomerFrontendUrl();
+// Log the customer frontend URL on module load for debugging
+const initialCustomerUrl = getCustomerFrontendUrl();
+console.log('🌐 Customer Frontend URL configured:', initialCustomerUrl);
+if (initialCustomerUrl.includes('vendor')) {
+    console.error('❌ CRITICAL: Customer Frontend URL is still pointing to vendor!');
+}
 
 /**
  * Generate a secure token for review request
@@ -145,14 +171,26 @@ export const sendReviewRequests = async (req, res) => {
                         }
 
                         // Create review request
+                        // Get customer frontend URL dynamically (not from constant)
+                        const customerFrontendUrl = getCustomerFrontendUrl();
                         const reviewToken = generateReviewToken();
-                        const reviewLink = `${CLIENT_URL}/review/${reviewToken}?orderId=${order._id}&productId=${orderItem.productId}`;
-                        const productLink = `${CLIENT_URL}/product/${orderItem.productId}`;
+                        const reviewLink = `${customerFrontendUrl}/review/${reviewToken}?orderId=${order._id}&productId=${orderItem.productId}`;
+                        const productLink = `${customerFrontendUrl}/product/${orderItem.productId}`;
                         
                         // Log review link for debugging (verify it's not vendor URL)
-                        console.log(`📧 Review link generated for ${customerEmail}: ${reviewLink}`);
-                        if (reviewLink.includes('vendor')) {
-                            console.error('❌ ERROR: Review link contains vendor URL! This should not happen.');
+                        console.log(`📧 Review link generated for ${customerEmail}:`);
+                        console.log(`   Review URL: ${reviewLink}`);
+                        console.log(`   Customer Frontend URL: ${customerFrontendUrl}`);
+                        
+                        // Final safety check - if review link contains vendor, abort
+                        if (reviewLink.includes('vendor.zubahouse.com') || reviewLink.includes('/vendor')) {
+                            console.error('❌ CRITICAL ERROR: Review link contains vendor URL! Aborting email send.');
+                            results.errors.push({
+                                orderId: order._id,
+                                productId: orderItem.productId,
+                                reason: 'Review link incorrectly points to vendor URL - configuration error'
+                            });
+                            continue; // Skip this review request
                         }
 
                         const reviewRequest = new ReviewRequestModel({
@@ -492,6 +530,40 @@ export const toggleReviewRequest = async (req, res) => {
 };
 
 /**
+ * GET /api/review-requests/config/check
+ * Check review link configuration (for debugging)
+ */
+export const checkReviewLinkConfig = async (req, res) => {
+    try {
+        const customerUrl = getCustomerFrontendUrl();
+        const vendorUrl = process.env.VENDOR_URL || 'https://vendor.zubahouse.com';
+        const envClientUrl = process.env.CLIENT_URL;
+        const envFrontendUrl = process.env.FRONTEND_URL;
+        
+        const isCorrect = !customerUrl.includes('vendor');
+        
+        return res.status(200).json({
+            error: false,
+            success: true,
+            data: {
+                customerFrontendUrl: customerUrl,
+                vendorUrl: vendorUrl,
+                envClientUrl: envClientUrl,
+                envFrontendUrl: envFrontendUrl,
+                isCorrect: isCorrect,
+                warning: isCorrect ? null : 'Review links are pointing to vendor URL! This is incorrect.'
+            }
+        });
+    } catch (error) {
+        return res.status(500).json({
+            error: true,
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+/**
  * GET /api/review/:token
  * Get review request by token (for customer review page)
  */
@@ -659,6 +731,7 @@ export default {
     rejectReviewRequest,
     toggleReviewRequest,
     getReviewRequestByToken,
-    submitReviewFromRequest
+    submitReviewFromRequest,
+    checkReviewLinkConfig
 };
 

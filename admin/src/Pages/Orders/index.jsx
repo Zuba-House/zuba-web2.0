@@ -4,7 +4,7 @@ import { FaAngleDown } from "react-icons/fa6";
 import Badge from "../../Components/Badge";
 import SearchBox from '../../Components/SearchBox';
 import { FaAngleUp } from "react-icons/fa6";
-import { deleteData, editData, fetchDataFromApi } from '../../utils/api';
+import { deleteData, editData, fetchDataFromApi, postData } from '../../utils/api';
 import Pagination from "@mui/material/Pagination";
 
 import MenuItem from '@mui/material/MenuItem';
@@ -391,6 +391,78 @@ export const Orders = () => {
                               label={<span className="text-xs">Review Request</span>}
                               style={{ marginTop: '4px' }}
                             />
+                          )}
+                          {/* Failed Order Notification Toggle and Manual Send - Only show for failed orders */}
+                          {order?.payment_status === 'FAILED' && (
+                            <>
+                              <FormControlLabel
+                                control={
+                                  <Switch
+                                    checked={order?.failedOrderNotificationEnabled !== false}
+                                    onChange={(e) => {
+                                      editData(`/api/order/${order?._id}/failed-notification-toggle`, {
+                                        enabled: e.target.checked
+                                      }).then((res) => {
+                                        if (res?.error === false) {
+                                          context.alertBox("success", res?.message || "Failed order notification setting updated");
+                                          // Refresh orders
+                                          fetchDataFromApi(`/api/order/order-list?page=${pageOrder}&limit=5`).then((res) => {
+                                            if (res?.error === false && res?.data) {
+                                              setOrdersData(res.data);
+                                            }
+                                          });
+                                        } else {
+                                          context.alertBox("error", res?.message || "Failed to update notification setting");
+                                        }
+                                      }).catch((error) => {
+                                        console.error("Error toggling failed order notification:", error);
+                                        context.alertBox("error", "Failed to update notification setting");
+                                      });
+                                    }}
+                                    size="small"
+                                  />
+                                }
+                                label={<span className="text-xs">Auto Notify</span>}
+                                style={{ marginTop: '4px' }}
+                              />
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                color="primary"
+                                onClick={() => {
+                                  const emailsSent = order?.failedOrderNotificationsSent || 0;
+                                  const canSend = emailsSent < 3;
+                                  
+                                  if (!canSend) {
+                                    context.alertBox("warning", `Maximum of 3 notification emails have already been sent for this order. Emails sent: ${emailsSent}`);
+                                    return;
+                                  }
+
+                                  postData(`/api/order/${order?._id}/send-failed-notification`, { force: false })
+                                    .then((res) => {
+                                      if (res?.error === false) {
+                                        context.alertBox("success", res?.message || "Failed order notification sent successfully");
+                                        // Refresh orders
+                                        fetchDataFromApi(`/api/order/order-list?page=${pageOrder}&limit=5`).then((res) => {
+                                          if (res?.error === false && res?.data) {
+                                            setOrdersData(res.data);
+                                          }
+                                        });
+                                      } else {
+                                        context.alertBox("error", res?.message || "Failed to send notification");
+                                      }
+                                    })
+                                    .catch((error) => {
+                                      console.error("Error sending failed order notification:", error);
+                                      context.alertBox("error", "Failed to send notification");
+                                    });
+                                }}
+                                disabled={(order?.failedOrderNotificationsSent || 0) >= 3}
+                                style={{ marginTop: '4px', fontSize: '11px', padding: '4px 8px' }}
+                              >
+                                Send Email {order?.failedOrderNotificationsSent ? `(${order.failedOrderNotificationsSent}/3)` : ''}
+                              </Button>
+                            </>
                           )}
                         </div>
                       </td>

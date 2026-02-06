@@ -441,6 +441,23 @@ connectDB()
             console.log(`✅ Server is running on port ${PORT}`);
             console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
             
+            // Validate review link configuration
+            const clientUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL;
+            const vendorUrl = process.env.VENDOR_URL || 'https://vendor.zubahouse.com';
+            
+            if (clientUrl) {
+                if (clientUrl.includes('vendor.zubahouse.com') || clientUrl.includes('/vendor')) {
+                    console.error('❌ CRITICAL CONFIGURATION ERROR:');
+                    console.error(`   CLIENT_URL is set to vendor URL: ${clientUrl}`);
+                    console.error(`   This will cause review links to point to vendor login!`);
+                    console.error(`   Please set CLIENT_URL to customer frontend URL (e.g., https://zubahouse.com)`);
+                } else {
+                    console.log(`✅ Review links will use customer frontend: ${clientUrl}`);
+                }
+            } else {
+                console.log(`⚠️  CLIENT_URL not set, using default: https://zubahouse.com`);
+            }
+            
             // Start scheduled sale management
             startSaleScheduler();
         });

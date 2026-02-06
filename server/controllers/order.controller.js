@@ -12,6 +12,7 @@ import AdminOrderNotificationEmail from "../utils/adminOrderNotificationEmailTem
 import sendEmailFun from "../config/sendEmail.js";
 import { calculateOrderCommissions, creditVendorBalance } from "../utils/commissionCalculator.js";
 import { sendVendorNewOrder } from "../utils/vendorEmails.js";
+import { FailedOrderEmailTemplate } from "../utils/failedOrderEmailTemplate.js";
 
 export const createOrderController = async (request, response) => {
     try {
@@ -567,6 +568,88 @@ export const createOrderController = async (request, response) => {
                     }
                 } catch (emailPrepError) {
                     console.error('❌ Error in email preparation (non-critical):', emailPrepError.message);
+                }
+            })(); // Fire and forget - don't await
+        }
+
+        // Send failed order notification email if payment failed
+        // This runs asynchronously and doesn't block order creation
+        if (paymentStatus === 'FAILED' && order.failedOrderNotificationEnabled !== false) {
+            (async () => {
+                try {
+                    // Use the sendFailedOrderNotification logic but call it directly
+                    // to avoid HTTP overhead since we're already in the controller
+                    let customerEmail = null;
+                    let customerName = 'Customer';
+
+                    if (order.userId) {
+                        try {
+                            const user = await UserModel.findById(order.userId).select('name email');
+                            if (user?.email) {
+                                customerEmail = user.email;
+                                customerName = user.name || customerName;
+                            }
+                        } catch (userError) {
+                            console.warn('⚠️ Could not fetch user for failed order notification:', userError.message);
+                        }
+                    } else if (order.guestCustomer?.email) {
+                        customerEmail = order.guestCustomer.email;
+                        customerName = order.guestCustomer.name || customerName;
+                    }
+
+                    if (customerEmail) {
+                        // Check total emails sent to this customer across all failed orders
+                        const customerEmailLower = customerEmail.toLowerCase();
+                        const allFailedOrders = await OrderModel.find({
+                            $or: [
+                                { userId: order.userId },
+                                { 'guestCustomer.email': { $regex: new RegExp(customerEmailLower, 'i') } }
+                            ],
+                            payment_status: 'FAILED'
+                        }).select('failedOrderNotificationsSent');
+
+                        const totalEmailsSent = allFailedOrders.reduce((sum, o) => sum + (o.failedOrderNotificationsSent || 0), 0);
+
+                        // Only send if we haven't reached the limit of 3 emails
+                        if (totalEmailsSent < 3 && (order.failedOrderNotificationsSent || 0) < 3) {
+                            const websiteUrl = process.env.WEBSITE_URL || process.env.CLIENT_URL || 'https://zubahouse.com';
+                            
+                            const emailHtml = FailedOrderEmailTemplate({
+                                customerName,
+                                orderId: order._id,
+                                websiteUrl
+                            });
+
+                            const emailText = `Hello ${customerName},\n\nWe wanted to let you know that your recent order attempt was unsuccessful.\n\nWe'd love to help you complete your purchase. Please visit our store: ${websiteUrl}\n\nIf you have any questions or need assistance:\n📧 Email: sales@zubahouse.com\n💬 WhatsApp: +1 437-557-7487\n\nYou can reply directly to this email or contact us using the information above. We're here to help!\n\nZuba House`;
+
+                            const emailSent = await sendEmailFun({
+                                sendTo: customerEmail,
+                                subject: 'Your Order Attempt - Zuba House',
+                                text: emailText,
+                                html: emailHtml
+                            });
+
+                            if (emailSent) {
+                                // Update order with notification sent
+                                order.failedOrderNotificationsSent = (order.failedOrderNotificationsSent || 0) + 1;
+                                if (!order.failedOrderNotificationsSentAt) {
+                                    order.failedOrderNotificationsSentAt = [];
+                                }
+                                order.failedOrderNotificationsSentAt.push(new Date());
+                                await order.save();
+
+                                console.log(`✅ Failed order notification sent automatically to ${customerEmail} for order ${order._id}`);
+                            } else {
+                                console.warn('⚠️ Failed to send failed order notification email (non-critical)');
+                            }
+                        } else {
+                            console.log(`⚠️ Skipping failed order notification - limit reached (${totalEmailsSent} emails already sent to this customer)`);
+                        }
+                    } else {
+                        console.warn('⚠️ No customer email found - skipping failed order notification');
+                    }
+                } catch (failedOrderEmailError) {
+                    console.error('❌ Error sending failed order notification (non-critical):', failedOrderEmailError.message);
                 }
             })(); // Fire and forget - don't await
         }

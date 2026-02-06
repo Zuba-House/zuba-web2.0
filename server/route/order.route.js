@@ -12,6 +12,11 @@ import {
     updateOrderStatusController 
 } from "../controllers/order.controller.js";
 import { toggleReviewRequest } from "../controllers/reviewRequest.controller.js";
+import { 
+    sendFailedOrderNotification, 
+    toggleFailedOrderNotification,
+    getFailedOrderNotificationStatus 
+} from "../controllers/failedOrderNotification.controller.js";
 
 const orderRouter = Router();
 
@@ -29,5 +34,9 @@ orderRouter.get('/sales', auth, requireAdminEmail, totalSalesController)
 orderRouter.get('/users', auth, requireAdminEmail, totalUsersController)
 orderRouter.delete('/deleteOrder/:id', auth, requireAdminEmail, deleteOrder)
 orderRouter.put('/:id/review-request-toggle', auth, requireAdminEmail, toggleReviewRequest)
+// Failed order notification routes
+orderRouter.post('/:id/send-failed-notification', auth, requireAdminEmail, sendFailedOrderNotification)
+orderRouter.put('/:id/failed-notification-toggle', auth, requireAdminEmail, toggleFailedOrderNotification)
+orderRouter.get('/:id/failed-notification-status', auth, requireAdminEmail, getFailedOrderNotificationStatus)
 
 export default orderRouter;
