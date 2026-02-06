@@ -16,7 +16,28 @@ export const ReviewRequestEmailTemplate = ({
     orderNumber,
     productLink
 }) => {
-    const baseUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+    /**
+     * Get customer frontend URL (never vendor URL)
+     * Used for footer links in email template
+     */
+    const getCustomerFrontendUrl = () => {
+        const vendorUrl = process.env.VENDOR_URL || 'https://vendor.zubahouse.com';
+        let clientUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+        
+        // Safety check: If CLIENT_URL is accidentally set to vendor URL, use fallback
+        if (clientUrl.includes('vendor.zubahouse.com') || clientUrl.includes('/vendor')) {
+            clientUrl = process.env.FRONTEND_URL || 'https://zubahouse.com';
+        }
+        
+        // Additional check: If it's still vendor URL, use production customer URL
+        if (clientUrl.includes('vendor')) {
+            clientUrl = 'https://zubahouse.com';
+        }
+        
+        return clientUrl;
+    };
+    
+    const baseUrl = getCustomerFrontendUrl();
     
     return `
 <!DOCTYPE html>

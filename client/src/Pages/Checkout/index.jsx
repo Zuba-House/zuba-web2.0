@@ -217,8 +217,19 @@ const Checkout = () => {
       return;
     }
 
+    // Validate phone, but be lenient - if it has at least 10 digits, allow it
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length < 10) {
+      context?.alertBox("error", "Please enter a valid phone number (at least 10 digits)");
+      return;
+    }
+    
+    // Try to validate phone, but don't block if validation service fails
     const phoneValid = await validatePhone(phone);
-    if (!phoneValid) {
+    if (!phoneValid && phoneDigits.length >= 10) {
+      // Phone has enough digits, allow to proceed even if validation service failed
+      console.warn('⚠️ Phone validation failed but phone has sufficient digits, allowing to proceed');
+    } else if (!phoneValid) {
       context?.alertBox("error", "Please enter a valid phone number");
       return;
     }
@@ -387,15 +398,39 @@ const Checkout = () => {
       console.log('📦 Response error field:', res?.error);
       console.log('📦 Response success field:', res?.success);
       
+      // CRITICAL: If payment succeeded, treat order as success even if response is ambiguous
       // Check multiple response formats for compatibility
-      // Also check for network errors or API errors
-      const isSuccess = (res && !res.error && res?.error !== true) && 
-                        (res?.error === false || res?.success === true || res?.orderId || res?.order?._id);
+      const hasOrderId = !!(res?.orderId || res?.order?._id || res?._id);
+      const hasSuccessFlag = res?.success === true || res?.error === false;
+      const hasNoError = !res?.error || res?.error === false;
       
-      // Check if response indicates an error
-      if (res?.error === true || res?.isAuthError) {
-        console.error('❌ Order creation failed with error response:', res);
-        context.alertBox("error", res?.message || "Failed to create order. Please try again or contact support.");
+      // If we have an order ID, it's a success (payment succeeded, order was created)
+      const isSuccess = hasOrderId || (hasNoError && hasSuccessFlag);
+      
+      // Check if response indicates a critical error (but payment already succeeded)
+      if (res?.error === true && !hasOrderId && !res?.isAuthError) {
+        // Payment succeeded but order creation had issues - check if emergency order was created
+        if (res?.warning || res?.orderId) {
+          // Emergency order was created - treat as success
+          console.log('✅ Emergency order created, treating as success');
+        } else {
+          console.error('❌ Order creation failed with error response:', res);
+          // Payment succeeded, so show warning but still try to redirect to success
+          // Admin can manually create order with payment ID
+          context.alertBox("warning", "Payment succeeded but order creation had issues. Please contact support with Payment ID: " + (paymentIntent?.id || 'N/A') + ". Your payment was successful.");
+          setIsProcessingOrder(false);
+          // Still redirect to success since payment succeeded
+          setTimeout(() => {
+            window.location.href = "/order/success?paymentId=" + (paymentIntent?.id || '');
+          }, 2000);
+          return;
+        }
+      }
+      
+      // Auth errors are different - user needs to login
+      if (res?.isAuthError) {
+        console.error('❌ Order creation failed with auth error:', res);
+        context.alertBox("error", res?.message || "Authentication required. Please login and try again.");
         setIsProcessingOrder(false);
         setTimeout(() => {
           window.location.href = "/order/failed";
@@ -403,7 +438,7 @@ const Checkout = () => {
         return;
       }
       
-      if (isSuccess) {
+      if (isSuccess || hasOrderId) {
         console.log('✅ Order created successfully!');
         
         // Record discount usage
@@ -448,35 +483,58 @@ const Checkout = () => {
           }
         }, 100);
       } else {
-        console.error('❌ Order creation failed:', res);
-        console.error('❌ Response details:', JSON.stringify(res, null, 2));
-        context.alertBox("error", res?.message || "Failed to create order");
-        setIsProcessingOrder(false); // Re-enable on error
-        setTimeout(() => {
-          window.location.href = "/order/failed";
-        }, 500);
+        // Ambiguous response but payment succeeded - be lenient
+        console.warn('⚠️ Ambiguous order creation response, but payment succeeded:', res);
+        console.warn('⚠️ Response details:', JSON.stringify(res, null, 2));
+        
+        // If payment succeeded, we should still show success
+        // The order might have been created but response was malformed
+        if (paymentIntent?.status === 'succeeded') {
+          console.log('✅ Payment succeeded, treating as success despite ambiguous response');
+          context.alertBox("warning", "Payment succeeded. If you don't see your order, please contact support with Payment ID: " + (paymentIntent?.id || 'N/A'));
+          setIsProcessingOrder(false);
+          setTimeout(() => {
+            window.location.href = "/order/success?paymentId=" + (paymentIntent?.id || '');
+          }, 1000);
+        } else {
+          // Payment didn't succeed or unclear
+          context.alertBox("error", res?.message || "Failed to create order");
+          setIsProcessingOrder(false);
+          setTimeout(() => {
+            window.location.href = "/order/failed";
+          }, 500);
+        }
       }
     } catch (error) {
       console.error('❌ Error creating order:', error);
       console.error('❌ Error details:', {
         message: error.message,
         stack: error.stack,
-        paymentIntentId: paymentIntent?.id
+        paymentIntentId: paymentIntent?.id,
+        paymentStatus: paymentIntent?.status
       });
       
-      // Even if order creation fails, payment succeeded - check if we should still redirect to success
-      // This is a fallback: payment succeeded, so we should at least show success page
-      console.warn('⚠️ Order creation error, but payment succeeded. Checking if order was created anyway...');
-      
-      // Try to redirect to success anyway since payment succeeded
-      // The order might have been created but response was malformed
-      context.alertBox("warning", "Payment succeeded. If you don't see your order, please contact support with payment ID: " + (paymentIntent?.id || 'N/A'));
-      setIsProcessingOrder(false); // Re-enable on error
-      
-      // Redirect to success since payment succeeded
-      setTimeout(() => {
-        window.location.href = "/order/success";
-      }, 1000);
+      // CRITICAL: If payment succeeded, ALWAYS redirect to success
+      // The order might have been created but network/response error occurred
+      if (paymentIntent?.status === 'succeeded') {
+        console.warn('⚠️ Order creation error, but payment succeeded. Redirecting to success page...');
+        console.warn('⚠️ User should contact support with Payment ID if order is missing:', paymentIntent?.id);
+        
+        // Show warning but redirect to success since payment succeeded
+        context.alertBox("warning", "Payment succeeded! If you don't see your order, please contact support with Payment ID: " + (paymentIntent?.id || 'N/A'));
+        setIsProcessingOrder(false);
+        
+        // Redirect to success immediately - payment succeeded
+        window.location.href = "/order/success?paymentId=" + (paymentIntent?.id || '');
+      } else {
+        // Payment didn't succeed or unclear - redirect to failed
+        console.error('❌ Payment status unclear or failed, redirecting to failed page');
+        context.alertBox("error", "Order creation failed. Please try again or contact support.");
+        setIsProcessingOrder(false);
+        setTimeout(() => {
+          window.location.href = "/order/failed";
+        }, 1000);
+      }
     }
   }
 

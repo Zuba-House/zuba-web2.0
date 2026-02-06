@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import OrderModel from "../models/order.model.js";
 import ProductModel from '../models/product.model.js';
 import UserModel from '../models/user.model.js';
@@ -146,120 +147,16 @@ export const createOrderController = async (request, response) => {
             };
         }
 
-        let order = new OrderModel({
-            userId: request.body.userId || null,
-            products: request.body.products,
-            paymentId: request.body.paymentId,
-            payment_status: request.body.payment_status,
-            delivery_address: request.body.delivery_address,
-            totalAmt: finalTotal, // Ensure shipping is included
-            shippingCost: shippingCost,
-            shippingRate: request.body.shippingRate || null,
-            shippingAddress: orderShippingAddress,
-            phone: request.body.phone || '',
-            // New customer info fields for better delivery
-            customerName: request.body.customerName || '',
-            apartmentNumber: request.body.apartmentNumber || '',
-            deliveryNote: request.body.deliveryNote || '',
-            date: request.body.date,
-            // Guest checkout fields
-            isGuestOrder: isGuestOrder,
-            guestCustomer: request.body.guestCustomer || null,
-            // Discount information
-            discounts: request.body.discounts || null,
-            // Status tracking
-            status: 'Received',
-            statusHistory: [{
-                status: 'Received',
-                timestamp: new Date(),
-                updatedBy: request.userId || null
-            }]
-        });
-
-        // Save order to database
-        try {
-            order = await order.save();
-            console.log('✅ Order saved successfully:', order._id);
-        } catch (saveError) {
-            console.error('❌ Failed to save order:', saveError);
-            return response.status(500).json({
-                error: true,
-                success: false,
-                message: 'Failed to save order to database',
-                details: process.env.NODE_ENV === 'development' ? saveError.message : undefined
-            });
-        }
-
         // ========================================
-        // CALCULATE VENDOR COMMISSIONS
+        // CRITICAL FIX: VALIDATE STOCK AVAILABILITY BEFORE ORDER CREATION
         // ========================================
-        try {
-            // Check if any products belong to vendors
-            const vendorProducts = request.body.products.filter(p => p.vendor || p.vendorId);
-            
-            if (vendorProducts.length > 0) {
-                console.log('💰 Calculating vendor commissions for', vendorProducts.length, 'vendor products');
-                
-                // Calculate commissions for all order items
-                const commissionResult = await calculateOrderCommissions(request.body.products);
-                
-                // Update order products with commission info
-                for (let i = 0; i < order.products.length; i++) {
-                    const updatedItem = commissionResult.items.find(item => 
-                        (item.productId?.toString() || item.productId) === (order.products[i].productId?.toString() || order.products[i].productId)
-                    );
-                    if (updatedItem) {
-                        order.products[i].vendorEarning = updatedItem.vendorEarning || 0;
-                        order.products[i].platformCommission = updatedItem.platformCommission || 0;
-                        order.products[i].commissionRate = updatedItem.commissionRate || 15;
-                    }
-                }
-                
-                // Add vendor summary to order
-                if (commissionResult.vendorSummary?.length > 0) {
-                    order.vendorSummary = commissionResult.vendorSummary.map(vs => ({
-                        vendor: vs.vendorId,
-                        vendorShopName: vs.vendorName || '',
-                        totalAmount: vs.totalAmount,
-                        commission: vs.commission,
-                        vendorEarning: vs.vendorEarning
-                    }));
-                }
-                
-                // Save order with commission data
-                await order.save();
-                console.log('✅ Order updated with commission data');
-                
-                // Send email notifications to vendors (non-blocking)
-                for (const vendorSum of (commissionResult.vendorSummary || [])) {
-                    try {
-                        const vendor = await VendorModel.findById(vendorSum.vendorId);
-                        if (vendor?.email) {
-                            const vendorItems = order.products.filter(p => 
-                                (p.vendor?.toString() || p.vendorId?.toString()) === vendorSum.vendorId.toString()
-                            );
-                            sendVendorNewOrder(vendor, order, vendorItems).catch(err => {
-                                console.error('Failed to send vendor order notification:', err);
-                            });
-                        }
-                    } catch (vendorEmailErr) {
-                        console.error('Error sending vendor notification:', vendorEmailErr);
-                    }
-                }
-            }
-        } catch (commissionError) {
-            console.error('⚠️ Commission calculation error (non-blocking):', commissionError);
-            // Don't fail order creation if commission calculation fails
-        }
-
-        // ========================================
-        // VALIDATE STOCK AVAILABILITY BEFORE ORDER CREATION
-        // ========================================
-        // Critical: Validate stock BEFORE creating order to prevent overselling
+        // This prevents race conditions where orders are saved but stock validation fails
+        // Validate stock BEFORE creating order to prevent overselling and failed orders
+        console.log('🔍 Validating stock availability before order creation...');
         for (let i = 0; i < request.body.products.length; i++) {
             const orderProduct = request.body.products[i];
             
-            // Get product from database
+            // Get product from database with fresh read
             const product = await ProductModel.findById(orderProduct.productId);
             
             if (!product) {
@@ -338,179 +235,340 @@ export const createOrderController = async (request, response) => {
                 }
             }
         }
+        console.log('✅ Stock validation passed - all products have sufficient stock');
 
-        // Update inventory only for successful or COD orders
+        // Determine if inventory should be affected (before transaction)
         const paymentStatus = (request.body.payment_status || '').toUpperCase();
         const shouldAffectInventory = paymentStatus !== 'FAILED';
-        
-        if (shouldAffectInventory) {
-            for (let i = 0; i < request.body.products.length; i++) {
-                const orderProduct = request.body.products[i];
+
+        // Start MongoDB session for transaction support
+        const session = await mongoose.startSession();
+        session.startTransaction();
+
+        let order = null;
+        try {
+            // Create order object
+            order = new OrderModel({
+                userId: request.body.userId || null,
+                products: request.body.products,
+                paymentId: request.body.paymentId,
+                payment_status: request.body.payment_status,
+                delivery_address: request.body.delivery_address,
+                totalAmt: finalTotal, // Ensure shipping is included
+                shippingCost: shippingCost,
+                shippingRate: request.body.shippingRate || null,
+                shippingAddress: orderShippingAddress,
+                phone: request.body.phone || '',
+                // New customer info fields for better delivery
+                customerName: request.body.customerName || '',
+                apartmentNumber: request.body.apartmentNumber || '',
+                deliveryNote: request.body.deliveryNote || '',
+                date: request.body.date,
+                // Guest checkout fields
+                isGuestOrder: isGuestOrder,
+                guestCustomer: request.body.guestCustomer || null,
+                // Discount information
+                discounts: request.body.discounts || null,
+                // Status tracking
+                status: 'Received',
+                statusHistory: [{
+                    status: 'Received',
+                    timestamp: new Date(),
+                    updatedBy: request.userId || null
+                }]
+            });
+
+            // Save order to database within transaction
+            order = await order.save({ session });
+            console.log('✅ Order saved successfully:', order._id);
+
+            // ========================================
+            // CALCULATE VENDOR COMMISSIONS
+            // ========================================
+            try {
+                // Check if any products belong to vendors
+                const vendorProducts = request.body.products.filter(p => p.vendor || p.vendorId);
                 
-                // Get product from database (already validated above, but fetch again for update)
-                const product = await ProductModel.findById(orderProduct.productId);
-                
-                if (!product) {
-                    console.error(`Product not found during stock update: ${orderProduct.productId}`);
-                    continue;
-                }
-                
-                // ========================================
-                // HANDLE VARIABLE PRODUCTS
-                // ========================================
-                if (orderProduct.productType === 'variable' && orderProduct.variationId) {
-                    // Find the specific variation
-                    const variationIndex = product.variations?.findIndex(
-                        v => v._id && v._id.toString() === orderProduct.variationId
-                    );
+                if (vendorProducts.length > 0) {
+                    console.log('💰 Calculating vendor commissions for', vendorProducts.length, 'vendor products');
                     
-                    if (variationIndex !== -1 && product.variations) {
-                        // Update variation stock
-                        const currentVariationStock = product.variations[variationIndex].stock || 0;
-                        const newVariationStock = Math.max(0, currentVariationStock - orderProduct.quantity);
-                        
-                        product.variations[variationIndex].stock = newVariationStock;
-                        
-                        // Update variation stock status
-                        if (newVariationStock <= 0) {
-                            product.variations[variationIndex].stockStatus = 'out_of_stock';
+                    // Calculate commissions for all order items
+                    const commissionResult = await calculateOrderCommissions(request.body.products);
+                    
+                    // Update order products with commission info
+                    for (let i = 0; i < order.products.length; i++) {
+                        const updatedItem = commissionResult.items.find(item => 
+                            (item.productId?.toString() || item.productId) === (order.products[i].productId?.toString() || order.products[i].productId)
+                        );
+                        if (updatedItem) {
+                            order.products[i].vendorEarning = updatedItem.vendorEarning || 0;
+                            order.products[i].platformCommission = updatedItem.platformCommission || 0;
+                            order.products[i].commissionRate = updatedItem.commissionRate || 15;
                         }
+                    }
+                    
+                    // Add vendor summary to order
+                    if (commissionResult.vendorSummary?.length > 0) {
+                        order.vendorSummary = commissionResult.vendorSummary.map(vs => ({
+                            vendor: vs.vendorId,
+                            vendorShopName: vs.vendorName || '',
+                            totalAmount: vs.totalAmount,
+                            commission: vs.commission,
+                            vendorEarning: vs.vendorEarning
+                        }));
+                    }
+                    
+                    // Save order with commission data within transaction
+                    await order.save({ session });
+                    console.log('✅ Order updated with commission data');
+                    
+                    // Send email notifications to vendors (non-blocking, outside transaction)
+                    for (const vendorSum of (commissionResult.vendorSummary || [])) {
+                        try {
+                            const vendor = await VendorModel.findById(vendorSum.vendorId);
+                            if (vendor?.email) {
+                                const vendorItems = order.products.filter(p => 
+                                    (p.vendor?.toString() || p.vendorId?.toString()) === vendorSum.vendorId.toString()
+                                );
+                                sendVendorNewOrder(vendor, order, vendorItems).catch(err => {
+                                    console.error('Failed to send vendor order notification:', err);
+                                });
+                            }
+                        } catch (vendorEmailErr) {
+                            console.error('Error sending vendor notification:', vendorEmailErr);
+                        }
+                    }
+                }
+            } catch (commissionError) {
+                console.error('⚠️ Commission calculation error (non-blocking):', commissionError);
+                // Don't fail order creation if commission calculation fails
+            }
+
+            // Update inventory only for successful or COD orders
+            if (shouldAffectInventory) {
+                console.log('📦 Updating inventory for order...');
+                for (let i = 0; i < request.body.products.length; i++) {
+                    const orderProduct = request.body.products[i];
+                    
+                    // Get product from database within transaction (with fresh read to prevent race conditions)
+                    const product = await ProductModel.findById(orderProduct.productId).session(session);
+                    
+                    if (!product) {
+                        console.error(`Product not found during stock update: ${orderProduct.productId}`);
+                        throw new Error(`Product not found during stock update: ${orderProduct.productId}`);
+                    }
+                    
+                    // Re-validate stock one more time within transaction to prevent race conditions
+                    if (orderProduct.productType === 'variable' && orderProduct.variationId) {
+                        const variation = product.variations?.find(
+                            v => v._id && v._id.toString() === orderProduct.variationId.toString()
+                        );
+                        if (variation && (variation.stock || 0) < orderProduct.quantity) {
+                            throw new Error(`Insufficient stock for variation ${orderProduct.variationId}: requested ${orderProduct.quantity}, available ${variation.stock}`);
+                        }
+                    } else {
+                        if ((product.countInStock || 0) < orderProduct.quantity) {
+                            throw new Error(`Insufficient stock for product ${orderProduct.productId}: requested ${orderProduct.quantity}, available ${product.countInStock}`);
+                        }
+                    }
+                    
+                    // ========================================
+                    // HANDLE VARIABLE PRODUCTS
+                    // ========================================
+                    if (orderProduct.productType === 'variable' && orderProduct.variationId) {
+                        // Find the specific variation
+                        const variationIndex = product.variations?.findIndex(
+                            v => v._id && v._id.toString() === orderProduct.variationId
+                        );
                         
-                        // Also update total product stock (sum of all variations)
-                        const totalStock = product.variations.reduce((sum, v) => sum + (v.stock || 0), 0);
-                        product.countInStock = totalStock;
+                        if (variationIndex !== -1 && product.variations) {
+                            // Update variation stock
+                            const currentVariationStock = product.variations[variationIndex].stock || 0;
+                            const newVariationStock = Math.max(0, currentVariationStock - orderProduct.quantity);
+                            
+                            product.variations[variationIndex].stock = newVariationStock;
+                            
+                            // Update variation stock status
+                            if (newVariationStock <= 0) {
+                                product.variations[variationIndex].stockStatus = 'out_of_stock';
+                            }
+                            
+                            // Also update total product stock (sum of all variations)
+                            const totalStock = product.variations.reduce((sum, v) => sum + (v.stock || 0), 0);
+                            product.countInStock = totalStock;
+                            
+                            // Update product stock status
+                            if (totalStock <= 0) {
+                                product.stockStatus = 'out_of_stock';
+                            }
+                            
+                            console.log(`Updated variation stock: Product ${orderProduct.productId}, Variation ${orderProduct.variationId}, New stock: ${newVariationStock}`);
+                        } else {
+                            console.error(`Variation not found: ${orderProduct.variationId}`);
+                            throw new Error(`Variation not found: ${orderProduct.variationId}`);
+                        }
+                    }
+                    // ========================================
+                    // HANDLE SIMPLE PRODUCTS
+                    // ========================================
+                    else {
+                        // Update product stock directly
+                        const currentStock = product.countInStock || 0;
+                        const newStock = Math.max(0, currentStock - orderProduct.quantity);
                         
-                        // Update product stock status
-                        if (totalStock <= 0) {
+                        product.countInStock = newStock;
+                        
+                        // Update stock status
+                        if (newStock <= 0) {
                             product.stockStatus = 'out_of_stock';
                         }
                         
-                        console.log(`Updated variation stock: Product ${orderProduct.productId}, Variation ${orderProduct.variationId}, New stock: ${newVariationStock}`);
-                    } else {
-                        console.error(`Variation not found: ${orderProduct.variationId}`);
-                    }
-                }
-                // ========================================
-                // HANDLE SIMPLE PRODUCTS
-                // ========================================
-                else {
-                    // Update product stock directly
-                    const currentStock = product.countInStock || 0;
-                    const newStock = Math.max(0, currentStock - orderProduct.quantity);
-                    
-                    product.countInStock = newStock;
-                    
-                    // Update stock status
-                    if (newStock <= 0) {
-                        product.stockStatus = 'out_of_stock';
+                        console.log(`Updated product stock: Product ${orderProduct.productId}, New stock: ${newStock}`);
                     }
                     
-                    console.log(`Updated product stock: Product ${orderProduct.productId}, New stock: ${newStock}`);
+                    // ========================================
+                    // UPDATE SALES COUNT
+                    // ========================================
+                    product.sale = (product.sale || 0) + orderProduct.quantity;
+                    product.totalSales = (product.totalSales || 0) + orderProduct.quantity;
+                    
+                    // Save product with updated stock within transaction
+                    await product.save({ session });
                 }
-                
-                // ========================================
-                // UPDATE SALES COUNT
-                // ========================================
-                product.sale = (product.sale || 0) + orderProduct.quantity;
-                product.totalSales = (product.totalSales || 0) + orderProduct.quantity;
-                
-                // Save product with updated stock
-                await product.save();
+                console.log('✅ Inventory updated successfully');
             }
+
+            // Commit transaction - all operations succeed together or fail together
+            await session.commitTransaction();
+            console.log('✅ Transaction committed successfully');
+        } catch (transactionError) {
+            // Rollback transaction on any error
+            await session.abortTransaction();
+            console.error('❌ Transaction aborted due to error:', transactionError);
+            
+            // If order was created, try to delete it
+            if (order && order._id) {
+                try {
+                    await OrderModel.findByIdAndDelete(order._id);
+                    console.log('✅ Cleaned up order after transaction failure:', order._id);
+                } catch (cleanupError) {
+                    console.error('⚠️ Failed to cleanup order after transaction failure:', cleanupError);
+                }
+            }
+            
+            // Return appropriate error response
+            return response.status(500).json({
+                error: true,
+                success: false,
+                message: transactionError.message || 'Failed to create order. Please try again.',
+                details: process.env.NODE_ENV === 'development' ? transactionError.stack : undefined
+            });
+        } finally {
+            // End session
+            session.endSession();
         }
 
-        // Send email only for non-failed orders
+        // Send emails asynchronously (fire and forget) - NEVER block order success
+        // If payment succeeded, order MUST succeed regardless of email failures
         if (shouldAffectInventory) {
-            // Get user email - either from logged-in user or guest customer
-            let userEmail = null;
-            let userName = null;
-            let userInfo = null;
-            
-            if (request.body.userId) {
-                const user = await UserModel.findOne({ _id: request.body.userId });
-                if (user?.email) {
-                    userEmail = user.email;
-                    userName = user.name;
-                    userInfo = {
-                        name: user.name,
-                        email: user.email,
-                        mobile: user.mobile,
-                        phone: user.mobile
-                    };
-                }
-            } else if (request.body.guestCustomer?.email) {
-                // Guest checkout
-                userEmail = request.body.guestCustomer.email;
-                userName = request.body.guestCustomer.name;
-                userInfo = {
-                    name: request.body.guestCustomer.name,
-                    email: request.body.guestCustomer.email,
-                    phone: request.body.guestCustomer.phone
-                };
-            }
-            
-            // Send customer confirmation email
-            if (userEmail) {
-                console.log('📧 Preparing to send order confirmation email to:', userEmail);
-                const recipients = [userEmail];
+            // Run email sending in background - don't await
+            (async () => {
                 try {
-                    const emailResult = await sendEmailFun({
-                        sendTo: recipients,
-                        subject: "Order Confirmation - Zuba House",
-                        text: "",
-                        html: OrderConfirmationEmail(userName || 'Customer', order)
-                    });
-                    console.log('✅ Customer confirmation email sent successfully:', {
-                        to: userEmail,
-                        result: emailResult
-                    });
-                } catch (emailError) {
-                    console.error('❌ Failed to send customer confirmation email:', {
-                        to: userEmail,
-                        error: emailError.message,
-                        stack: emailError.stack
-                    });
-                    // Don't fail order creation if email fails
-                }
-            } else {
-                console.warn('⚠️ No user email found - skipping customer confirmation email');
-            }
-
-            // Send admin notification email
-            try {
-                const adminEmail = process.env.ADMIN_EMAIL || 'sales@zubahouse.com';
-                console.log('📧 Preparing to send admin notification email to:', adminEmail);
-                
-                // Get shipping address if available - prefer order.shippingAddress, then fetch from delivery_address
-                let shippingAddress = null;
-                if (order.shippingAddress) {
-                    // Use shipping address stored directly in order
-                    shippingAddress = order.shippingAddress;
-                } else if (order.delivery_address) {
-                    try {
-                        shippingAddress = await AddressModel.findById(order.delivery_address);
-                    } catch (addrError) {
-                        console.log('Could not fetch shipping address:', addrError.message);
+                    // Get user email - either from logged-in user or guest customer
+                    let userEmail = null;
+                    let userName = null;
+                    let userInfo = null;
+                    
+                    if (request.body.userId) {
+                        try {
+                            const user = await UserModel.findOne({ _id: request.body.userId });
+                            if (user?.email) {
+                                userEmail = user.email;
+                                userName = user.name;
+                                userInfo = {
+                                    name: user.name,
+                                    email: user.email,
+                                    mobile: user.mobile,
+                                    phone: user.mobile
+                                };
+                            }
+                        } catch (userError) {
+                            console.warn('⚠️ Could not fetch user for email:', userError.message);
+                        }
+                    } else if (request.body.guestCustomer?.email) {
+                        // Guest checkout
+                        userEmail = request.body.guestCustomer.email;
+                        userName = request.body.guestCustomer.name;
+                        userInfo = {
+                            name: request.body.guestCustomer.name,
+                            email: request.body.guestCustomer.email,
+                            phone: request.body.guestCustomer.phone
+                        };
                     }
-                }
+                    
+                    // Send customer confirmation email (non-blocking)
+                    if (userEmail) {
+                        console.log('📧 Preparing to send order confirmation email to:', userEmail);
+                        sendEmailFun({
+                            sendTo: [userEmail],
+                            subject: "Order Confirmation - Zuba House",
+                            text: "",
+                            html: OrderConfirmationEmail(userName || 'Customer', order)
+                        }).then((emailResult) => {
+                            console.log('✅ Customer confirmation email sent successfully:', {
+                                to: userEmail,
+                                result: emailResult
+                            });
+                        }).catch((emailError) => {
+                            console.error('❌ Failed to send customer confirmation email (non-critical):', {
+                                to: userEmail,
+                                error: emailError.message
+                            });
+                        });
+                    } else {
+                        console.warn('⚠️ No user email found - skipping customer confirmation email');
+                    }
 
-                const adminEmailResult = await sendEmailFun({
-                    sendTo: [adminEmail],
-                    subject: `New Order #${order._id} - ${userName || 'Guest Customer'}`,
-                    text: "",
-                    html: AdminOrderNotificationEmail(order, userInfo, shippingAddress)
-                });
-                console.log('✅ Admin notification email sent successfully:', {
-                    to: adminEmail,
-                    result: adminEmailResult
-                });
-            } catch (adminEmailError) {
-                console.error('❌ Error sending admin notification email:', {
-                    error: adminEmailError.message,
-                    stack: adminEmailError.stack
-                });
-                // Don't fail order creation if admin email fails
-            }
+                    // Send admin notification email (non-blocking)
+                    try {
+                        const adminEmail = process.env.ADMIN_EMAIL || 'sales@zubahouse.com';
+                        console.log('📧 Preparing to send admin notification email to:', adminEmail);
+                        
+                        // Get shipping address if available - prefer order.shippingAddress, then fetch from delivery_address
+                        let shippingAddress = null;
+                        if (order.shippingAddress) {
+                            // Use shipping address stored directly in order
+                            shippingAddress = order.shippingAddress;
+                        } else if (order.delivery_address) {
+                            try {
+                                shippingAddress = await AddressModel.findById(order.delivery_address);
+                            } catch (addrError) {
+                                console.log('Could not fetch shipping address:', addrError.message);
+                            }
+                        }
+
+                        sendEmailFun({
+                            sendTo: [adminEmail],
+                            subject: `New Order #${order._id} - ${userName || 'Guest Customer'}`,
+                            text: "",
+                            html: AdminOrderNotificationEmail(order, userInfo, shippingAddress)
+                        }).then((adminEmailResult) => {
+                            console.log('✅ Admin notification email sent successfully:', {
+                                to: adminEmail,
+                                result: adminEmailResult
+                            });
+                        }).catch((adminEmailError) => {
+                            console.error('❌ Error sending admin notification email (non-critical):', {
+                                error: adminEmailError.message
+                            });
+                        });
+                    } catch (adminEmailError) {
+                        console.error('❌ Error preparing admin email (non-critical):', adminEmailError.message);
+                    }
+                } catch (emailPrepError) {
+                    console.error('❌ Error in email preparation (non-critical):', emailPrepError.message);
+                }
+            })(); // Fire and forget - don't await
         }
 
 
@@ -533,9 +591,75 @@ export const createOrderController = async (request, response) => {
         console.error('❌ Order creation error:', {
             message: error.message,
             stack: error.stack,
-            body: request.body
+            body: request.body,
+            paymentStatus: request.body.payment_status
         });
         
+        // CRITICAL: If payment succeeded, we MUST NOT fail the order
+        // Try to create order anyway with minimal validation
+        const paymentStatus = (request.body.payment_status || '').toUpperCase();
+        if (paymentStatus === 'COMPLETED' || paymentStatus === 'SUCCEEDED') {
+            console.warn('⚠️ Payment succeeded but order creation had error. Attempting emergency order creation...');
+            
+            try {
+                // Emergency order creation - minimal validation, just save the order
+                const emergencyOrder = new OrderModel({
+                    userId: request.body.userId || null,
+                    products: request.body.products || [],
+                    paymentId: request.body.paymentId || '',
+                    payment_status: 'COMPLETED',
+                    delivery_address: request.body.delivery_address || null,
+                    totalAmt: request.body.totalAmt || 0,
+                    shippingCost: request.body.shippingCost || 0,
+                    shippingRate: request.body.shippingRate || null,
+                    shippingAddress: request.body.shippingAddress || null,
+                    phone: request.body.phone || '',
+                    customerName: request.body.customerName || '',
+                    apartmentNumber: request.body.apartmentNumber || '',
+                    deliveryNote: request.body.deliveryNote || '',
+                    date: request.body.date || new Date().toLocaleString("en-US", {
+                        month: "short",
+                        day: "2-digit",
+                        year: "numeric",
+                    }),
+                    isGuestOrder: request.body.isGuestOrder || false,
+                    guestCustomer: request.body.guestCustomer || null,
+                    discounts: request.body.discounts || null,
+                    status: 'Received',
+                    statusHistory: [{
+                        status: 'Received',
+                        timestamp: new Date(),
+                        updatedBy: request.userId || null
+                    }],
+                    emergencyCreated: true, // Flag to indicate this was emergency creation
+                    originalError: error.message
+                });
+                
+                const savedEmergencyOrder = await emergencyOrder.save();
+                console.log('✅ Emergency order created successfully:', savedEmergencyOrder._id);
+                
+                return response.status(200).json({
+                    error: false,
+                    success: true,
+                    message: "Order Placed Successfully (Emergency Mode)",
+                    order: savedEmergencyOrder,
+                    orderId: savedEmergencyOrder._id,
+                    warning: "Order created in emergency mode due to validation error, but payment succeeded"
+                });
+            } catch (emergencyError) {
+                console.error('❌ Emergency order creation also failed:', emergencyError);
+                // Even emergency creation failed - return error but log payment ID for manual recovery
+                return response.status(500).json({
+                    error: true,
+                    success: false,
+                    message: 'Order creation failed. Payment succeeded. Please contact support with Payment ID: ' + (request.body.paymentId || 'N/A'),
+                    paymentId: request.body.paymentId,
+                    details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                });
+            }
+        }
+        
+        // If payment didn't succeed, return normal error
         return response.status(500).json({
             error: true,
             success: false,
@@ -844,8 +968,9 @@ export const updateOrderStatusController = async (request, response) => {
                         // Populate products for email template
                         const populatedOrder = await savedOrder.populate('products.productId');
                         
-                        const emailSubject = `Order Status Update - Order #${savedOrder._id.toString().slice(-8).toUpperCase()}`;
-                        const emailText = `Your order #${savedOrder._id.toString().slice(-8).toUpperCase()} status has been updated to ${newStatus}.`;
+                        // Use full order ID for consistency with order confirmation email
+                        const emailSubject = `Order Status Update - Order #${savedOrder._id.toString()}`;
+                        const emailText = `Your order #${savedOrder._id.toString()} status has been updated to ${newStatus}.`;
                         
                         console.log('📧 Calling sendEmail function...');
                         const emailResult = await sendEmail(

@@ -341,6 +341,15 @@ const orderSchema = new mongoose.Schema({
     reviewRequestsSentAt: {
         type: Date,
         default: null
+    },
+    // Emergency order creation flag (for orders created when payment succeeded but validation had issues)
+    emergencyCreated: {
+        type: Boolean,
+        default: false
+    },
+    originalError: {
+        type: String,
+        default: null
     }
 }, {
     timestamps: true

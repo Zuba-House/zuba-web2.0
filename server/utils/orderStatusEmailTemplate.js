@@ -56,7 +56,8 @@ const OrderStatusEmailTemplate = (order, newStatus) => {
   };
 
   const statusInfo = statusMessages[newStatus] || statusMessages['Received'];
-  const orderId = order._id.toString().slice(-8).toUpperCase();
+  // Use full order ID for consistency - same as order confirmation email
+  const orderId = order._id.toString();
   const orderDate = new Date(order.createdAt).toLocaleDateString('en-US', { 
     year: 'numeric', 
     month: 'long', 

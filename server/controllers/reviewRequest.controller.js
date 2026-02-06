@@ -7,7 +7,29 @@ import sendEmailFun from '../config/sendEmail.js';
 import { ReviewRequestEmailTemplate } from '../utils/reviewRequestEmailTemplate.js';
 import crypto from 'crypto';
 
-const CLIENT_URL = process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+/**
+ * Get the customer frontend URL (never vendor URL)
+ * Ensures review links always point to the customer-facing website
+ */
+const getCustomerFrontendUrl = () => {
+    const vendorUrl = process.env.VENDOR_URL || 'https://vendor.zubahouse.com';
+    let clientUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+    
+    // Safety check: If CLIENT_URL is accidentally set to vendor URL, use fallback
+    if (clientUrl.includes('vendor.zubahouse.com') || clientUrl.includes('/vendor')) {
+        console.warn('⚠️ CLIENT_URL appears to be vendor URL, using fallback to customer frontend');
+        clientUrl = process.env.FRONTEND_URL || 'https://zubahouse.com';
+    }
+    
+    // Additional check: If it's still vendor URL, use production customer URL
+    if (clientUrl.includes('vendor')) {
+        clientUrl = 'https://zubahouse.com';
+    }
+    
+    return clientUrl;
+};
+
+const CLIENT_URL = getCustomerFrontendUrl();
 
 /**
  * Generate a secure token for review request
@@ -126,6 +148,12 @@ export const sendReviewRequests = async (req, res) => {
                         const reviewToken = generateReviewToken();
                         const reviewLink = `${CLIENT_URL}/review/${reviewToken}?orderId=${order._id}&productId=${orderItem.productId}`;
                         const productLink = `${CLIENT_URL}/product/${orderItem.productId}`;
+                        
+                        // Log review link for debugging (verify it's not vendor URL)
+                        console.log(`📧 Review link generated for ${customerEmail}: ${reviewLink}`);
+                        if (reviewLink.includes('vendor')) {
+                            console.error('❌ ERROR: Review link contains vendor URL! This should not happen.');
+                        }
 
                         const reviewRequest = new ReviewRequestModel({
                             orderId: order._id,
