@@ -574,7 +574,9 @@ export const createOrderController = async (request, response) => {
 
         // Send failed order notification email if payment failed
         // This runs asynchronously and doesn't block order creation
-        if (paymentStatus === 'FAILED' && order.failedOrderNotificationEnabled !== false) {
+        // Check if notifications are enabled (default to true for backward compatibility)
+        const notificationsEnabled = order.failedOrderNotificationEnabled !== false;
+        if (paymentStatus === 'FAILED' && notificationsEnabled) {
             (async () => {
                 try {
                     // Use the sendFailedOrderNotification logic but call it directly
@@ -598,20 +600,23 @@ export const createOrderController = async (request, response) => {
                     }
 
                     if (customerEmail) {
-                        // Check total emails sent to this customer across all failed orders
+                        // Check total emails sent to this customer across all failed orders (excluding current order)
                         const customerEmailLower = customerEmail.toLowerCase();
                         const allFailedOrders = await OrderModel.find({
                             $or: [
                                 { userId: order.userId },
                                 { 'guestCustomer.email': { $regex: new RegExp(customerEmailLower, 'i') } }
                             ],
-                            payment_status: 'FAILED'
+                            payment_status: 'FAILED',
+                            _id: { $ne: order._id } // Exclude current order
                         }).select('failedOrderNotificationsSent');
 
-                        const totalEmailsSent = allFailedOrders.reduce((sum, o) => sum + (o.failedOrderNotificationsSent || 0), 0);
+                        const totalEmailsSentFromOtherOrders = allFailedOrders.reduce((sum, o) => sum + (o.failedOrderNotificationsSent || 0), 0);
+                        const currentOrderEmailsSent = order.failedOrderNotificationsSent || 0;
+                        const totalEmailsSent = totalEmailsSentFromOtherOrders + currentOrderEmailsSent;
 
-                        // Only send if we haven't reached the limit of 3 emails
-                        if (totalEmailsSent < 3 && (order.failedOrderNotificationsSent || 0) < 3) {
+                        // Only send if we haven't reached the limit of 3 emails total
+                        if (totalEmailsSent < 3) {
                             const websiteUrl = process.env.WEBSITE_URL || process.env.CLIENT_URL || 'https://zubahouse.com';
                             
                             const emailHtml = FailedOrderEmailTemplate({
