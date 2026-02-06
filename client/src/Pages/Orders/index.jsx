@@ -25,11 +25,26 @@ const Orders = () => {
 
 
   useEffect(() => {
-    fetchDataFromApi(`/api/order/order-list/orders?page=${page}&limit=5`).then((res) => {
-      if (res?.error === false) {
-        setOrders(res)
+    const fetchOrders = async () => {
+      try {
+        const res = await fetchDataFromApi(`/api/order/order-list/orders?page=${page}&limit=5`);
+        console.log('📦 Orders response:', res);
+        
+        if (res?.error === false && res?.success !== false) {
+          setOrders(res);
+        } else {
+          console.error('❌ Error fetching orders:', res);
+          // Set empty orders on error
+          setOrders({ data: [], total: 0, totalPages: 0 });
+        }
+      } catch (error) {
+        console.error('❌ Error fetching orders:', error);
+        // Set empty orders on error
+        setOrders({ data: [], total: 0, totalPages: 0 });
       }
-    })
+    };
+    
+    fetchOrders();
   }, [page])
 
   return (
@@ -44,10 +59,16 @@ const Orders = () => {
             <div className="py-5 px-5 border-b border-[rgba(0,0,0,0.1)]">
               <h2>My Orders</h2>
               <p className="mt-0 mb-0">
-                There are <span className="font-bold text-primary">{ orders?.data?.length}</span>{" "}
+                There are <span className="font-bold text-primary">{ orders?.data?.length || 0}</span>{" "}
                 orders
               </p>
 
+              {(!orders?.data || orders.data.length === 0) ? (
+                <div className="mt-5 p-8 text-center">
+                  <p className="text-gray-500 text-lg">No orders found</p>
+                  <p className="text-gray-400 text-sm mt-2">Your orders will appear here once you place an order.</p>
+                </div>
+              ) : (
               <div className="relative overflow-x-auto mt-5">
                 <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
                   <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
@@ -292,6 +313,7 @@ const Orders = () => {
                   </tbody>
                 </table>
               </div>
+              )}
 
 
               {

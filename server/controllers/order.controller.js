@@ -700,15 +700,84 @@ export async function getOrderDetailsController(request, response) {
 
 export async function getUserOrderDetailsController(request, response) {
     try {
-        const userId = request.userId // order id
+        const userId = request.userId; // User ID from auth middleware
+        
+        if (!userId) {
+            return response.status(401).json({
+                message: "User authentication required",
+                error: true,
+                success: false
+            });
+        }
 
-        const { page, limit } = request.query;
+        const { page = 1, limit = 5 } = request.query;
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
 
-        const orderlist = await OrderModel.find({ userId: userId }).sort({ createdAt: -1 }).populate('delivery_address userId').skip((page - 1) * limit).limit(parseInt(limit));
+        // Get user email to also fetch guest orders with matching email
+        let userEmail = null;
+        try {
+            const user = await UserModel.findById(userId).select('email');
+            if (user?.email) {
+                userEmail = user.email.toLowerCase();
+            }
+        } catch (userError) {
+            console.warn('Could not fetch user email for guest order matching:', userError.message);
+        }
 
-        const orderTotal = await OrderModel.find({ userId: userId }).sort({ createdAt: -1 }).populate('delivery_address userId');
+        // Build query: orders where userId matches (handle both ObjectId and string)
+        // Also include guest orders with matching email
+        let userIdQuery;
+        
+        // Handle both ObjectId and string formats
+        try {
+            if (mongoose.Types.ObjectId.isValid(userId)) {
+                userIdQuery = { userId: new mongoose.Types.ObjectId(userId) };
+            } else {
+                userIdQuery = { userId: userId };
+            }
+        } catch {
+            userIdQuery = { userId: userId };
+        }
+        
+        const query = {
+            $or: [
+                userIdQuery
+            ]
+        };
+        
+        // Also include guest orders with matching email if user email is available
+        if (userEmail) {
+            query.$or.push({
+                isGuestOrder: true,
+                'guestCustomer.email': { $regex: new RegExp(userEmail, 'i') }
+            });
+        }
 
-        const total = await orderTotal?.length;
+        console.log('🔍 Fetching orders for user:', {
+            userId,
+            userEmail,
+            query: JSON.stringify(query)
+        });
+
+        // Get paginated orders
+        const orderlist = await OrderModel.find(query)
+            .sort({ createdAt: -1 })
+            .populate('delivery_address userId')
+            .skip(skip)
+            .limit(limitNum)
+            .lean(); // Use lean() for better performance
+
+        // Get total count for pagination
+        const total = await OrderModel.countDocuments(query);
+
+        console.log('✅ Found orders:', {
+            count: orderlist.length,
+            total,
+            page: pageNum,
+            totalPages: Math.ceil(total / limitNum)
+        });
 
         return response.json({
             message: "order list",
@@ -716,15 +785,16 @@ export async function getUserOrderDetailsController(request, response) {
             error: false,
             success: true,
             total: total,
-            page: parseInt(page),
-            totalPages: Math.ceil(total / limit)
-        })
+            page: pageNum,
+            totalPages: Math.ceil(total / limitNum)
+        });
     } catch (error) {
+        console.error('❌ Error fetching user orders:', error);
         return response.status(500).json({
             message: error.message || error,
             error: true,
             success: false
-        })
+        });
     }
 }
 
