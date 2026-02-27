@@ -874,6 +874,118 @@ ProductSchema.statics.generateUniqueSlug = async function(baseSlug, excludeId = 
   }
 };
 
+/**
+ * Generate a unique SKU by checking for duplicates in products and variations
+ * @param {String} baseSku - The base SKU to make unique (optional)
+ * @param {String} excludeId - Product ID to exclude from duplicate check (for updates)
+ * @param {Array} excludeVariationSkus - Array of variation SKUs to exclude (for updates)
+ * @returns {Promise<String>} - A unique SKU
+ */
+ProductSchema.statics.generateUniqueSku = async function(baseSku = null, excludeId = null, excludeVariationSkus = []) {
+  // If no base SKU provided, generate one from timestamp
+  let sku = baseSku;
+  if (!sku || !sku.trim()) {
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+    sku = `SKU-${timestamp}-${random}`;
+  } else {
+    // Normalize the SKU (uppercase, trim)
+    sku = sku.trim().toUpperCase();
+  }
+  
+  // Check if SKU exists in product-level
+  const productQuery = { sku: sku };
+  if (excludeId) {
+    productQuery._id = { $ne: excludeId };
+  }
+  
+  const existingProduct = await this.findOne(productQuery);
+  
+  // Check if SKU exists in any variation (embedded variations)
+  const variationQuery = { 'variations.sku': sku };
+  if (excludeId) {
+    variationQuery._id = { $ne: excludeId };
+  }
+  
+  const existingVariation = await this.findOne(variationQuery);
+  
+  // If SKU doesn't exist and not in exclude list, return it
+  const normalizedExcludeList = excludeVariationSkus.map(s => s ? s.trim().toUpperCase() : null).filter(Boolean);
+  if (!existingProduct && !existingVariation && !normalizedExcludeList.includes(sku)) {
+    return sku;
+  }
+  
+  // If SKU exists, append a number and try again
+  let counter = 2;
+  let baseSkuPart = baseSku ? baseSku.trim().toUpperCase() : sku.split('-').slice(0, -1).join('-') || sku;
+  let uniqueSku = `${baseSkuPart}-${counter}`;
+  
+  // If no base SKU was provided, use the generated SKU as base
+  if (!baseSku) {
+    baseSkuPart = sku;
+    uniqueSku = `${baseSkuPart}-${counter}`;
+  }
+  
+  while (true) {
+    const checkProductQuery = { sku: uniqueSku };
+    const checkVariationQuery = { 'variations.sku': uniqueSku };
+    
+    if (excludeId) {
+      checkProductQuery._id = { $ne: excludeId };
+      checkVariationQuery._id = { $ne: excludeId };
+    }
+    
+    const productExists = await this.findOne(checkProductQuery);
+    const variationExists = await this.findOne(checkVariationQuery);
+    const inExcludeList = normalizedExcludeList.includes(uniqueSku);
+    
+    if (!productExists && !variationExists && !inExcludeList) {
+      return uniqueSku;
+    }
+    
+    counter++;
+    uniqueSku = `${baseSkuPart}-${counter}`;
+    
+    // Safety limit to prevent infinite loops
+    if (counter > 10000) {
+      // Fallback to timestamp-based SKU
+      const timestamp = Date.now().toString(36).toUpperCase();
+      const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+      return `SKU-${timestamp}-${random}`;
+    }
+  }
+};
+
+/**
+ * Check if a SKU is unique (not used in products or variations)
+ * @param {String} sku - The SKU to check
+ * @param {String} excludeId - Product ID to exclude from check (for updates)
+ * @returns {Promise<Boolean>} - True if SKU is unique, false otherwise
+ */
+ProductSchema.statics.isSkuUnique = async function(sku, excludeId = null) {
+  if (!sku || !sku.trim()) {
+    return true; // Empty SKU is considered unique (sparse index)
+  }
+  
+  const normalizedSku = sku.trim().toUpperCase();
+  
+  // Check product-level SKU
+  const productQuery = { sku: normalizedSku };
+  if (excludeId) {
+    productQuery._id = { $ne: excludeId };
+  }
+  const existingProduct = await this.findOne(productQuery);
+  
+  // Check variation-level SKU
+  const variationQuery = { 'variations.sku': normalizedSku };
+  if (excludeId) {
+    variationQuery._id = { $ne: excludeId };
+  }
+  const existingVariation = await this.findOne(variationQuery);
+  
+  return !existingProduct && !existingVariation;
+};
+
 // ============================================
 // MIDDLEWARE
 // ============================================

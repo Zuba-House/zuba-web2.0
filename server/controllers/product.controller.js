@@ -648,6 +648,81 @@ export async function createProduct(request, response) {
             });
         }
 
+        // Validate and generate unique SKU for product-level
+        if (productData.sku && productData.sku.trim()) {
+            const isUnique = await ProductModel.isSkuUnique(productData.sku);
+            if (!isUnique) {
+                // Generate a unique SKU based on the provided one
+                productData.sku = await ProductModel.generateUniqueSku(productData.sku);
+            } else {
+                // Normalize SKU (uppercase, trim)
+                productData.sku = productData.sku.trim().toUpperCase();
+            }
+        } else if (productData.productType === 'simple') {
+            // Auto-generate SKU for simple products if not provided
+            const baseSku = productData.name
+                ? productData.name.substring(0, 10).toUpperCase().replace(/[^A-Z0-9]/g, '') || 'PROD'
+                : 'PROD';
+            productData.sku = await ProductModel.generateUniqueSku(baseSku);
+        }
+
+        // Validate and generate unique SKUs for variations
+        if (productData.variations && productData.variations.length > 0) {
+            const variationSkus = [];
+            for (let i = 0; i < productData.variations.length; i++) {
+                const variation = productData.variations[i];
+                if (variation.sku && variation.sku.trim()) {
+                    // Normalize the variation SKU
+                    let normalizedVariationSku = variation.sku.trim().toUpperCase();
+                    
+                    // Check if this variation SKU conflicts with product SKU
+                    if (productData.sku && normalizedVariationSku === productData.sku) {
+                        // Conflict with product SKU, generate new one
+                        normalizedVariationSku = await ProductModel.generateUniqueSku(variation.sku, null, [...variationSkus, productData.sku]);
+                    } 
+                    // Check if variation SKU conflicts with other variations in this product
+                    else if (variationSkus.includes(normalizedVariationSku)) {
+                        // Conflict with another variation in the same product, generate new one
+                        normalizedVariationSku = await ProductModel.generateUniqueSku(variation.sku, null, [...variationSkus, productData.sku].filter(Boolean));
+                    }
+                    // Check if variation SKU exists in database
+                    else {
+                        const isUnique = await ProductModel.isSkuUnique(normalizedVariationSku);
+                        if (!isUnique) {
+                            // SKU exists in database, generate new one
+                            normalizedVariationSku = await ProductModel.generateUniqueSku(variation.sku, null, [...variationSkus, productData.sku].filter(Boolean));
+                        }
+                    }
+                    
+                    variation.sku = normalizedVariationSku;
+                    variationSkus.push(variation.sku);
+                } else if (productData.productType === 'variable') {
+                    // Auto-generate SKU for variations if not provided
+                    const baseSku = productData.sku 
+                        ? `${productData.sku}-VAR${i + 1}`
+                        : (productData.name 
+                            ? `${productData.name.substring(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, '') || 'VAR'}-${i + 1}`
+                            : `VAR-${i + 1}`);
+                    const generatedSku = await ProductModel.generateUniqueSku(baseSku, null, [...variationSkus, productData.sku].filter(Boolean));
+                    variation.sku = generatedSku;
+                    variationSkus.push(variation.sku);
+                }
+            }
+        }
+
+        // Validate barcode uniqueness if provided
+        if (productData.barcode && productData.barcode.trim()) {
+            const existingBarcode = await ProductModel.findOne({ 
+                barcode: productData.barcode.trim() 
+            });
+            if (existingBarcode) {
+                // Barcode exists, set to null to avoid conflict (or generate unique one)
+                productData.barcode = null;
+            } else {
+                productData.barcode = productData.barcode.trim();
+            }
+        }
+
         let product = new ProductModel(productData);
         product = await product.save();
 
@@ -680,6 +755,29 @@ export async function createProduct(request, response) {
 
 
     } catch (error) {
+        // Handle duplicate key errors specifically
+        if (error.code === 11000 || (error.name === 'MongoServerError' && error.code === 11000)) {
+            const duplicateField = error.keyPattern ? Object.keys(error.keyPattern)[0] : 'unknown';
+            let errorMessage = 'Duplicate entry detected. ';
+            
+            if (duplicateField === 'sku') {
+                errorMessage += 'The SKU already exists. Please use a different SKU or leave it blank to auto-generate.';
+            } else if (duplicateField === 'barcode') {
+                errorMessage += 'The barcode already exists. Please use a different barcode or leave it blank.';
+            } else if (duplicateField === 'variations.sku') {
+                errorMessage += 'One or more variation SKUs already exist. Please use different SKUs or leave them blank to auto-generate.';
+            } else {
+                errorMessage += `Duplicate value for field: ${duplicateField}`;
+            }
+            
+            return response.status(409).json({
+                message: errorMessage,
+                error: true,
+                success: false,
+                duplicateField: duplicateField
+            });
+        }
+        
         return response.status(500).json({
             message: error.message || error,
             error: true,
@@ -1737,17 +1835,32 @@ export async function getProduct(request, response) {
 
         // Check if product is available for public viewing
         // Vendor products must be approved AND published
+        // Platform products (non-vendor) only need to be published
         const isVendorProduct = product.productOwnerType === 'VENDOR';
         const isApproved = product.approvalStatus === 'APPROVED' || !product.approvalStatus;
         const isPublished = product.status === 'published';
         
-        if (isVendorProduct && (!isApproved || !isPublished)) {
-            // Product is not available for public viewing
-            return response.status(404).json({
-                message: "This product is not available",
-                error: true,
-                success: false
-            })
+        // Check if user is admin or marketing manager (they can see all products)
+        const isAdminOrMarketingManager = request.userId && 
+            (request.user?.role?.toUpperCase() === 'ADMIN' || request.user?.role?.toUpperCase() === 'MARKETING_MANAGER');
+        
+        // Only enforce visibility rules for non-admin users
+        if (!isAdminOrMarketingManager) {
+            if (isVendorProduct && (!isApproved || !isPublished)) {
+                // Vendor product is not available for public viewing
+                return response.status(404).json({
+                    message: "This product is not available",
+                    error: true,
+                    success: false
+                })
+            } else if (!isVendorProduct && !isPublished) {
+                // Platform product must be published
+                return response.status(404).json({
+                    message: "This product is not available",
+                    error: true,
+                    success: false
+                })
+            }
         }
 
         // Convert to plain object to ensure all fields are serialized
