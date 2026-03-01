@@ -807,18 +807,32 @@ export async function getAllProducts(request, response) {
             // Public users only see published products
             query.status = 'published';
             
-            // Also filter by approval status - only show approved products to public
-            // Products without approvalStatus field are considered approved (legacy products)
+            // Visibility logic: Show all published products EXCEPT unapproved vendor products
+            // This means:
+            // - Platform products (non-vendor) always show if published
+            // - Products without productOwnerType always show if published (legacy)
+            // - Vendor products only show if approved (or have no approvalStatus for legacy)
             query.$and = query.$and || [];
             query.$and.push({
                 $or: [
-                    { approvalStatus: 'APPROVED' },
-                    { approvalStatus: { $exists: false } }, // Legacy products without approvalStatus
-                    { productOwnerType: { $ne: 'VENDOR' } } // Platform products are always visible
+                    // Non-vendor products (platform or legacy without productOwnerType)
+                    { productOwnerType: { $ne: 'VENDOR' } },
+                    { productOwnerType: { $exists: false } },
+                    // Vendor products that are approved
+                    { 
+                        productOwnerType: 'VENDOR',
+                        $or: [
+                            { approvalStatus: 'APPROVED' },
+                            { approvalStatus: { $exists: false } } // Legacy vendor products
+                        ]
+                    }
                 ]
             });
         }
 
+        // Debug: Log the query being used
+        console.log('🔍 getAllProducts query:', JSON.stringify(query, null, 2));
+        
         const totalProducts = await ProductModel.find(query);
         const products = await ProductModel.find(query)
             .populate("vendor", "storeName storeSlug isVerified status")
@@ -827,6 +841,18 @@ export async function getAllProducts(request, response) {
             .limit(parseInt(limit));
 
         const total = await ProductModel.countDocuments(query);
+        
+        // Debug: Log results
+        console.log(`📦 getAllProducts: Found ${total} total products, returning ${products.length} products`);
+        if (products.length > 0) {
+            console.log('📦 Sample product:', {
+                id: products[0]._id,
+                name: products[0].name,
+                status: products[0].status,
+                productOwnerType: products[0].productOwnerType,
+                approvalStatus: products[0].approvalStatus
+            });
+        }
 
         return response.status(200).json({
             error: false,
@@ -891,9 +917,17 @@ export async function getAllProductsByCatId(request, response) {
                 { status: 'published' },
                 { 
                     $or: [
-                        { approvalStatus: 'APPROVED' },
-                        { approvalStatus: { $exists: false } },
-                        { productOwnerType: { $ne: 'VENDOR' } }
+                        // Platform products (non-vendor) are always visible if published
+                        { productOwnerType: { $ne: 'VENDOR' } },
+                        { productOwnerType: { $exists: false } }, // Legacy products without productOwnerType
+                        // Vendor products must be approved
+                        { 
+                            productOwnerType: 'VENDOR',
+                            $or: [
+                                { approvalStatus: 'APPROVED' },
+                                { approvalStatus: { $exists: false } } // Legacy vendor products without approvalStatus
+                            ]
+                        }
                     ]
                 }
             ]
@@ -1396,12 +1430,24 @@ export async function getAllFeaturedProducts(request, response) {
     try {
         // Only show published and approved featured products
         const products = await ProductModel.find({
-            isFeatured: true,
-            status: 'published',
-            $or: [
-                { approvalStatus: 'APPROVED' },
-                { approvalStatus: { $exists: false } },
-                { productOwnerType: { $ne: 'VENDOR' } }
+            $and: [
+                { isFeatured: true },
+                { status: 'published' },
+                { 
+                    $or: [
+                        // Platform products (non-vendor) are always visible if published
+                        { productOwnerType: { $ne: 'VENDOR' } },
+                        { productOwnerType: { $exists: false } }, // Legacy products without productOwnerType
+                        // Vendor products must be approved
+                        { 
+                            productOwnerType: 'VENDOR',
+                            $or: [
+                                { approvalStatus: 'APPROVED' },
+                                { approvalStatus: { $exists: false } } // Legacy vendor products without approvalStatus
+                            ]
+                        }
+                    ]
+                }
             ]
         })
             .populate("category")
@@ -1442,9 +1488,26 @@ export async function getSaleProducts(request, response) {
         const skip = (page - 1) * limit;
         const now = new Date();
 
-        // First, get all published products
+        // First, get all published products with proper visibility filters
         const baseQuery = {
-            status: 'published'
+            $and: [
+                { status: 'published' },
+                { 
+                    $or: [
+                        // Platform products (non-vendor) are always visible if published
+                        { productOwnerType: { $ne: 'VENDOR' } },
+                        { productOwnerType: { $exists: false } }, // Legacy products without productOwnerType
+                        // Vendor products must be approved
+                        { 
+                            productOwnerType: 'VENDOR',
+                            $or: [
+                                { approvalStatus: 'APPROVED' },
+                                { approvalStatus: { $exists: false } } // Legacy vendor products without approvalStatus
+                            ]
+                        }
+                    ]
+                }
+            ]
         };
 
         // Fetch more products than needed to filter
@@ -1640,12 +1703,24 @@ export async function getAllProductsBanners(request, response) {
     try {
         // Only show published and approved products for banners
         const products = await ProductModel.find({
-            isDisplayOnHomeBanner: true,
-            status: 'published',
-            $or: [
-                { approvalStatus: 'APPROVED' },
-                { approvalStatus: { $exists: false } },
-                { productOwnerType: { $ne: 'VENDOR' } }
+            $and: [
+                { isDisplayOnHomeBanner: true },
+                { status: 'published' },
+                { 
+                    $or: [
+                        // Platform products (non-vendor) are always visible if published
+                        { productOwnerType: { $ne: 'VENDOR' } },
+                        { productOwnerType: { $exists: false } }, // Legacy products without productOwnerType
+                        // Vendor products must be approved
+                        { 
+                            productOwnerType: 'VENDOR',
+                            $or: [
+                                { approvalStatus: 'APPROVED' },
+                                { approvalStatus: { $exists: false } } // Legacy vendor products without approvalStatus
+                            ]
+                        }
+                    ]
+                }
             ]
         }).populate("category");
 
@@ -3024,9 +3099,17 @@ export async function filters(request, response) {
     }
     filters.$and.push({
         $or: [
-            { approvalStatus: 'APPROVED' },
-            { approvalStatus: { $exists: false } },
-            { productOwnerType: { $ne: 'VENDOR' } }
+            // Platform products (non-vendor) are always visible if published
+            { productOwnerType: { $ne: 'VENDOR' } },
+            { productOwnerType: { $exists: false } }, // Legacy products without productOwnerType
+            // Vendor products must be approved
+            { 
+                productOwnerType: 'VENDOR',
+                $or: [
+                    { approvalStatus: 'APPROVED' },
+                    { approvalStatus: { $exists: false } } // Legacy vendor products without approvalStatus
+                ]
+            }
         ]
     });
 
