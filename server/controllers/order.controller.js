@@ -195,7 +195,9 @@ export const createOrderController = async (request, response) => {
                 }
 
                 const variationStock = variation.stock || 0;
-                if (variationStock < orderProduct.quantity) {
+                const hasEndlessStock = variation.endlessStock === true;
+                
+                if (!hasEndlessStock && variationStock < orderProduct.quantity) {
                     console.error(`❌ Order creation failed: Insufficient stock for variation: ${orderProduct.variationId}, requested: ${orderProduct.quantity}, available: ${variationStock}`);
                     return response.status(400).json({
                         error: true,
@@ -204,7 +206,7 @@ export const createOrderController = async (request, response) => {
                     });
                 }
 
-                if (variation.stockStatus === 'out_of_stock') {
+                if (!hasEndlessStock && variation.stockStatus === 'out_of_stock') {
                     console.error(`❌ Order creation failed: Variation out of stock: ${orderProduct.variationId}`);
                     return response.status(400).json({
                         error: true,
@@ -215,8 +217,17 @@ export const createOrderController = async (request, response) => {
             }
             // Validate stock for simple products
             else {
-                const productStock = product.countInStock || 0;
-                if (productStock < orderProduct.quantity) {
+                // Check stock from multiple possible locations (new and old structure)
+                const productStock = product.inventory?.stock !== undefined 
+                    ? product.inventory.stock 
+                    : (product.countInStock !== undefined 
+                        ? product.countInStock 
+                        : (product.stock !== undefined ? product.stock : 0));
+                
+                // Check if product has endless stock
+                const hasEndlessStock = product.inventory?.endlessStock === true || product.endlessStock === true;
+                
+                if (!hasEndlessStock && productStock < orderProduct.quantity) {
                     console.error(`❌ Order creation failed: Insufficient stock for product: ${orderProduct.productId}, requested: ${orderProduct.quantity}, available: ${productStock}`);
                     return response.status(400).json({
                         error: true,
@@ -225,8 +236,8 @@ export const createOrderController = async (request, response) => {
                     });
                 }
 
-                // Check stock status for simple products
-                if (product.inventory?.stockStatus === 'out_of_stock' || product.stockStatus === 'out_of_stock') {
+                // Check stock status for simple products (only if not endless stock)
+                if (!hasEndlessStock && (product.inventory?.stockStatus === 'out_of_stock' || product.stockStatus === 'out_of_stock')) {
                     console.error(`❌ Order creation failed: Product out of stock: ${orderProduct.productId}`);
                     return response.status(400).json({
                         error: true,
