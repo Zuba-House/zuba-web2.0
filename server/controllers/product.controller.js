@@ -447,9 +447,10 @@ export async function createProduct(request, response) {
             productOwnerType = 'PLATFORM';
             approvalStatus = 'APPROVED';
         } else if (isMarketingManager) {
-            // Marketing Manager products need approval (not full admin)
+            // Marketing Manager products are platform products - no approval needed
+            // They show immediately when published (visibility doesn't check approval for platform products)
             productOwnerType = 'PLATFORM';
-            approvalStatus = 'PENDING_REVIEW';
+            approvalStatus = 'APPROVED'; // Set to APPROVED for consistency, but not required for visibility
         }
         
         // Override if explicitly provided in request body (only full admins can override)
@@ -808,22 +809,20 @@ export async function getAllProducts(request, response) {
             query.status = 'published';
             
             // Visibility logic: Show all published products EXCEPT unapproved vendor products
-            // This means:
-            // - Platform products (non-vendor) always show if published
-            // - Products without productOwnerType always show if published (legacy)
-            // - Vendor products only show if approved (or have no approvalStatus for legacy)
+            // IMPORTANT: Platform products (non-vendor) ALWAYS show if published, regardless of approval status
+            // Only vendor products require approval
             query.$and = query.$and || [];
             query.$and.push({
                 $or: [
-                    // Non-vendor products (platform or legacy without productOwnerType)
+                    // Platform products (non-vendor) - ALWAYS visible if published (no approval needed)
                     { productOwnerType: { $ne: 'VENDOR' } },
-                    { productOwnerType: { $exists: false } },
-                    // Vendor products that are approved
+                    { productOwnerType: { $exists: false } }, // Legacy products without productOwnerType
+                    // Vendor products - only show if approved
                     { 
                         productOwnerType: 'VENDOR',
                         $or: [
                             { approvalStatus: 'APPROVED' },
-                            { approvalStatus: { $exists: false } } // Legacy vendor products
+                            { approvalStatus: { $exists: false } } // Legacy vendor products without approvalStatus
                         ]
                     }
                 ]
@@ -2288,18 +2287,29 @@ export async function updateProduct(request, response) {
         const isFullAdmin = request.isFullAdmin !== undefined ? request.isFullAdmin : (userRole === 'ADMIN');
         const isMarketingManager = request.isMarketingManager !== undefined ? request.isMarketingManager : (userRole === 'MARKETING_MANAGER');
         
-        // If status is being changed to 'published' by non-full-admin, require approval
+        // Handle approval status when publishing products
+        // IMPORTANT: Platform products (non-vendor) don't need approval - they show immediately when published
+        // Only vendor products need approval
         if (request.body.status === 'published' && existingProduct.status !== 'published') {
-            if (!isFullAdmin) {
-                // Non-full-admins (marketing managers) need approval when publishing
-                updateData.approvalStatus = 'PENDING_REVIEW';
-                console.log('📋 Product status changed to published by non-full-admin, setting approvalStatus to PENDING_REVIEW');
-            } else if (request.body.approvalStatus) {
+            const isVendorProduct = existingProduct.productOwnerType === 'VENDOR' || request.body.productOwnerType === 'VENDOR';
+            
+            if (isFullAdmin) {
                 // Full admin can explicitly set approval status
-                updateData.approvalStatus = request.body.approvalStatus;
+                if (request.body.approvalStatus) {
+                    updateData.approvalStatus = request.body.approvalStatus;
+                } else {
+                    // Full admin publishing - auto-approve
+                    updateData.approvalStatus = 'APPROVED';
+                }
+            } else if (isVendorProduct) {
+                // Vendor products need approval when published by non-admin
+                updateData.approvalStatus = 'PENDING_REVIEW';
+                console.log('📋 Vendor product status changed to published by non-admin, setting approvalStatus to PENDING_REVIEW');
             } else {
-                // Full admin publishing - auto-approve
+                // Platform products (non-vendor) - no approval needed, but set to APPROVED for consistency
+                // They will show immediately because visibility query doesn't check approval for platform products
                 updateData.approvalStatus = 'APPROVED';
+                console.log('📋 Platform product published - no approval needed, setting to APPROVED for consistency');
             }
         } else if (request.body.approvalStatus && isFullAdmin) {
             // Only full admins can change approval status directly
