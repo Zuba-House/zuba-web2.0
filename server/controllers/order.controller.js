@@ -606,12 +606,23 @@ export const createOrderController = async (request, response) => {
                         orderId: order._id
                     });
                     
-                    // Background operations
+                    // Background operations - emails FIRST, then stock/commissions
                     (async () => {
                         try {
+                            // Send emails FIRST (most important - must happen for every order)
+                            await sendOrderEmails(order, request.body);
+                            
+                            // Then update stock and commissions
                             await updateOrderStockAndCommissions(order, request.body.products, shouldAffectInventory);
                         } catch (bgError) {
                             console.error('⚠️ Background operations failed (non-critical):', bgError);
+                            // Try emails again as last resort
+                            try {
+                                console.log('🔄 Retrying email sending after background error...');
+                                await sendOrderEmails(order, request.body);
+                            } catch (emailError) {
+                                console.error('❌ Email sending retry also failed:', emailError);
+                            }
                         }
                     })();
                     
