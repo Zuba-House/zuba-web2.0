@@ -15,6 +15,161 @@ import { sendVendorNewOrder } from "../utils/vendorEmails.js";
 import { FailedOrderEmailTemplate } from "../utils/failedOrderEmailTemplate.js";
 
 // ========================================
+// HELPER FUNCTION: Send order emails (customer + admin)
+// This MUST be called for every order
+// ========================================
+async function sendOrderEmails(order, requestBody) {
+    try {
+        console.log('📧 Starting email sending process for order:', order._id);
+        
+        // Get user email - either from logged-in user or guest customer
+        let userEmail = null;
+        let userName = null;
+        let userInfo = null;
+        
+        if (requestBody.userId) {
+            try {
+                const user = await UserModel.findOne({ _id: requestBody.userId });
+                if (user?.email) {
+                    userEmail = user.email;
+                    userName = user.name;
+                    userInfo = {
+                        name: user.name,
+                        email: user.email,
+                        mobile: user.mobile,
+                        phone: user.mobile
+                    };
+                }
+            } catch (userError) {
+                console.warn('⚠️ Could not fetch user for email:', userError.message);
+            }
+        } else if (requestBody.guestCustomer?.email) {
+            // Guest checkout
+            userEmail = requestBody.guestCustomer.email;
+            userName = requestBody.guestCustomer.name;
+            userInfo = {
+                name: requestBody.guestCustomer.name,
+                email: requestBody.guestCustomer.email,
+                phone: requestBody.guestCustomer.phone
+            };
+        }
+        
+        // Send customer confirmation email
+        if (userEmail) {
+            try {
+                console.log('📧 Sending customer confirmation email to:', userEmail);
+                console.log('📧 Order details for email:', {
+                    orderId: order._id,
+                    productsCount: order.products?.length || 0,
+                    totalAmt: order.totalAmt
+                });
+                
+                const emailHtml = OrderConfirmationEmail(userName || 'Customer', order);
+                
+                if (!emailHtml || emailHtml.trim().length === 0) {
+                    console.error('❌ Email HTML template is empty!');
+                    throw new Error('Email HTML template is empty');
+                }
+                
+                console.log('📧 Email HTML generated, length:', emailHtml.length);
+                
+                const emailResult = await sendEmailFun({
+                    sendTo: [userEmail],
+                    subject: "Order Confirmation - Zuba House",
+                    text: "",
+                    html: emailHtml
+                });
+                
+                if (emailResult) {
+                    console.log('✅ Customer confirmation email sent successfully to:', userEmail);
+                } else {
+                    console.error('❌ Customer confirmation email failed (sendEmailFun returned false)');
+                    console.error('❌ This usually means SendGrid API key is missing or invalid');
+                }
+            } catch (emailError) {
+                console.error('❌ Failed to send customer confirmation email:', {
+                    to: userEmail,
+                    error: emailError.message,
+                    stack: emailError.stack,
+                    response: emailError.response?.body || emailError.response
+                });
+            }
+        } else {
+            console.warn('⚠️ No user email found - skipping customer confirmation email');
+            console.warn('⚠️ Request body:', {
+                hasUserId: !!requestBody.userId,
+                hasGuestCustomer: !!requestBody.guestCustomer,
+                guestEmail: requestBody.guestCustomer?.email
+            });
+        }
+
+        // Send admin notification email
+        try {
+            const adminEmail = process.env.ADMIN_EMAIL || process.env.ADMIN_EMAIL_ADDRESS || 'sales@zubahouse.com';
+            console.log('📧 Sending admin notification email to:', adminEmail);
+            console.log('📧 Checking SendGrid configuration...');
+            
+            if (!process.env.SENDGRID_API_KEY) {
+                console.error('❌ SENDGRID_API_KEY is not set in environment variables!');
+                console.error('❌ Emails will fail. Please set SENDGRID_API_KEY in your environment.');
+            } else {
+                console.log('✅ SENDGRID_API_KEY is configured');
+            }
+            
+            // Get shipping address if available
+            let shippingAddress = null;
+            if (order.shippingAddress) {
+                shippingAddress = order.shippingAddress;
+            } else if (order.delivery_address) {
+                try {
+                    shippingAddress = await AddressModel.findById(order.delivery_address);
+                } catch (addrError) {
+                    console.log('Could not fetch shipping address:', addrError.message);
+                }
+            }
+
+            const adminEmailHtml = AdminOrderNotificationEmail(order, userInfo, shippingAddress);
+            
+            if (!adminEmailHtml || adminEmailHtml.trim().length === 0) {
+                console.error('❌ Admin email HTML template is empty!');
+                throw new Error('Admin email HTML template is empty');
+            }
+            
+            console.log('📧 Admin email HTML generated, length:', adminEmailHtml.length);
+            
+            const adminEmailResult = await sendEmailFun({
+                sendTo: [adminEmail],
+                subject: `New Order #${order._id} - ${userName || 'Guest Customer'}`,
+                text: "",
+                html: adminEmailHtml
+            });
+            
+            if (adminEmailResult) {
+                console.log('✅ Admin notification email sent successfully to:', adminEmail);
+            } else {
+                console.error('❌ Admin notification email failed (sendEmailFun returned false)');
+                console.error('❌ This usually means SendGrid API key is missing or invalid');
+            }
+        } catch (adminEmailError) {
+            console.error('❌ Error sending admin notification email:', {
+                error: adminEmailError.message,
+                stack: adminEmailError.stack,
+                response: adminEmailError.response?.body || adminEmailError.response
+            });
+        }
+        
+        console.log('✅ Email sending process completed for order:', order._id);
+    } catch (error) {
+        console.error('❌ Critical error in sendOrderEmails function:', {
+            error: error.message,
+            stack: error.stack,
+            orderId: order?._id
+        });
+        // Don't throw - emails are non-critical but we want to log the error
+    }
+}
+
+// ========================================
 // HELPER FUNCTION: Update stock and commissions (non-blocking)
 // This runs in background after order is saved
 // ========================================
@@ -415,10 +570,21 @@ export const createOrderController = async (request, response) => {
                 // Stock updates, commissions, emails - all happen after response is sent
                 (async () => {
                     try {
+                        // Send emails FIRST (most important - must happen for every order)
+                        await sendOrderEmails(order, request.body);
+                        
+                        // Then update stock and commissions
                         await updateOrderStockAndCommissions(order, request.body.products, shouldAffectInventory);
                     } catch (bgError) {
                         console.error('⚠️ Background operations failed (non-critical):', bgError);
                         // Order is already saved, so this is non-critical
+                        // But try to send emails anyway as a last resort
+                        try {
+                            console.log('🔄 Retrying email sending after background error...');
+                            await sendOrderEmails(order, request.body);
+                        } catch (emailError) {
+                            console.error('❌ Email sending retry also failed:', emailError);
+                        }
                     }
                 })();
                 
@@ -765,12 +931,22 @@ export const createOrderController = async (request, response) => {
                         orderId: savedEmergencyOrder._id
                     });
                     
-                    // Update stock and commissions in background (non-blocking)
+                    // Send emails and update stock/commissions in background (non-blocking)
                     (async () => {
                         try {
+                            // Send emails FIRST (most important)
+                            await sendOrderEmails(savedEmergencyOrder, request.body);
+                            
+                            // Then update stock and commissions
                             await updateOrderStockAndCommissions(savedEmergencyOrder, request.body.products, shouldAffectInventory);
                         } catch (bgError) {
                             console.error('⚠️ Background operations failed (non-critical):', bgError);
+                            // Try emails again as last resort
+                            try {
+                                await sendOrderEmails(savedEmergencyOrder, request.body);
+                            } catch (emailError) {
+                                console.error('❌ Email sending retry failed:', emailError);
+                            }
                         }
                     })();
                     
@@ -801,6 +977,16 @@ export const createOrderController = async (request, response) => {
                                 order: saved,
                                 orderId: saved._id
                             });
+                            
+                            // Send emails in background (non-blocking)
+                            (async () => {
+                                try {
+                                    await sendOrderEmails(saved, request.body);
+                                } catch (emailError) {
+                                    console.error('❌ Email sending failed for last resort order:', emailError);
+                                }
+                            })();
+                            
                             return;
                         } catch (lastResortError) {
                             console.error('❌ LAST RESORT save also failed:', lastResortError);
@@ -846,104 +1032,15 @@ export const createOrderController = async (request, response) => {
         }
 
         // Send emails asynchronously (fire and forget) - NEVER block order success
+        // CRITICAL: Emails MUST be sent for ALL orders, regardless of shouldAffectInventory
         // If payment succeeded, order MUST succeed regardless of email failures
-        if (shouldAffectInventory) {
+        if (order && order._id) {
             // Run email sending in background - don't await
             (async () => {
                 try {
-                    // Get user email - either from logged-in user or guest customer
-                    let userEmail = null;
-                    let userName = null;
-                    let userInfo = null;
-                    
-                    if (request.body.userId) {
-                        try {
-                            const user = await UserModel.findOne({ _id: request.body.userId });
-                            if (user?.email) {
-                                userEmail = user.email;
-                                userName = user.name;
-                                userInfo = {
-                                    name: user.name,
-                                    email: user.email,
-                                    mobile: user.mobile,
-                                    phone: user.mobile
-                                };
-                            }
-                        } catch (userError) {
-                            console.warn('⚠️ Could not fetch user for email:', userError.message);
-                        }
-                    } else if (request.body.guestCustomer?.email) {
-                        // Guest checkout
-                        userEmail = request.body.guestCustomer.email;
-                        userName = request.body.guestCustomer.name;
-                        userInfo = {
-                            name: request.body.guestCustomer.name,
-                            email: request.body.guestCustomer.email,
-                            phone: request.body.guestCustomer.phone
-                        };
-                    }
-                    
-                    // Send customer confirmation email (non-blocking)
-                    if (userEmail) {
-                        console.log('📧 Preparing to send order confirmation email to:', userEmail);
-                        sendEmailFun({
-                            sendTo: [userEmail],
-                            subject: "Order Confirmation - Zuba House",
-                            text: "",
-                            html: OrderConfirmationEmail(userName || 'Customer', order)
-                        }).then((emailResult) => {
-                            console.log('✅ Customer confirmation email sent successfully:', {
-                                to: userEmail,
-                                result: emailResult
-                            });
-                        }).catch((emailError) => {
-                            console.error('❌ Failed to send customer confirmation email (non-critical):', {
-                                to: userEmail,
-                                error: emailError.message
-                            });
-                        });
-                    } else {
-                        console.warn('⚠️ No user email found - skipping customer confirmation email');
-                    }
-
-                    // Send admin notification email (non-blocking)
-                    try {
-                        const adminEmail = process.env.ADMIN_EMAIL || 'sales@zubahouse.com';
-                        console.log('📧 Preparing to send admin notification email to:', adminEmail);
-                        
-                        // Get shipping address if available - prefer order.shippingAddress, then fetch from delivery_address
-                        let shippingAddress = null;
-                        if (order.shippingAddress) {
-                            // Use shipping address stored directly in order
-                            shippingAddress = order.shippingAddress;
-                        } else if (order.delivery_address) {
-                            try {
-                                shippingAddress = await AddressModel.findById(order.delivery_address);
-                            } catch (addrError) {
-                                console.log('Could not fetch shipping address:', addrError.message);
-                            }
-                        }
-
-                        sendEmailFun({
-                            sendTo: [adminEmail],
-                            subject: `New Order #${order._id} - ${userName || 'Guest Customer'}`,
-                            text: "",
-                            html: AdminOrderNotificationEmail(order, userInfo, shippingAddress)
-                        }).then((adminEmailResult) => {
-                            console.log('✅ Admin notification email sent successfully:', {
-                                to: adminEmail,
-                                result: adminEmailResult
-                            });
-                        }).catch((adminEmailError) => {
-                            console.error('❌ Error sending admin notification email (non-critical):', {
-                                error: adminEmailError.message
-                            });
-                        });
-                    } catch (adminEmailError) {
-                        console.error('❌ Error preparing admin email (non-critical):', adminEmailError.message);
-                    }
-                } catch (emailPrepError) {
-                    console.error('❌ Error in email preparation (non-critical):', emailPrepError.message);
+                    await sendOrderEmails(order, request.body);
+                } catch (emailError) {
+                    console.error('❌ Email sending failed in transaction path (non-critical):', emailError);
                 }
             })(); // Fire and forget - don't await
         }
@@ -1101,6 +1198,15 @@ export const createOrderController = async (request, response) => {
                 
                 const savedEmergencyOrder = await emergencyOrder.save();
                 console.log('✅ Emergency order created successfully:', savedEmergencyOrder._id);
+                
+                // Send emails in background (non-blocking)
+                (async () => {
+                    try {
+                        await sendOrderEmails(savedEmergencyOrder, request.body);
+                    } catch (emailError) {
+                        console.error('❌ Email sending failed for emergency order:', emailError);
+                    }
+                })();
                 
                 return response.status(200).json({
                     error: false,
