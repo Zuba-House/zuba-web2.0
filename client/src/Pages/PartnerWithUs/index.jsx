@@ -307,7 +307,7 @@ const PartnerWithUs = () => {
               transition={{ delay: 0.5 }}
             >
               <a 
-                href="mailto:partners@zubahouse.com"
+                href="mailto:info@zubahouse.com"
                 className="px-8 py-4 rounded-full font-semibold transition-all duration-300 hover:scale-105 shadow-lg"
                 style={{ backgroundColor: '#efb291', color: '#0b2735' }}
               >
@@ -514,7 +514,7 @@ const PartnerWithUs = () => {
 
                   <div className="mt-8 text-center">
                     <a 
-                      href={`mailto:partners@zubahouse.com?subject=${encodeURIComponent(type.title + ' Application')}&body=${encodeURIComponent('I am interested in becoming a ' + type.title.toLowerCase() + ' at Zuba House.')}`}
+                      href={`mailto:info@zubahouse.com?subject=${encodeURIComponent(type.title + ' Application')}&body=${encodeURIComponent('I am interested in becoming a ' + type.title.toLowerCase() + ' at Zuba House.')}`}
                       className="inline-block px-10 py-4 rounded-full font-bold text-lg transition-all duration-300 hover:scale-105 shadow-xl"
                       style={{ backgroundColor: '#efb291', color: '#0b2735' }}
                     >
@@ -678,7 +678,7 @@ const PartnerWithUs = () => {
               </p>
               <div className="flex flex-wrap gap-4 justify-center">
                 <a 
-                  href="mailto:partners@zubahouse.com?cc=info@zubahouse.com&subject=Partnership Application"
+                  href="mailto:info@zubahouse.com?subject=Partnership Application"
                   className="px-10 py-4 rounded-full font-bold text-lg transition-all duration-300 hover:scale-105 shadow-xl"
                   style={{ backgroundColor: '#0b2735', color: '#e5e2db' }}
                 >
@@ -700,10 +700,6 @@ const PartnerWithUs = () => {
                   Questions about partnerships?
                 </p>
                 <div className="flex flex-wrap justify-center gap-6 text-sm">
-                  <span style={{ color: '#0b2735' }}>
-                    <FaEnvelope className="inline mr-2" />
-                    partners@zubahouse.com
-                  </span>
                   <span style={{ color: '#0b2735' }}>
                     <FaEnvelope className="inline mr-2" />
                     info@zubahouse.com
