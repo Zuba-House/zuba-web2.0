@@ -18,18 +18,20 @@ import { FailedOrderEmailTemplate } from "../utils/failedOrderEmailTemplate.js";
 // HELPER FUNCTION: Send order emails (customer + admin)
 // This MUST be called for every order
 // ========================================
-async function sendOrderEmails(order, requestBody) {
+async function sendOrderEmails(order, emailData) {
     try {
         console.log('📧 Starting email sending process for order:', order._id);
         
         // Get user email - either from logged-in user or guest customer
+        // emailData can be minimal object with userId, guestCustomer, customerName
+        // or full requestBody (for backward compatibility)
         let userEmail = null;
         let userName = null;
         let userInfo = null;
         
-        if (requestBody.userId) {
+        if (emailData?.userId) {
             try {
-                const user = await UserModel.findOne({ _id: requestBody.userId });
+                const user = await UserModel.findOne({ _id: emailData.userId });
                 if (user?.email) {
                     userEmail = user.email;
                     userName = user.name;
@@ -43,14 +45,14 @@ async function sendOrderEmails(order, requestBody) {
             } catch (userError) {
                 console.warn('⚠️ Could not fetch user for email:', userError.message);
             }
-        } else if (requestBody.guestCustomer?.email) {
+        } else if (emailData?.guestCustomer?.email) {
             // Guest checkout
-            userEmail = requestBody.guestCustomer.email;
-            userName = requestBody.guestCustomer.name;
+            userEmail = emailData.guestCustomer.email;
+            userName = emailData.guestCustomer.name || emailData.customerName;
             userInfo = {
-                name: requestBody.guestCustomer.name,
-                email: requestBody.guestCustomer.email,
-                phone: requestBody.guestCustomer.phone
+                name: emailData.guestCustomer.name || emailData.customerName,
+                email: emailData.guestCustomer.email,
+                phone: emailData.guestCustomer.phone
             };
         }
         
@@ -96,10 +98,10 @@ async function sendOrderEmails(order, requestBody) {
             }
         } else {
             console.warn('⚠️ No user email found - skipping customer confirmation email');
-            console.warn('⚠️ Request body:', {
-                hasUserId: !!requestBody.userId,
-                hasGuestCustomer: !!requestBody.guestCustomer,
-                guestEmail: requestBody.guestCustomer?.email
+            console.warn('⚠️ Email data:', {
+                hasUserId: !!emailData?.userId,
+                hasGuestCustomer: !!emailData?.guestCustomer,
+                guestEmail: emailData?.guestCustomer?.email
             });
         }
 
@@ -167,6 +169,30 @@ async function sendOrderEmails(order, requestBody) {
         });
         // Don't throw - emails are non-critical but we want to log the error
     }
+}
+
+// ========================================
+// HELPER FUNCTION: Run background task with timeout and memory cleanup
+// Prevents memory leaks from hanging background operations
+// ========================================
+function runBackgroundTask(taskFn, timeoutMs = 30000) {
+    return new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+            console.warn('⚠️ Background task timed out after', timeoutMs, 'ms');
+            resolve(null);
+        }, timeoutMs);
+        
+        Promise.resolve(taskFn())
+            .then((result) => {
+                clearTimeout(timeout);
+                resolve(result);
+            })
+            .catch((error) => {
+                clearTimeout(timeout);
+                console.error('⚠️ Background task error:', error.message);
+                resolve(null);
+            });
+    });
 }
 
 // ========================================
@@ -588,25 +614,24 @@ export const createOrderController = async (request, response) => {
                 
                 // Now do all other operations in background (non-blocking)
                 // Stock updates, commissions, emails - all happen after response is sent
-                (async () => {
-                    try {
-                        // Send emails FIRST (most important - must happen for every order)
-                        await sendOrderEmails(order, request.body);
+                // Use process.nextTick to defer execution and allow response to be sent first
+                // This helps with memory management by not keeping request.body in closure
+                process.nextTick(() => {
+                    runBackgroundTask(async () => {
+                        // Extract only necessary data to avoid keeping entire request.body in memory
+                        const emailData = {
+                            userId: request.body.userId || null,
+                            guestCustomer: request.body.guestCustomer || null,
+                            customerName: request.body.customerName || null
+                        };
                         
-                        // Then update stock and commissions
+                        // Send emails FIRST (most important - must happen for every order)
+                        await sendOrderEmails(order, emailData);
+                        
+                        // Then update stock and commissions (only pass products array, not full request.body)
                         await updateOrderStockAndCommissions(order, request.body.products, shouldAffectInventory);
-                    } catch (bgError) {
-                        console.error('⚠️ Background operations failed (non-critical):', bgError);
-                        // Order is already saved, so this is non-critical
-                        // But try to send emails anyway as a last resort
-                        try {
-                            console.log('🔄 Retrying email sending after background error...');
-                            await sendOrderEmails(order, request.body);
-                        } catch (emailError) {
-                            console.error('❌ Email sending retry also failed:', emailError);
-                        }
-                    }
-                })();
+                    }, 60000); // 60 second timeout
+                });
                 
                 return; // Exit early - order is saved, customer is happy
             } catch (saveError) {
@@ -653,19 +678,17 @@ export const createOrderController = async (request, response) => {
                         });
                         
                         // Background operations
-                        (async () => {
-                            try {
-                                await sendOrderEmails(order, request.body);
+                        process.nextTick(() => {
+                            runBackgroundTask(async () => {
+                                const emailData = {
+                                    userId: request.body.userId || null,
+                                    guestCustomer: request.body.guestCustomer || null,
+                                    customerName: request.body.customerName || null
+                                };
+                                await sendOrderEmails(order, emailData);
                                 await updateOrderStockAndCommissions(order, request.body.products, shouldAffectInventory);
-                            } catch (bgError) {
-                                console.error('⚠️ Background operations failed (non-critical):', bgError);
-                                try {
-                                    await sendOrderEmails(order, request.body);
-                                } catch (emailError) {
-                                    console.error('❌ Email sending retry also failed:', emailError);
-                                }
-                            }
-                        })();
+                            }, 60000);
+                        });
                         
                         return;
                     } catch (fixError) {
@@ -690,24 +713,17 @@ export const createOrderController = async (request, response) => {
                     });
                     
                     // Background operations - emails FIRST, then stock/commissions
-                    (async () => {
-                        try {
-                            // Send emails FIRST (most important - must happen for every order)
-                            await sendOrderEmails(order, request.body);
-                            
-                            // Then update stock and commissions
+                    process.nextTick(() => {
+                        runBackgroundTask(async () => {
+                            const emailData = {
+                                userId: request.body.userId || null,
+                                guestCustomer: request.body.guestCustomer || null,
+                                customerName: request.body.customerName || null
+                            };
+                            await sendOrderEmails(order, emailData);
                             await updateOrderStockAndCommissions(order, request.body.products, shouldAffectInventory);
-                        } catch (bgError) {
-                            console.error('⚠️ Background operations failed (non-critical):', bgError);
-                            // Try emails again as last resort
-                            try {
-                                console.log('🔄 Retrying email sending after background error...');
-                                await sendOrderEmails(order, request.body);
-                            } catch (emailError) {
-                                console.error('❌ Email sending retry also failed:', emailError);
-                            }
-                        }
-                    })();
+                        }, 60000);
+                    });
                     
                     return;
                 } catch (emergencyError) {
@@ -1026,23 +1042,17 @@ export const createOrderController = async (request, response) => {
                     });
                     
                     // Send emails and update stock/commissions in background (non-blocking)
-                    (async () => {
-                        try {
-                            // Send emails FIRST (most important)
-                            await sendOrderEmails(savedEmergencyOrder, request.body);
-                            
-                            // Then update stock and commissions
+                    process.nextTick(() => {
+                        runBackgroundTask(async () => {
+                            const emailData = {
+                                userId: request.body.userId || null,
+                                guestCustomer: request.body.guestCustomer || null,
+                                customerName: request.body.customerName || null
+                            };
+                            await sendOrderEmails(savedEmergencyOrder, emailData);
                             await updateOrderStockAndCommissions(savedEmergencyOrder, request.body.products, shouldAffectInventory);
-                        } catch (bgError) {
-                            console.error('⚠️ Background operations failed (non-critical):', bgError);
-                            // Try emails again as last resort
-                            try {
-                                await sendOrderEmails(savedEmergencyOrder, request.body);
-                            } catch (emailError) {
-                                console.error('❌ Email sending retry failed:', emailError);
-                            }
-                        }
-                    })();
+                        }, 60000);
+                    });
                     
                     return;
                 } catch (emergencyError) {
@@ -1073,13 +1083,16 @@ export const createOrderController = async (request, response) => {
                             });
                             
                             // Send emails in background (non-blocking)
-                            (async () => {
-                                try {
-                                    await sendOrderEmails(saved, request.body);
-                                } catch (emailError) {
-                                    console.error('❌ Email sending failed for last resort order:', emailError);
-                                }
-                            })();
+                            process.nextTick(() => {
+                                runBackgroundTask(async () => {
+                                    const emailData = {
+                                        userId: request.body.userId || null,
+                                        guestCustomer: request.body.guestCustomer || null,
+                                        customerName: request.body.customerName || null
+                                    };
+                                    await sendOrderEmails(saved, emailData);
+                                }, 30000);
+                            });
                             
                             return;
                         } catch (lastResortError) {
@@ -1130,13 +1143,16 @@ export const createOrderController = async (request, response) => {
         // If payment succeeded, order MUST succeed regardless of email failures
         if (order && order._id) {
             // Run email sending in background - don't await
-            (async () => {
-                try {
-                    await sendOrderEmails(order, request.body);
-                } catch (emailError) {
-                    console.error('❌ Email sending failed in transaction path (non-critical):', emailError);
-                }
-            })(); // Fire and forget - don't await
+            process.nextTick(() => {
+                runBackgroundTask(async () => {
+                    const emailData = {
+                        userId: request.body.userId || null,
+                        guestCustomer: request.body.guestCustomer || null,
+                        customerName: request.body.customerName || null
+                    };
+                    await sendOrderEmails(order, emailData);
+                }, 30000);
+            });
         }
 
         // Send failed order notification email if payment failed
@@ -1294,13 +1310,16 @@ export const createOrderController = async (request, response) => {
                 console.log('✅ Emergency order created successfully:', savedEmergencyOrder._id);
                 
                 // Send emails in background (non-blocking)
-                (async () => {
-                    try {
-                        await sendOrderEmails(savedEmergencyOrder, request.body);
-                    } catch (emailError) {
-                        console.error('❌ Email sending failed for emergency order:', emailError);
-                    }
-                })();
+                process.nextTick(() => {
+                    runBackgroundTask(async () => {
+                        const emailData = {
+                            userId: request.body.userId || null,
+                            guestCustomer: request.body.guestCustomer || null,
+                            customerName: request.body.customerName || null
+                        };
+                        await sendOrderEmails(savedEmergencyOrder, emailData);
+                    }, 30000);
+                });
                 
                 return response.status(200).json({
                     error: false,
