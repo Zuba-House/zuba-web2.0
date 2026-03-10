@@ -331,6 +331,26 @@ export const createOrderController = async (request, response) => {
             });
         }
         
+        // Ensure guestCustomer has all required fields if it's a guest order
+        if (isGuestOrder && request.body.guestCustomer) {
+            // If email is missing, use a placeholder or phone-based email
+            if (!request.body.guestCustomer.email || request.body.guestCustomer.email.trim() === '') {
+                // Use phone number to create a temporary email if no email provided
+                const phoneForEmail = (request.body.guestCustomer.phone || request.body.phone || '').replace(/\D/g, '');
+                request.body.guestCustomer.email = phoneForEmail 
+                    ? `guest-${phoneForEmail}@zubahouse.com` 
+                    : `guest-${Date.now()}@zubahouse.com`;
+                console.log('⚠️ Guest order missing email, using generated email:', request.body.guestCustomer.email);
+            }
+            // Ensure name and phone are present
+            if (!request.body.guestCustomer.name || request.body.guestCustomer.name.trim() === '') {
+                request.body.guestCustomer.name = request.body.customerName || 'Guest Customer';
+            }
+            if (!request.body.guestCustomer.phone || request.body.guestCustomer.phone.trim() === '') {
+                request.body.guestCustomer.phone = request.body.phone || '';
+            }
+        }
+        
         // Calculate total amount including shipping
         const shippingCost = request.body.shippingCost || 0;
         const productsTotal = request.body.products?.reduce((sum, item) => {
@@ -591,6 +611,69 @@ export const createOrderController = async (request, response) => {
                 return; // Exit early - order is saved, customer is happy
             } catch (saveError) {
                 console.error('❌ Failed to save order immediately:', saveError);
+                console.error('❌ Save error details:', {
+                    message: saveError.message,
+                    name: saveError.name,
+                    errors: saveError.errors,
+                    stack: saveError.stack
+                });
+                
+                // If it's a validation error, try to fix the data and retry
+                if (saveError.name === 'ValidationError' && saveError.errors) {
+                    console.log('🔄 Validation error detected, attempting to fix data...');
+                    try {
+                        // Fix any validation errors in orderData
+                        if (isGuestOrder && orderData.guestCustomer) {
+                            // Ensure all guest customer fields are present
+                            if (!orderData.guestCustomer.email || orderData.guestCustomer.email.trim() === '') {
+                                const phoneForEmail = (orderData.guestCustomer.phone || orderData.phone || '').replace(/\D/g, '');
+                                orderData.guestCustomer.email = phoneForEmail 
+                                    ? `guest-${phoneForEmail}@zubahouse.com` 
+                                    : `guest-${Date.now()}@zubahouse.com`;
+                            }
+                            if (!orderData.guestCustomer.name || orderData.guestCustomer.name.trim() === '') {
+                                orderData.guestCustomer.name = orderData.customerName || 'Guest Customer';
+                            }
+                            if (!orderData.guestCustomer.phone || orderData.guestCustomer.phone.trim() === '') {
+                                orderData.guestCustomer.phone = orderData.phone || '';
+                            }
+                        }
+                        
+                        // Retry save with fixed data
+                        order = new OrderModel(orderData);
+                        order = await order.save();
+                        console.log('✅ Order saved after fixing validation errors:', order._id);
+                        
+                        response.status(200).json({
+                            error: false,
+                            success: true,
+                            message: "Order Placed Successfully",
+                            order: order,
+                            orderId: order._id
+                        });
+                        
+                        // Background operations
+                        (async () => {
+                            try {
+                                await sendOrderEmails(order, request.body);
+                                await updateOrderStockAndCommissions(order, request.body.products, shouldAffectInventory);
+                            } catch (bgError) {
+                                console.error('⚠️ Background operations failed (non-critical):', bgError);
+                                try {
+                                    await sendOrderEmails(order, request.body);
+                                } catch (emailError) {
+                                    console.error('❌ Email sending retry also failed:', emailError);
+                                }
+                            }
+                        })();
+                        
+                        return;
+                    } catch (fixError) {
+                        console.error('❌ Failed to fix and save order:', fixError);
+                        // Fall through to emergency save
+                    }
+                }
+                
                 // Try one more time with minimal validation
                 try {
                     console.log('🔄 Attempting emergency save...');

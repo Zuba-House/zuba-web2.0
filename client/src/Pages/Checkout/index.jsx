@@ -337,7 +337,8 @@ const Checkout = () => {
     const guestCustomer = isGuestOrder ? {
       name: customerName,
       phone: phone,
-      email: userData?.email || null // Use email if available, otherwise null (optional for guest)
+      // Email is required for guest orders - use phone-based email if not provided
+      email: userData?.email || (phone ? `guest-${phone.replace(/\D/g, '')}@zubahouse.com` : `guest-${Date.now()}@zubahouse.com`)
     } : null;
 
     const payLoad = {
