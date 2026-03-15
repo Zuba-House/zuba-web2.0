@@ -44,7 +44,6 @@ import EditCategory from "../../Pages/Categegory/editCategory";
 import Dialog from '@mui/material/Dialog';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
-import Typography from '@mui/material/Typography';
 import { IoMdClose } from "react-icons/io";
 import Slide from '@mui/material/Slide';
 import EditProductEnhanced from "../../Pages/Products/EditProductEnhanced";
