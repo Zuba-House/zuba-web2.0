@@ -14,7 +14,24 @@ import { FaRegUser } from "react-icons/fa6";
 import { IoMdLogOut } from "react-icons/io";
 import { MyContext } from "../../App";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { fetchDataFromApi } from "../../utils/api";
+import { fetchDataFromApi, putData } from "../../utils/api";
+import Typography from "@mui/material/Typography";
+import Box from "@mui/material/Box";
+import ListItemText from "@mui/material/ListItemText";
+
+// Simple function to format time ago
+const formatTimeAgo = (date) => {
+  if (!date) return 'Just now';
+  const now = new Date();
+  const then = new Date(date);
+  const diffInSeconds = Math.floor((now - then) / 1000);
+  
+  if (diffInSeconds < 60) return 'Just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+  return then.toLocaleDateString();
+};
 import AddProductEnhanced from "../../Pages/Products/AddProductEnhanced";
 import AddHomeSlide from "../../Pages/HomeSliderBanners/addHomeSlide";
 import AddCategory from "../../Pages/Categegory/addCategory";
@@ -58,7 +75,12 @@ const StyledBadge = styled(Badge)(({ theme }) => ({
 const Header = () => {
   const [anchorMyAcc, setAnchorMyAcc] = React.useState(null);
   const openMyAcc = Boolean(anchorMyAcc);
-
+  
+  const [anchorNotifications, setAnchorNotifications] = React.useState(null);
+  const openNotifications = Boolean(anchorNotifications);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   const history = useNavigate();
 
@@ -69,9 +91,71 @@ const Header = () => {
     setAnchorMyAcc(null);
   };
 
+  const handleClickNotifications = (event) => {
+    setAnchorNotifications(event.currentTarget);
+    fetchNotifications();
+  };
+  
+  const handleCloseNotifications = () => {
+    setAnchorNotifications(null);
+  };
+
   const context = useContext(MyContext);
 
   const location = useLocation();
+
+  // Fetch notifications
+  const fetchNotifications = async () => {
+    if (!context?.isLogin) return;
+    
+    setLoadingNotifications(true);
+    try {
+      const res = await fetchDataFromApi("/api/notifications");
+      if (res?.error === false && res?.notifications) {
+        setNotifications(res.notifications || []);
+        setUnreadCount(res.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  // Mark notification as read
+  const markAsRead = async (notificationId) => {
+    try {
+      const res = await putData(`/api/notifications/${notificationId}/read`, {});
+      if (res?.error === false) {
+        // Update local state
+        setNotifications(prev => 
+          prev.map(notif => 
+            notif._id === notificationId 
+              ? { ...notif, isRead: true, readAt: new Date() }
+              : notif
+          )
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  // Mark all as read
+  const markAllAsRead = async () => {
+    try {
+      const res = await putData("/api/notifications/read-all", {});
+      if (res?.error === false) {
+        setNotifications(prev => 
+          prev.map(notif => ({ ...notif, isRead: true, readAt: new Date() }))
+        );
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
 
   useEffect(() => {
 
@@ -87,6 +171,14 @@ const Header = () => {
       history(location.pathname)
     } else {
       history("/login")
+    }
+
+    // Fetch notifications on mount and periodically
+    if (context?.isLogin) {
+      fetchNotifications();
+      // Refresh notifications every 30 seconds
+      const interval = setInterval(fetchNotifications, 30000);
+      return () => clearInterval(interval);
     }
 
   }, [context?.isLogin]);
@@ -140,11 +232,159 @@ const Header = () => {
         </div>
 
         <div className="part2  flex items-center justify-end gap-5">
-          <IconButton aria-label="cart">
-            <StyledBadge badgeContent={4} color="secondary">
+          <IconButton 
+            aria-label="notifications"
+            onClick={handleClickNotifications}
+          >
+            <StyledBadge badgeContent={unreadCount > 0 ? unreadCount : 0} color="secondary">
               <FaRegBell />
             </StyledBadge>
           </IconButton>
+
+          <Menu
+            anchorEl={anchorNotifications}
+            id="notifications-menu"
+            open={openNotifications}
+            onClose={handleCloseNotifications}
+            slotProps={{
+              paper: {
+                elevation: 0,
+                sx: {
+                  overflow: "visible",
+                  filter: "drop-shadow(0px 2px 8px rgba(0,0,0,0.32))",
+                  mt: 1.5,
+                  minWidth: 350,
+                  maxWidth: 400,
+                  maxHeight: 500,
+                  "&::before": {
+                    content: '""',
+                    display: "block",
+                    position: "absolute",
+                    top: 0,
+                    right: 14,
+                    width: 10,
+                    height: 10,
+                    bgcolor: "background.paper",
+                    transform: "translateY(-50%) rotate(45deg)",
+                    zIndex: 0,
+                  },
+                },
+              },
+            }}
+            transformOrigin={{ horizontal: "right", vertical: "top" }}
+            anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
+          >
+            <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+              <div className="flex items-center justify-between">
+                <Typography variant="h6" sx={{ fontSize: '16px', fontWeight: 600 }}>
+                  Notifications
+                </Typography>
+                {unreadCount > 0 && (
+                  <Button 
+                    size="small" 
+                    onClick={markAllAsRead}
+                    sx={{ fontSize: '12px', textTransform: 'none' }}
+                  >
+                    Mark all as read
+                  </Button>
+                )}
+              </div>
+            </Box>
+            
+            <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+              {loadingNotifications ? (
+                <MenuItem disabled>
+                  <Typography>Loading...</Typography>
+                </MenuItem>
+              ) : notifications.length === 0 ? (
+                <MenuItem disabled>
+                  <Typography sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+                    No notifications
+                  </Typography>
+                </MenuItem>
+              ) : (
+                notifications.map((notification) => (
+                  <MenuItem
+                    key={notification._id}
+                    onClick={() => {
+                      if (!notification.isRead) {
+                        markAsRead(notification._id);
+                      }
+                      handleCloseNotifications();
+                      // Navigate based on notification type
+                      if (notification.type === 'order_status' && notification.orderId) {
+                        history(`/orders`);
+                      } else if (notification.type === 'new_order' && notification.orderId) {
+                        history(`/orders`);
+                      }
+                    }}
+                    sx={{
+                      backgroundColor: notification.isRead ? 'transparent' : 'action.hover',
+                      borderLeft: notification.isRead ? 'none' : '3px solid',
+                      borderColor: notification.isRead ? 'transparent' : 'primary.main',
+                      py: 1.5,
+                      px: 2,
+                    }}
+                  >
+                    <ListItemText
+                      primary={
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            fontWeight: notification.isRead ? 400 : 600,
+                            fontSize: '14px'
+                          }}
+                        >
+                          {notification.title}
+                        </Typography>
+                      }
+                      secondary={
+                        <Box>
+                          <Typography 
+                            variant="caption" 
+                            sx={{ 
+                              color: 'text.secondary',
+                              fontSize: '12px',
+                              display: 'block',
+                              mt: 0.5
+                            }}
+                          >
+                            {notification.message}
+                          </Typography>
+                          <Typography 
+                            variant="caption" 
+                            sx={{ 
+                              color: 'text.secondary',
+                              fontSize: '11px',
+                              display: 'block',
+                              mt: 0.5
+                            }}
+                          >
+                            {formatTimeAgo(notification.createdAt)}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </MenuItem>
+                ))
+              )}
+            </Box>
+            
+            {notifications.length > 0 && (
+              <>
+                <Divider />
+                <MenuItem 
+                  onClick={() => {
+                    handleCloseNotifications();
+                    // Could navigate to a full notifications page
+                  }}
+                  sx={{ justifyContent: 'center', fontSize: '12px' }}
+                >
+                  View all notifications
+                </MenuItem>
+              </>
+            )}
+          </Menu>
 
           {context.isLogin === true ? (
             <div className="relative">
