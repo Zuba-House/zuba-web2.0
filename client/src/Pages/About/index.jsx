@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { FaGlobe, FaUsers, FaHeart, FaLeaf, FaHandshake, FaAward } from "react-icons/fa";
 import { IoMdMail } from "react-icons/io";
 import { motion } from "framer-motion";
+import { optimizeCloudinaryUrl } from "../../utils/imageOptimizer";
 
 const AboutUs = () => {
   const fadeIn = {
@@ -70,9 +71,10 @@ const AboutUs = () => {
               variants={fadeIn}
             >
               <img
-                src="https://res.cloudinary.com/dimtdehjp/image/upload/v1763072499/mission_k7faw5.jpg"
+                src={optimizeCloudinaryUrl("https://res.cloudinary.com/dimtdehjp/image/upload/v1763072499/mission_k7faw5.jpg", { width: 800, height: 500, quality: 'auto', format: 'auto' })}
                 alt="African Artisan"
                 className="rounded-2xl shadow-2xl w-full h-[400px] object-cover"
+                loading="lazy"
               />
             </motion.div>
 
@@ -216,9 +218,10 @@ const AboutUs = () => {
               className="order-1 lg:order-2"
             >
               <img
-                src="https://res.cloudinary.com/dimtdehjp/image/upload/v1763072498/hero-banner_t1zkuj.jpg"
+                src={optimizeCloudinaryUrl("https://res.cloudinary.com/dimtdehjp/image/upload/v1763072498/hero-banner_t1zkuj.jpg", { width: 800, height: 500, quality: 'auto', format: 'auto' })}
                 alt="Our Mission"
                 className="rounded-2xl shadow-2xl w-full h-[400px] object-cover"
+                loading="lazy"
               />
             </motion.div>
           </div>
@@ -236,9 +239,10 @@ const AboutUs = () => {
               variants={fadeIn}
             >
               <img
-                src="https://res.cloudinary.com/dimtdehjp/image/upload/v1763072498/africa-to-world_hvfoyx.jpg"
+                src={optimizeCloudinaryUrl("https://res.cloudinary.com/dimtdehjp/image/upload/v1763072498/africa-to-world_hvfoyx.jpg", { width: 800, height: 500, quality: 'auto', format: 'auto' })}
                 alt="Our Vision"
                 className="rounded-2xl shadow-2xl w-full h-[400px] object-cover"
+                loading="lazy"
               />
             </motion.div>
 

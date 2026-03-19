@@ -6,6 +6,7 @@ import "swiper/css";
 import "swiper/css/navigation";
 import { Navigation } from "swiper/modules";
 import { MyContext } from "../../App";
+import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 
 export const ProductZoom = (props) => {
 
@@ -36,11 +37,11 @@ export const ProductZoom = (props) => {
     }
   }, [props?.images]);
 
-  // Filter and normalize images
+  // Filter and normalize images (with Cloudinary optimization for faster loading)
   const normalizedImages = (props?.images || [])
     .map(item => {
       const imageUrl = typeof item === 'string' ? item : (item?.url || item);
-      return imageUrl;
+      return imageUrl ? getOptimizedImageUrl(imageUrl, { width: 1000, height: 1000, quality: 'auto', format: 'auto' }) : '';
     })
     .filter(Boolean);
 

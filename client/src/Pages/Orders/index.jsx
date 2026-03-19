@@ -7,6 +7,7 @@ import { FaAngleUp } from "react-icons/fa6";
 import { fetchDataFromApi } from "../../utils/api";
 import Pagination from "@mui/material/Pagination";
 import { formatCurrency } from "../../utils/currency";
+import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 
 const Orders = () => {
   const [isOpenOrderdProduct, setIsOpenOrderdProduct] = useState(null);
@@ -269,8 +270,10 @@ const Orders = () => {
 
                                                 <td className="px-6 py-4 font-[500]">
                                                   <img
-                                                    src={item?.image}
+                                                    src={getOptimizedImageUrl(item?.image, { width: 80, height: 80, quality: 'auto', format: 'auto' })}
+                                                    alt=""
                                                     className="w-[40px] h-[40px] object-cover rounded-md"
+                                                    loading="lazy"
                                                   />
                                                 </td>
 

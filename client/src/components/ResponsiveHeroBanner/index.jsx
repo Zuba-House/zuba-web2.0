@@ -5,6 +5,7 @@ import "swiper/css/navigation";
 import { Navigation, Autoplay } from "swiper/modules";
 import { Link } from "react-router-dom";
 import { fetchDataFromApi } from "../../utils/api";
+import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 
 /**
  * Responsive Hero Banner Component
@@ -108,9 +109,11 @@ const ResponsiveHeroBanner = () => {
                 <SwiperSlide key={banner._id || banner.id || index}>
                   <div className="item rounded-[10px] overflow-hidden relative">
                     <img
-                      src={banner.imageUrl}
+                      src={getOptimizedImageUrl(banner.imageUrl, { width: 1200, height: isMobile ? 500 : 800, quality: 'auto', format: 'auto' })}
                       alt={banner.title || "Banner"}
                       className={`w-full ${isMobile ? 'h-[250px]' : 'h-[400px]'} object-cover`}
+                      loading={index === 0 ? "eager" : "lazy"}
+                      fetchPriority={index === 0 ? "high" : undefined}
                     />
                     {hasContent && (
                       <div className={`absolute inset-0 bg-black bg-opacity-40 flex items-center ${isMobile ? 'justify-center text-center' : 'justify-center text-center'} p-4 sm:p-6 lg:p-8 lg:p-12`}>
@@ -160,9 +163,10 @@ const ResponsiveHeroBanner = () => {
       <div className="container">
         <div className="item rounded-[10px] overflow-hidden relative">
           <img
-            src={displayBanner.imageUrl}
+            src={getOptimizedImageUrl(displayBanner.imageUrl, { width: 1200, height: isMobile ? 500 : 800, quality: 'auto', format: 'auto' })}
             alt={displayBanner.title || "Banner"}
             className={`w-full ${isMobile ? 'h-[250px]' : 'h-[400px]'} object-cover`}
+            fetchPriority="high"
           />
           {hasContent && (
                 <div className={`absolute inset-0 bg-black bg-opacity-40 flex items-center ${isMobile ? 'justify-center text-center' : 'justify-center text-center'} ${isMobile ? 'p-4 sm:p-6' : 'p-8 lg:p-12'}`}>

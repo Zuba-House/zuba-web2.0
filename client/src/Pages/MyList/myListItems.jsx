@@ -5,6 +5,7 @@ import { IoCloseSharp } from "react-icons/io5";
 import { MyContext } from "../../App";
 import { deleteData } from "../../utils/api";
 import { formatCurrency } from "../../utils/currency";
+import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 
 const MyListItems = (props) => {
 
@@ -23,8 +24,10 @@ const MyListItems = (props) => {
       <div className="img w-[30%] sm:w-[15%] h-[150px] rounded-md overflow-hidden">
         <Link to={`/product/${props?.item?.productId}`} className="group">
           <img
-            src={props?.item?.image}
+            src={getOptimizedImageUrl(props?.item?.image, { width: 300, height: 300, quality: 'auto', format: 'auto' })}
             className="w-full group-hover:scale-105 transition-all"
+            alt=""
+            loading="lazy"
           />
         </Link>
       </div>

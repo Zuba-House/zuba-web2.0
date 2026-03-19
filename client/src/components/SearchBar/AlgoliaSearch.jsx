@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchDataFromApi, postData } from '../../utils/api';
+import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 import './AlgoliaSearch.css';
 
 const CustomSearch = ({ placeholder = "Search for products..." }) => {
@@ -61,14 +62,16 @@ const CustomSearch = ({ placeholder = "Search for products..." }) => {
     }
   };
 
-  // Get image URL helper
+  // Get image URL helper (returns optimized Cloudinary URL when applicable)
   const getImageUrl = (images) => {
     if (!images || images.length === 0) return '/placeholder.png';
     const firstImage = images[0];
-    if (typeof firstImage === 'string') return firstImage;
-    if (typeof firstImage === 'object' && firstImage.url) return firstImage.url;
-    if (typeof firstImage === 'object' && firstImage.secureUrl) return firstImage.secureUrl;
-    return '/placeholder.png';
+    let url = '';
+    if (typeof firstImage === 'string') url = firstImage;
+    else if (typeof firstImage === 'object' && firstImage.url) url = firstImage.url;
+    else if (typeof firstImage === 'object' && firstImage.secureUrl) url = firstImage.secureUrl;
+    if (!url) return '/placeholder.png';
+    return getOptimizedImageUrl(url, { width: 96, height: 96, quality: 'auto', format: 'auto' }) || url;
   };
 
   // Get price helper

@@ -2,13 +2,16 @@ import React from "react";
 import "../bannerBoxV2/style.css";
 import { Link } from "react-router-dom";
 import { formatCurrency } from "../../utils/currency";
+import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 
 const BannerBoxV2 = (props) => {
   return (
     <div className="bannerBoxV2 box w-full overflow-hidden rounded-md group relative">
       <img
-        src={props.image}
+        src={getOptimizedImageUrl(props.image, { width: 800, height: 600, quality: 'auto', format: 'auto' })}
         className="w-full transition-all duration-150 group-hover:scale-105"
+        alt=""
+        loading="lazy"
       />
 
       <div

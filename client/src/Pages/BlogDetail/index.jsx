@@ -4,6 +4,7 @@ import { IoArrowBack } from 'react-icons/io5';
 import { fetchDataFromApi } from '../../utils/api';
 import CircularProgress from '@mui/material/CircularProgress';
 import { Helmet } from 'react-helmet-async';
+import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 
 const BlogDetail = () => {
   const { id } = useParams();
@@ -176,7 +177,7 @@ const BlogDetail = () => {
             {blog.images && blog.images.length > 0 && (
               <figure className="mb-6 sm:mb-8">
                 <img 
-                  src={blog.images[0]} 
+                  src={getOptimizedImageUrl(blog.images[0], { width: 1200, height: 600, quality: 'auto', format: 'auto' })} 
                   alt={blog.title}
                   className="w-full h-[250px] sm:h-[350px] lg:h-[400px] object-cover rounded-lg shadow-md"
                   loading="eager"

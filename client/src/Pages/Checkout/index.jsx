@@ -10,6 +10,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import CircularProgress from '@mui/material/CircularProgress';
 import StripeCheckout from "../../components/StripeCheckout.jsx";
 import { formatCurrency } from "../../utils/currency";
+import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 
 const VITE_API_URL = import.meta.env.VITE_API_URL;
 
@@ -297,7 +298,7 @@ const Checkout = () => {
         }
         
         return {
-          productId: item.productId,
+          productId: item.productId != null ? String(item.productId) : item.productId,
           productTitle: item.productTitle || item.name || 'Unknown Product',
           quantity: itemQuantity,
           price: itemPrice,
@@ -459,16 +460,19 @@ const Checkout = () => {
           }
         }
         
-        // Clear cart in background (don't wait for it)
+        // Clear cart: for logged-in user clear server cart; for guest clear localStorage
         try {
-          deleteData(`/api/cart/emptyCart/${user?._id}`).catch(err => {
-            console.warn('⚠️ Cart clear failed (non-critical):', err);
-          });
+          if (user?._id) {
+            deleteData(`/api/cart/emptyCart/${user._id}`).catch(err => {
+              console.warn('⚠️ Cart clear failed (non-critical):', err);
+            });
+          } else {
+            context?.clearGuestCart?.();
+          }
+          context?.getCartItems();
         } catch {
-          // ignore cart empty errors but still proceed
+          // ignore cart clear errors
         }
-        
-        context?.getCartItems();
         
         // IMMEDIATE redirect - don't wait for alertBox or other UI updates
         console.log('✅ Order created! Redirecting immediately to success page...');
@@ -553,21 +557,53 @@ const Checkout = () => {
     if (shippingAddress && context?.userData?.address_details) {
       const existingAddress = context.userData.address_details.find(addr => 
         addr.address?.city === shippingAddress.city &&
-        addr.address?.postalCode === shippingAddress.postal_code
+        addr.address?.postalCode === (shippingAddress.postal_code || shippingAddress.postalCode)
       );
       addressId = existingAddress?._id || null;
     }
+
+    // Format products same as success path so server accepts the payload (including guest orders)
+    let formattedProducts = [];
+    try {
+      formattedProducts = (context?.cartData || []).map(item => {
+        const itemPrice = parseFloat(item.price || 0);
+        const itemQuantity = parseInt(item.quantity || 1);
+        return {
+          productId: item.productId != null ? String(item.productId) : item.productId,
+          productTitle: item.productTitle || item.name || 'Unknown Product',
+          quantity: itemQuantity,
+          price: itemPrice,
+          subTotal: parseFloat((item.subTotal || itemPrice * itemQuantity).toFixed(2)),
+          image: item.image || '',
+          productType: item.productType || 'simple',
+          variationId: item.variationId || null,
+          variation: item.variation || null,
+        };
+      }).filter(p => p.productId && p.quantity > 0 && p.price > 0);
+    } catch {
+      formattedProducts = [];
+    }
+
+    const isGuestOrder = !user?._id;
+    const guestCustomer = isGuestOrder ? {
+      name: customerName || 'Guest Customer',
+      phone: phone || '',
+      email: userData?.email || (phone ? `guest-${phone.replace(/\D/g, '')}@zubahouse.com` : `guest-${Date.now()}@zubahouse.com`)
+    } : null;
     
     const payLoad = {
-      userId: user?._id,
-      products: context?.cartData,
+      userId: user?._id || null,
+      isGuestOrder,
+      guestCustomer,
+      products: formattedProducts.length > 0 ? formattedProducts : context?.cartData,
       paymentId: pi?.id || '',
       payment_status: "FAILED",
       delivery_address: addressId,
       totalAmt: totalAmount,
+      shippingCost: selectedShippingRate ? (selectedShippingRate.cost ?? selectedShippingRate.price ?? 0) : 0,
+      shippingRate: selectedShippingRate,
       shippingAddress: shippingAddress,
       phone: phone,
-      // New customer info fields
       customerName: customerName,
       apartmentNumber: apartmentNumber,
       deliveryNote: deliveryNote,
@@ -693,8 +729,10 @@ const Checkout = () => {
                         <div className="part1 flex items-center gap-3">
                           <div className="img w-[50px] h-[50px] object-cover overflow-hidden rounded-md group cursor-pointer">
                             <img
-                              src={item?.image}
+                              src={getOptimizedImageUrl(item?.image, { width: 100, height: 100, quality: 'auto', format: 'auto' })}
                               className="w-full transition-all group-hover:scale-105"
+                              alt=""
+                              loading="lazy"
                             />
                           </div>
 

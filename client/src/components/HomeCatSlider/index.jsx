@@ -1,4 +1,5 @@
 import React, { useContext } from "react";
+import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import "swiper/css/navigation";
@@ -57,9 +58,10 @@ const HomeCatSlider = (props) => {
                     <div className="item py-3 lg:py-7 px-2 lg:px-3 bg-white rounded-sm text-center flex items-center justify-center flex-col hover:bg-gray-50 transition-all min-h-[80px] lg:min-h-[120px]">
                       <div className="flex items-center justify-center mb-1 lg:mb-2">
                         <img
-                          src={cat?.images?.[0]}
+                          src={getOptimizedImageUrl(cat?.images?.[0], { width: 80, height: 80, quality: 'auto', format: 'auto' })}
                           className="w-[35px] h-[35px] sm:w-[40px] sm:h-[40px] lg:w-[60px] lg:h-[60px] object-contain transition-all"
                           alt={cat?.name}
+                          loading="lazy"
                           onError={(e) => {
                             e.target.src = 'https://via.placeholder.com/60?text=Category';
                           }}

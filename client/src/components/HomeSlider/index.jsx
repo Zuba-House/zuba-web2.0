@@ -2,9 +2,9 @@ import React, { useContext } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import "swiper/css/navigation";
-
 import { Navigation, Autoplay } from "swiper/modules";
 import { MyContext } from "../../App";
+import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 
 const HomeSlider = (props) => {
 
@@ -30,9 +30,10 @@ const HomeSlider = (props) => {
                 <SwiperSlide key={index}>
                   <div className="item rounded-[10px] overflow-hidden">
                     <img
-                      src={item?.images[0]}
+                      src={getOptimizedImageUrl(item?.images[0], { width: 1200, height: 600, quality: 'auto', format: 'auto' })}
                       alt="Banner slide"
                       className="w-full"
+                      loading="lazy"
                     />
                   </div>
                 </SwiperSlide>

@@ -104,6 +104,8 @@ The following environment variables are **REQUIRED** for the server to start:
 - `cloudinary_Config_Cloud_Name` - Cloudinary cloud name
 - `cloudinary_Config_api_key` - Cloudinary API key
 - `cloudinary_Config_api_secret` - Cloudinary API secret
+
+  **Cloudinary plan & image speed:** To check if your plan is expiring or you're hitting limits (which can slow image delivery), go to [Cloudinary Console](https://cloudinary.com/console) → Dashboard. There you can see usage, plan expiry, and bandwidth/storage. The client uses optimized URLs (`f_auto`, `q_auto`, and resizing) so images load faster and use less bandwidth.
 - `EMAIL` - Email address for sending emails
 - `EMAIL_PASS` - Email password/app password
 - `MONGODB_URI` or `MONGODB_LOCAL_URI` - At least one MongoDB connection string is required

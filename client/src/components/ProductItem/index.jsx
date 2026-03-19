@@ -386,9 +386,10 @@ const ProductItem = (props) => {
                 
                 return secondImageUrl ? (
                   <img
-                    src={secondImageUrl}
+                    src={getOptimizedImageUrl(secondImageUrl, { width: 800, height: 800, quality: 'auto', format: 'auto' })}
                     className="w-full transition-all duration-700 absolute top-0 left-0 opacity-0 group-hover:opacity-100 group-hover:scale-105"
                     alt={item?.name || 'Product image'}
+                    loading="lazy"
                     onError={(e) => {
                       e.target.style.display = 'none';
                     }}

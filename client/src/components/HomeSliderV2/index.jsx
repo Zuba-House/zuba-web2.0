@@ -1,5 +1,6 @@
 import React, { useContext } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
+import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 // Import Swiper styles
 import "swiper/css";
 import "swiper/css/effect-fade";
@@ -59,7 +60,7 @@ const HomeBannerV2 = (props) => {
             <SwiperSlide key={index}>
 
                 <div className="item w-full rounded-md overflow-hidden relative">
-                  <img src={item?.bannerimages[0]} className="w-full" />
+                  <img src={getOptimizedImageUrl(item?.bannerimages[0], { width: 1200, height: 600, quality: 'auto', format: 'auto' })} className="w-full" alt="" loading="lazy" />
 
                   <div className="info absolute top-0 -right-[100%] opacity-0 w-[50%] h-[100%] z-50 p-8 flex items-center flex-col justify-center transition-all duration-700">
 

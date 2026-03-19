@@ -10,6 +10,7 @@ import { BsStars, BsArrowRepeat, BsEmojiSunglasses } from "react-icons/bs";
 import { IoRefresh, IoSparkles, IoTrendingUp } from "react-icons/io5";
 import { MdExplore, MdAutoAwesome } from "react-icons/md";
 import { formatCurrency } from "../../utils/currency";
+import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/free-mode";
@@ -142,9 +143,10 @@ const DailyDiscover = () => {
           <div className="featured-content">
             <div className="featured-image-wrapper">
               <img 
-                src={featuredPick?.images?.[0]?.url || featuredPick?.images?.[0] || '/placeholder.jpg'} 
+                src={getOptimizedImageUrl(featuredPick?.images?.[0]?.url || featuredPick?.images?.[0], { width: 600, height: 600, quality: 'auto', format: 'auto' }) || '/placeholder.jpg'} 
                 alt={featuredPick?.name}
                 className="featured-image"
+                loading="lazy"
               />
               <div className="featured-overlay">
                 <Link to={`/product/${featuredPick?._id}`} className="featured-cta">

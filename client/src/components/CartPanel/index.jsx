@@ -5,6 +5,7 @@ import Button from "@mui/material/Button";
 import { MyContext } from "../../App";
 import { deleteData } from "../../utils/api";
 import { formatCurrency } from "../../utils/currency";
+import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 
 const CartPanel = (props) => {
 
@@ -41,8 +42,10 @@ const CartPanel = (props) => {
                 <div className="img w-[25%] overflow-hidden h-[80px] rounded-md"  onClick={context.toggleCartPanel(false)}>
                   <Link to={`/product/${item?.productId}`} className="block group">
                     <img
-                      src={item?.image}
+                      src={getOptimizedImageUrl(item?.image, { width: 160, height: 160, quality: 'auto', format: 'auto' })}
                       className="w-full group-hover:scale-105"
+                      loading="lazy"
+                      alt=""
                     />
                   </Link>
                 </div>

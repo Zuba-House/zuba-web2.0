@@ -772,6 +772,7 @@ function App() {
     getUserDetails,
     clearSession,
     // Guest cart functions
+    clearGuestCart,
     updateGuestCartQty,
     removeFromGuestCart,
     mergeGuestCartWithServer,

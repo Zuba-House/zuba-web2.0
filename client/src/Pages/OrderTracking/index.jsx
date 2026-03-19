@@ -21,6 +21,7 @@ import {
   FaHeadset
 } from "react-icons/fa";
 import { fetchDataFromApi } from "../../utils/api";
+import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 
 const OrderTracking = () => {
   useEffect(() => {
@@ -492,9 +493,10 @@ const OrderTracking = () => {
                         >
                           <div className="w-20 h-20 bg-white rounded-lg overflow-hidden flex-shrink-0">
                             <img
-                              src={item.image || "/placeholder-product.png"}
+                              src={getOptimizedImageUrl(item.image, { width: 160, height: 160, quality: 'auto', format: 'auto' }) || "/placeholder-product.png"}
                               alt={item.name}
                               className="w-full h-full object-cover"
+                              loading="lazy"
                             />
                           </div>
                           <div className="flex-1">

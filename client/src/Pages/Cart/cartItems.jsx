@@ -8,6 +8,7 @@ import { IoCloseSharp } from "react-icons/io5";
 import { deleteData, editData, fetchDataFromApi } from "../../utils/api";
 import { MyContext } from "../../App";
 import { formatCurrency } from "../../utils/currency";
+import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 
 const CartItems = (props) => {
   const [sizeanchorEl, setSizeAnchorEl] = useState(null);
@@ -108,9 +109,10 @@ const CartItems = (props) => {
       <div className="img w-[30%] sm:w-[20%] lg:w-[15%] rounded-md overflow-hidden relative">
         <Link to={`/product/${props?.item?.productId}`} className="group">
           <img
-            src={props?.item?.image}
+            src={getOptimizedImageUrl(props?.item?.image, { width: 200, height: 200, quality: 'auto', format: 'auto' })}
             className="w-full group-hover:scale-105 transition-all"
             alt={props?.item?.productTitle}
+            loading="lazy"
           />
         </Link>
       </div>

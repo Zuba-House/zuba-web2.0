@@ -5,6 +5,7 @@ import { IoIosArrowForward } from "react-icons/io";
 import { fetchDataFromApi, deleteData } from '../../utils/api';
 import { LazyLoadImage } from "react-lazy-load-image-component";
 import "react-lazy-load-image-component/src/effects/blur.css";
+import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 
 
 const BlogItem = (props) => {
@@ -25,7 +26,7 @@ const BlogItem = (props) => {
           alt={props?.item?.title || "Blog post image"}
           effect="blur"
           className="w-full h-full object-cover transition-all duration-300 group-hover:scale-105"
-          src={props?.item?.images?.[0]}
+          src={getOptimizedImageUrl(props?.item?.images?.[0], { width: 600, height: 400, quality: 'auto', format: 'auto' })}
           loading="lazy"
         />
 
