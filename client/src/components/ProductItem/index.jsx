@@ -301,7 +301,7 @@ const ProductItem = (props) => {
   };
 
   return (
-    <div className="productItem shadow-lg rounded-md overflow-hidden border-1 border-[rgba(0,0,0,0.1)]">
+    <div className="productItem h-full flex flex-col shadow-lg rounded-md overflow-hidden border-1 border-[rgba(0,0,0,0.1)]">
       <div className="group imgWrapper w-[100%]  overflow-hidden  rounded-md rounded-bl-none rounded-br-none relative">
         {/* Out of Stock Badge */}
         {isOutOfStock() && (
@@ -513,7 +513,7 @@ const ProductItem = (props) => {
         </div>
       </div>
 
-      <div className="info p-3 py-3 lg:py-5 relative pb-[42px] lg:pb-[50px] lg:h-[190px] h-auto">
+      <div className="info p-3 py-3 lg:py-5 relative flex flex-col flex-1 min-h-[160px] lg:min-h-[190px]">
         <h6 className="text-[10px] lg:text-[13px] !font-[400] truncate mb-1">
           <span className="link transition-all block truncate">
             {item?.brand}
@@ -527,7 +527,7 @@ const ProductItem = (props) => {
 
         <Rating name="size-small" defaultValue={item?.rating} size="small" readOnly />
 
-        <div className="flex items-center gap-2 justify-between flex-wrap">
+        <div className="flex items-center gap-2 justify-between flex-wrap gap-y-1 shrink-0">
           {isVariableProduct(item) ? (
             // Variable product - show price range
             (() => {
@@ -573,7 +573,7 @@ const ProductItem = (props) => {
         </div>
 
 
-        <div className="!absolute bottom-[10px] left-0 right-0 pl-3 pr-3 w-full">
+        <div className="productItem-cartRow mt-auto pt-3 w-full shrink-0">
 
           {
             isAdded === false ?

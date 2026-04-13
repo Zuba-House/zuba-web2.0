@@ -202,7 +202,6 @@
 @media (min-width: 1280px) {
   .productItem .info {
     padding: 16px 12px !important;
-    padding-bottom: 60px !important;
   }
   
   .productItem .info h6 {
@@ -241,7 +240,6 @@
   
   .productItem .info {
     padding: 18px 14px !important;
-    padding-bottom: 65px !important;
   }
   
   .productItem .info h6 {
@@ -272,4 +270,55 @@
     min-width: 40px !important;
     min-height: 40px !important;
   }
+}
+
+/* Grids: stretch product cards so row heights match and .info flex + mt-auto can push the cart down */
+.grid > .productItem {
+  align-self: stretch;
+}
+
+/* Swiper: slides as flex containers so .productItem (h-full flex-col) fills slide width */
+.productsSlider .swiper-slide,
+.ngomaProductsSlider .swiper-slide,
+.sale-products-slider .swiper-slide {
+  display: flex;
+  height: auto;
+  box-sizing: border-box;
+}
+
+.productsSlider .swiper-slide > .productItem,
+.ngomaProductsSlider .swiper-slide > .productItem,
+.sale-products-slider .swiper-slide > .productItem {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Feature wrappers around ProductItem: full column flex so inner card can grow */
+.flash-swiper .swiper-slide,
+.discover-swiper .swiper-slide,
+.gifts-swiper .swiper-slide,
+.ai-swiper .swiper-slide {
+  display: flex;
+  height: auto;
+  box-sizing: border-box;
+}
+
+.flash-swiper .swiper-slide > .flash-product-card,
+.discover-swiper .swiper-slide > .discover-product-card,
+.gifts-swiper .swiper-slide > .gift-product-card,
+.ai-swiper .swiper-slide > .ai-product-card {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.flash-product-card > .productItem,
+.discover-product-card > .productItem,
+.gift-product-card > .productItem,
+.ai-product-card > .productItem {
+  flex: 1 1 auto;
+  min-height: 0;
 }
