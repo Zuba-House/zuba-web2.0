@@ -26,10 +26,22 @@ import { optimizeCloudinaryUrl, preloadImage } from "../../utils/imageOptimizer"
 
 const StyledBadge = styled(Badge)(({ theme }) => ({
   "& .MuiBadge-badge": {
-    right: -3,
-    top: 13,
+    right: 2,
+    top: 4,
     border: `2px solid ${theme.palette.background.paper}`,
-    padding: "0 4px",
+    padding: "0 5px",
+    fontSize: "0.65rem",
+    minWidth: "18px",
+    height: "18px",
+  },
+  "@media (min-width: 992px)": {
+    "& .MuiBadge-badge": {
+      right: -4,
+      top: 8,
+      minWidth: "20px",
+      height: "20px",
+      fontSize: "0.7rem",
+    },
   },
 }));
 
@@ -53,6 +65,8 @@ const Header = () => {
 
 
   const location = useLocation();
+  const cartCount = context?.cartData?.length || 0;
+  const wishlistCount = context?.myListData?.length || 0;
 
   const protectedRoutes = [
     "/my-account",
@@ -367,8 +381,14 @@ const Header = () => {
                   <li>
                     <Tooltip title="Wishlist">
                       <Link to="/my-list">
-                        <IconButton aria-label="cart" className="hover:!text-[#efb291]">
-                          <StyledBadge badgeContent={context?.myListData?.length !== 0 ? context?.myListData?.length : 0} color="secondary">
+                        <IconButton aria-label="wishlist" className="hover:!text-[#efb291]">
+                          <StyledBadge
+                            overlap="circular"
+                            anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                            badgeContent={wishlistCount > 99 ? "99+" : wishlistCount}
+                            invisible={wishlistCount === 0}
+                            color="secondary"
+                          >
                             <FaRegHeart className="text-[#e5e2db]" />
                           </StyledBadge>
                         </IconButton>
@@ -397,19 +417,12 @@ const Header = () => {
                       }}
                     >
                       <StyledBadge 
-                        badgeContent={context?.cartData?.length !== 0 ? context?.cartData?.length : 0} 
-                        color="secondary"
-                        sx={{
-                          '& .MuiBadge-badge': {
-                            '@media (max-width: 992px)': {
-                              fontSize: '10px',
-                              minWidth: '18px',
-                              height: '18px',
-                              padding: '0 4px'
-                            }
-                          }
-                        }}
-                      >
+                          overlap="circular"
+                          anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                          badgeContent={cartCount > 99 ? "99+" : cartCount}
+                          invisible={cartCount === 0}
+                          color="secondary"
+                        >
                         <MdOutlineShoppingCart className="text-[#e5e2db] text-[20px] lg:text-[24px]" />
                       </StyledBadge>
                     </IconButton>

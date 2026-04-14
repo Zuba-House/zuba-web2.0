@@ -87,6 +87,27 @@ nav ul button:hover{background: none !important;}
 .swiper-button-prev:hover,.swiper-button-next:hover{background: #eeb190 !important;}
 .swiper-button-prev:hover::after,.swiper-button-next:hover::after{color: #fff !important;}
 
+.responsive-hero-swiper .swiper-button-prev,
+.responsive-hero-swiper .swiper-button-next {
+  background: rgba(229, 226, 219, 0.95) !important;
+  border: 1px solid rgba(11, 39, 53, 0.2);
+}
+
+.responsive-hero-swiper .swiper-button-prev:after,
+.responsive-hero-swiper .swiper-button-next:after {
+  color: #0b2735 !important;
+}
+
+.responsive-hero-swiper .swiper-button-prev:hover,
+.responsive-hero-swiper .swiper-button-next:hover {
+  background: #eeb190 !important;
+}
+
+.responsive-hero-swiper .swiper-button-prev:hover:after,
+.responsive-hero-swiper .swiper-button-next:hover:after {
+  color: #0b2735 !important;
+}
+
 .homeCatSlider .item:hover img{transform:scale(1.1);}
 
 

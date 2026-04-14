@@ -719,7 +719,7 @@ const Checkout = () => {
                 <span className="text-[14px] font-[600]">Subtotal</span>
               </div>
 
-              <div className="mb-5 scroll max-h-[250px] overflow-y-scroll overflow-x-hidden pr-2">
+              <div className="mb-5 scroll checkout-items max-h-[250px] overflow-y-scroll overflow-x-hidden pr-2">
 
                 {
                   context?.cartData?.length !== 0 && context?.cartData?.map((item, index) => {

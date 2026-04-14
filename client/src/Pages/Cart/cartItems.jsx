@@ -5,7 +5,7 @@ import MenuItem from "@mui/material/MenuItem";
 import { GoTriangleDown } from "react-icons/go";
 import Rating from "@mui/material/Rating";
 import { IoCloseSharp } from "react-icons/io5";
-import { deleteData, editData, fetchDataFromApi } from "../../utils/api";
+import { deleteData, editData } from "../../utils/api";
 import { MyContext } from "../../App";
 import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 
@@ -18,9 +18,10 @@ const CartItems = (props) => {
   const [selectedQty, setSelectedQty] = useState(props.qty);
   const openQty = Boolean(qtyanchorEl);
 
-  const numbers = Array.from({ length: 20 }, () => Math.floor(Math.random() * 10) + 1);
-
   const context = useContext(MyContext);
+  const title = props?.item?.productTitle || "";
+  const maxTitleLength = context?.windowWidth < 992 ? 42 : 120;
+  const titlePreview = title.length > maxTitleLength ? `${title.slice(0, maxTitleLength)}...` : title;
 
   const handleClickSize = (event) => {
     setSizeAnchorEl(event.currentTarget);
@@ -119,8 +120,8 @@ const CartItems = (props) => {
       <div className="info  w-[70%]  sm:w-[80%]  lg:w-[85%] relative">
         <IoCloseSharp className="cursor-pointer absolute top-[0px] right-[0px] text-[22px] link transition-all" onClick={() => removeItem(props?.item?._id)} />
         <span className="text-[13px]">{props?.item?.brand}</span>
-        <h3 className="text-[13px] sm:text-[15px] w-[80%]">
-          <Link to={`/product/${props?.item?.productId}`} className="link">{props?.item?.productTitle?.substr(0, context?.windowWidth < 992 ? 30 : 120) + '...'}</Link>
+        <h3 className="text-[13px] sm:text-[15px] w-full cart-item-title">
+          <Link to={`/product/${props?.item?.productId}`} className="link">{titlePreview}</Link>
         </h3>
 
         {/* Variation Info Display */}

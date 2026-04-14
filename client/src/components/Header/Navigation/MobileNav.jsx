@@ -5,7 +5,7 @@ import { IoSearch } from "react-icons/io5";
 import { LuHeart } from "react-icons/lu";
 import { BsBagCheck } from "react-icons/bs";
 import { FiUser } from "react-icons/fi";
-import { NavLink } from "react-router";
+import { NavLink } from "react-router-dom";
 import { MdOutlineFilterAlt } from "react-icons/md";
 import { MyContext } from '../../../App';
 import { useLocation } from "react-router-dom";
@@ -31,11 +31,13 @@ const MobileNav = () => {
         context?.setOpenSearchPanel(false)
     }
 
+    const navLinkClass = ({ isActive }) =>
+        `mobile-nav-link ${isActive ? "isActive" : ""}`;
 
     return (
         <div className='mobileNav bg-white p-1 px-3 w-full flex items-center justify-between fixed bottom-0 left-0 gap-0 z-[51]'>
-            <NavLink to="/" exact={true} activeClassName="isActive" onClick={()=>context?.setOpenSearchPanel(false)}>
-                <Button className="flex-col !w-[40px] !min-w-[40px] !capitalize !text-gray-700">
+            <NavLink to="/" className={navLinkClass} onClick={()=>context?.setOpenSearchPanel(false)}>
+                <Button className="mobile-nav-btn flex-col !capitalize !text-gray-700">
                     <IoHomeOutline size={18} />
                     <span className='text-[12px]'>Home</span>
                 </Button>
@@ -44,12 +46,12 @@ const MobileNav = () => {
 
             {
                 context?.isFilterBtnShow === true &&
-                <Button className="flex-col !w-[40px] !h-[40px] !min-w-[40px] !capitalize !text-gray-700 !bg-primary !rounded-full mobile-filter-btn" onClick={openFilters}>
+                <Button className="mobile-filter-btn flex-col !capitalize !text-gray-700 !bg-primary !rounded-full" onClick={openFilters}>
                     <MdOutlineFilterAlt size={24} className='text-white mobile-filter-icon' />
                 </Button>
             }
 
-            <Button className="flex-col !w-[40px] !min-w-[40px] !capitalize !text-gray-700 mobile-search-btn"
+            <Button className="mobile-nav-btn flex-col !capitalize !text-gray-700 mobile-search-btn"
             onClick={()=>context?.setOpenSearchPanel(true)}>
                 <IoSearch size={24} className='mobile-search-icon' />
                 <span className='text-[12px]'>Search</span>
@@ -58,23 +60,23 @@ const MobileNav = () => {
 
 
 
-            <NavLink to="/my-list" exact={true} activeClassName="isActive" onClick={()=>context?.setOpenSearchPanel(false)}>
-                <Button className="flex-col !w-[40px] !min-w-[40px] !capitalize !text-gray-700">
+            <NavLink to="/my-list" className={navLinkClass} onClick={()=>context?.setOpenSearchPanel(false)}>
+                <Button className="mobile-nav-btn flex-col !capitalize !text-gray-700">
                     <LuHeart size={18} />
                     <span className='text-[12px]'>Wishlist</span>
                 </Button>
             </NavLink>
 
 
-            <NavLink to="/my-orders" exact={true} activeClassName="isActive" onClick={()=>context?.setOpenSearchPanel(false)}>
-                <Button className="flex-col !w-[40px] !min-w-[40px] !capitalize !text-gray-700">
+            <NavLink to="/my-orders" className={navLinkClass} onClick={()=>context?.setOpenSearchPanel(false)}>
+                <Button className="mobile-nav-btn flex-col !capitalize !text-gray-700">
                     <BsBagCheck size={18} />
                     <span className='text-[12px]'>Orders</span>
                 </Button>
             </NavLink>
 
-            <NavLink to="/my-account" exact={true} activeClassName="isActive" onClick={()=>context?.setOpenSearchPanel(false)}>
-                <Button className="flex-col !w-[40px] !min-w-[40px] !capitalize !text-gray-700">
+            <NavLink to="/my-account" className={navLinkClass} onClick={()=>context?.setOpenSearchPanel(false)}>
+                <Button className="mobile-nav-btn flex-col !capitalize !text-gray-700">
                     <FiUser size={18} />
                     <span className='text-[12px]'>Account</span>
                 </Button>

@@ -95,13 +95,13 @@ const ResponsiveHeroBanner = () => {
         <div className="container">
           <Swiper
             modules={[Navigation, Autoplay]}
-            navigation={true}
+            navigation={!isMobile}
             autoplay={{
               delay: 5000,
               disableOnInteraction: false,
             }}
             loop={true}
-            className="rounded-[10px] overflow-hidden"
+            className="rounded-[10px] overflow-hidden responsive-hero-swiper"
           >
             {filteredBanners.map((banner, index) => {
               const hasContent = banner.title || banner.subtitle || banner.ctaText;
