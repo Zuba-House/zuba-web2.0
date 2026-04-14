@@ -178,7 +178,7 @@ input[type=number]::-webkit-outer-spin-button {
 
 .productsSlider .swiper,.blogSection .swiper{overflow: inherit !important;}
 
-.cartPanel .MuiPaper-root{width: 400px; overflow: hidden;}
+.cartPanel .MuiPaper-root{width: 400px; overflow: hidden; display: flex; flex-direction: column;}
 .addressPanel .MuiPaper-root{width: 500px; overflow: hidden;}
 
 

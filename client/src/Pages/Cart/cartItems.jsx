@@ -93,7 +93,7 @@ const CartItems = (props) => {
 
 
   return (
-    <div className="cartItem w-full p-3 flex items-center gap-4 pb-5 border-b border-[rgba(0,0,0,0.1)] relative">
+    <div className="cartItem cart-page-item w-full p-3 flex items-center gap-4 pb-5 border-b border-[rgba(0,0,0,0.1)] relative">
       {/* Out of Stock Badge */}
       {props?.item?.isOutOfStock && (
         <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded text-[10px] font-bold z-10">
@@ -117,9 +117,9 @@ const CartItems = (props) => {
         </Link>
       </div>
 
-      <div className="info  w-[70%]  sm:w-[80%]  lg:w-[85%] relative">
-        <IoCloseSharp className="cursor-pointer absolute top-[0px] right-[0px] text-[22px] link transition-all" onClick={() => removeItem(props?.item?._id)} />
-        <span className="text-[13px]">{props?.item?.brand}</span>
+      <div className="info w-[70%] sm:w-[80%] lg:w-[85%] relative">
+        <IoCloseSharp className="cart-item-remove cursor-pointer absolute top-[0px] right-[0px] text-[22px] link transition-all" onClick={() => removeItem(props?.item?._id)} />
+        <span className="cart-item-brand text-[13px]">{props?.item?.brand}</span>
         <h3 className="text-[13px] sm:text-[15px] w-full cart-item-title">
           <Link to={`/product/${props?.item?.productId}`} className="link">{titlePreview}</Link>
         </h3>
@@ -140,7 +140,7 @@ const CartItems = (props) => {
 
         <Rating name="size-small" value={props?.item?.rating} size="small" readOnly />
 
-        <div className="flex items-center gap-4 mt-2">
+        <div className="cart-item-actions flex items-center gap-4 mt-2">
           {/* Old variation system - kept for backward compatibility only */}
           {(props?.item?.size || props?.item?.weight || props?.item?.ram) && !props?.item?.variation && (
             <div className="text-[11px] bg-gray-100 px-2 py-1 rounded">
@@ -192,7 +192,7 @@ const CartItems = (props) => {
           </div>
         )}
 
-        <div className="flex items-center gap-4 mt-2">
+        <div className="cart-item-price-row flex items-center gap-4 mt-2">
           <span className="price text-[14px] font-[600]">{context?.formatPrice(props?.item?.price)}</span>
 
           {props?.item?.oldPrice && props?.item?.oldPrice > props?.item?.price && (

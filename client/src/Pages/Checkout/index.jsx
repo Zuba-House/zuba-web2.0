@@ -205,7 +205,17 @@ const Checkout = () => {
     }
 
     // Validate shipping address and rate
-    if (!selectedShippingRate || (!selectedShippingRate.cost && !selectedShippingRate.price)) {
+    const shippingRateValue = selectedShippingRate
+      ? (selectedShippingRate.cost ?? selectedShippingRate.price)
+      : null;
+    const hasValidShippingRate =
+      !!selectedShippingRate &&
+      shippingRateValue !== null &&
+      shippingRateValue !== undefined &&
+      !Number.isNaN(Number(shippingRateValue)) &&
+      Number(shippingRateValue) >= 0;
+
+    if (!hasValidShippingRate) {
       context?.alertBox("error", "Please select a shipping method");
       return;
     }

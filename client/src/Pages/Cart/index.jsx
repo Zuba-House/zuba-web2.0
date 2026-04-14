@@ -554,10 +554,16 @@ const CartPage = () => {
                               !phoneError &&
                               phoneDigits.length >= 10;
               
-              // Shipping rate validation
-              const hasShippingRate = selectedShippingRate && 
-                                     (selectedShippingRate.cost || selectedShippingRate.price) &&
-                                     (selectedShippingRate.cost > 0 || selectedShippingRate.price > 0);
+              // Shipping rate validation: allow free shipping (0 cost) as valid
+              const shippingValue = selectedShippingRate
+                ? (selectedShippingRate.cost ?? selectedShippingRate.price)
+                : null;
+              const hasShippingRate =
+                !!selectedShippingRate &&
+                shippingValue !== null &&
+                shippingValue !== undefined &&
+                !Number.isNaN(Number(shippingValue)) &&
+                Number(shippingValue) >= 0;
               
               const handleCheckoutClick = async () => {
                 // Validate customer name - REQUIRED
