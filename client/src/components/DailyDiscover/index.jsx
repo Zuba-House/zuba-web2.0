@@ -9,7 +9,6 @@ import { FaRandom, FaSyncAlt, FaRegLightbulb, FaRegEye, FaHeart, FaStar } from "
 import { BsStars, BsArrowRepeat, BsEmojiSunglasses } from "react-icons/bs";
 import { IoRefresh, IoSparkles, IoTrendingUp } from "react-icons/io5";
 import { MdExplore, MdAutoAwesome } from "react-icons/md";
-import { formatCurrency } from "../../utils/currency";
 import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 import "swiper/css";
 import "swiper/css/navigation";
@@ -164,11 +163,11 @@ const DailyDiscover = () => {
               </p>
               <div className="featured-price">
                 <span className="current-price">
-                  {formatCurrency(featuredPick?.pricing?.price || featuredPick?.price || 0)}
+                  {context?.formatPrice(featuredPick?.pricing?.price || featuredPick?.price || 0)}
                 </span>
                 {featuredPick?.pricing?.regularPrice > featuredPick?.pricing?.price && (
                   <span className="original-price">
-                    {formatCurrency(featuredPick?.pricing?.regularPrice)}
+                    {context?.formatPrice(featuredPick?.pricing?.regularPrice)}
                   </span>
                 )}
               </div>

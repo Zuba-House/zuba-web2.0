@@ -13,7 +13,6 @@ import { deleteData, editData, postData } from "../../utils/api";
 import CircularProgress from '@mui/material/CircularProgress';
 import { MdClose } from "react-icons/md";
 import { IoMdHeart } from "react-icons/io";
-import { formatCurrency } from "../../utils/currency";
 import { normalizeProduct } from "../../utils/productNormalizer";
 import { getPriceRange, isVariableProduct } from '../../utils/productUtils';
 import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
@@ -536,18 +535,18 @@ const ProductItem = (props) => {
                 return (
                   <div className="flex items-center gap-1 flex-wrap">
                     <span className="price text-primary text-[12px] lg:text-[14px] font-[600]">
-                      {formatCurrency(priceRange.min)} - {formatCurrency(priceRange.max)}
+                      {context?.formatPrice(priceRange.min)} - {context?.formatPrice(priceRange.max)}
                     </span>
-                    <span className="text-[10px] lg:text-[11px] text-gray-600 font-[500]">USD</span>
+                    <span className="text-[10px] lg:text-[11px] text-gray-600 font-[500]">{context?.displayCurrency || "USD"}</span>
                   </div>
                 );
               }
               return (
                 <div className="flex items-center gap-1">
                   <span className="price text-primary text-[12px] lg:text-[14px] font-[600]">
-                    {formatCurrency(item?.price || priceRange?.min)}
+                    {context?.formatPrice(item?.price || priceRange?.min)}
                   </span>
-                  <span className="text-[10px] lg:text-[11px] text-gray-600 font-[500]">USD</span>
+                  <span className="text-[10px] lg:text-[11px] text-gray-600 font-[500]">{context?.displayCurrency || "USD"}</span>
                 </div>
               );
             })()
@@ -557,16 +556,16 @@ const ProductItem = (props) => {
               {item?.isOnSale && item?.oldPrice > item?.price && (
                 <div className="flex items-center gap-1">
                   <span className="oldPrice line-through text-gray-500 text-[12px] lg:text-[14px] font-[500]">
-                    {formatCurrency(item?.oldPrice)}
+                    {context?.formatPrice(item?.oldPrice)}
                   </span>
-                  <span className="text-[10px] lg:text-[11px] text-gray-400 font-[400] line-through">USD</span>
+                  <span className="text-[10px] lg:text-[11px] text-gray-400 font-[400] line-through">{context?.displayCurrency || "USD"}</span>
                 </div>
               )}
               <div className="flex items-center gap-1">
                 <span className="price text-primary text-[12px] lg:text-[14px] font-[600]">
-                  {formatCurrency(item?.price)}
+                  {context?.formatPrice(item?.price)}
                 </span>
-                <span className="text-[10px] lg:text-[11px] text-gray-600 font-[500]">USD</span>
+                <span className="text-[10px] lg:text-[11px] text-gray-600 font-[500]">{context?.displayCurrency || "USD"}</span>
               </div>
             </>
           )}

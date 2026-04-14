@@ -7,7 +7,6 @@ import Rating from "@mui/material/Rating";
 import { IoCloseSharp } from "react-icons/io5";
 import { deleteData, editData, fetchDataFromApi } from "../../utils/api";
 import { MyContext } from "../../App";
-import { formatCurrency } from "../../utils/currency";
 import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 
 const CartItems = (props) => {
@@ -193,11 +192,11 @@ const CartItems = (props) => {
         )}
 
         <div className="flex items-center gap-4 mt-2">
-          <span className="price text-[14px] font-[600]">{formatCurrency(props?.item?.price)}</span>
+          <span className="price text-[14px] font-[600]">{context?.formatPrice(props?.item?.price)}</span>
 
           {props?.item?.oldPrice && props?.item?.oldPrice > props?.item?.price && (
             <span className="oldPrice line-through text-gray-500 text-[14px] font-[500]">
-              {formatCurrency(props?.item?.oldPrice)}
+              {context?.formatPrice(props?.item?.oldPrice)}
             </span>
           )}
 

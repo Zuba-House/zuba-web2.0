@@ -13,7 +13,6 @@ import { deleteData, editData, postData } from "../../utils/api";
 import CircularProgress from '@mui/material/CircularProgress';
 import { MdClose } from "react-icons/md";
 import { IoMdHeart } from "react-icons/io";
-import { formatCurrency } from "../../utils/currency";
 import { getOptimizedImageUrl } from '../../utils/imageOptimizer';
 
 const ProductItem = (props) => {
@@ -387,16 +386,16 @@ const ProductItem = (props) => {
           {props?.item?.oldPrice && props?.item?.oldPrice > props?.item?.price && (
             <div className="flex items-center gap-1">
               <span className="oldPrice line-through text-gray-500 text-[15px] font-[500]">
-                {formatCurrency(props?.item?.oldPrice)}
+                {context?.formatPrice(props?.item?.oldPrice)}
               </span>
-              <span className="text-[11px] text-gray-400 font-[400] line-through">USD</span>
+              <span className="text-[11px] text-gray-400 font-[400] line-through">{context?.displayCurrency || "USD"}</span>
             </div>
           )}
           <div className="flex items-center gap-1">
             <span className="price text-primary text-[15px] font-[600]">
-              {formatCurrency(props?.item?.price)}
+              {context?.formatPrice(props?.item?.price)}
             </span>
-            <span className="text-[12px] text-gray-600 font-[500]">USD</span>
+            <span className="text-[12px] text-gray-600 font-[500]">{context?.displayCurrency || "USD"}</span>
           </div>
         </div>
 

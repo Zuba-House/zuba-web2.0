@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { BrowserRouter, Route, Routes, Link } from "react-router-dom";
 import Button from "@mui/material/Button";
 import emailjs from '@emailjs/browser';
@@ -48,6 +48,13 @@ import ScrollToTop from "./components/ScrollToTop";
 import toast, { Toaster } from 'react-hot-toast';
 import { fetchDataFromApi, postData } from "./utils/api";
 import { trackPageView } from "./utils/analytics";
+import {
+  CURRENCY_MANUAL_KEY,
+  CURRENCY_STORAGE_KEY,
+  DISPLAY_CURRENCY_CODES,
+  convertUsdToDisplay,
+  formatMoney
+} from "./utils/currency";
 import Address from "./Pages/MyAccount/address";
 import { OrderSuccess } from "./Pages/Orders/success";
 import { OrderFailed } from "./Pages/Orders/failed";
@@ -86,6 +93,151 @@ function App() {
   const [isFilterBtnShow, setisFilterBtnShow] = useState(false);
 
   const [openSearchPanel, setOpenSearchPanel] = useState(false);
+
+  const [displayCurrency, setDisplayCurrencyState] = useState(() => {
+    try {
+      const saved = localStorage.getItem(CURRENCY_STORAGE_KEY);
+      if (saved && DISPLAY_CURRENCY_CODES.includes(saved)) return saved;
+    } catch {
+      /* ignore */
+    }
+    return "USD";
+  });
+  const [currencyRates, setCurrencyRates] = useState(null);
+
+  const setDisplayCurrency = useCallback((code) => {
+    if (!DISPLAY_CURRENCY_CODES.includes(code)) return;
+    try {
+      localStorage.setItem(CURRENCY_STORAGE_KEY, code);
+      localStorage.setItem(CURRENCY_MANUAL_KEY, "true");
+    } catch {
+      /* ignore */
+    }
+    setDisplayCurrencyState(code);
+  }, []);
+
+  const formatPrice = useCallback(
+    (usdAmount) => {
+      const n = Number(usdAmount);
+      if (displayCurrency === "USD" || !currencyRates) {
+        return formatMoney(isNaN(n) ? 0 : n, "USD");
+      }
+      const rate = currencyRates[displayCurrency];
+      if (!rate || isNaN(rate)) {
+        return formatMoney(isNaN(n) ? 0 : n, "USD");
+      }
+      const converted = convertUsdToDisplay(n, displayCurrency, currencyRates);
+      return formatMoney(converted, displayCurrency);
+    },
+    [displayCurrency, currencyRates]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const api = import.meta.env.VITE_API_URL;
+        let ratesJson = {};
+        let detectJson = {};
+
+        if (api) {
+          try {
+            const [ratesRes, detectRes] = await Promise.all([
+              fetch(`${api}/api/currency/rates`),
+              fetch(`${api}/api/currency/detect`)
+            ]);
+            try {
+              ratesJson = await ratesRes.json();
+            } catch {
+              ratesJson = {};
+            }
+            try {
+              detectJson = await detectRes.json();
+            } catch {
+              detectJson = {};
+            }
+          } catch {
+            ratesJson = {};
+            detectJson = {};
+          }
+        }
+
+        if (cancelled) return;
+
+        if (
+          ratesJson?.rates?.CAD != null &&
+          ratesJson?.rates?.EUR != null &&
+          !Number.isNaN(Number(ratesJson.rates.CAD)) &&
+          !Number.isNaN(Number(ratesJson.rates.EUR))
+        ) {
+          setCurrencyRates({
+            CAD: Number(ratesJson.rates.CAD),
+            EUR: Number(ratesJson.rates.EUR)
+          });
+        } else {
+          try {
+            const fb = await fetch(
+              "https://api.frankfurter.app/latest?from=USD&to=CAD,EUR"
+            );
+            const fj = await fb.json();
+            if (fj?.rates?.CAD && fj?.rates?.EUR) {
+              setCurrencyRates({
+                CAD: Number(fj.rates.CAD),
+                EUR: Number(fj.rates.EUR)
+              });
+            }
+          } catch {
+            /* keep null; formatPrice falls back to USD */
+          }
+        }
+
+        let manual = false;
+        try {
+          manual = localStorage.getItem(CURRENCY_MANUAL_KEY) === "true";
+          if (!manual && localStorage.getItem(CURRENCY_STORAGE_KEY)) {
+            manual = true;
+          }
+        } catch {
+          manual = false;
+        }
+
+        const guessCurrencyFromNavigator = () => {
+          if (typeof navigator === "undefined") return null;
+          const full = (navigator.language || "").toUpperCase();
+          const primary = (navigator.language || "en").split("-")[0].toUpperCase();
+          if (full.endsWith("-CA") || full.includes("FR-CA")) return "CAD";
+          if (full.endsWith("-US")) return "USD";
+          const eurPrimary = new Set([
+            "DE", "FR", "IT", "ES", "NL", "PT", "FI", "GA", "ET", "LV", "LT", "MT", "SL", "SK", "EL", "HR"
+          ]);
+          if (eurPrimary.has(primary)) return "EUR";
+          return null;
+        };
+
+        const serverDetected =
+          detectJson?.displayCurrency &&
+          DISPLAY_CURRENCY_CODES.includes(detectJson.displayCurrency)
+            ? detectJson.displayCurrency
+            : null;
+        const detected = serverDetected || guessCurrencyFromNavigator();
+
+        if (!manual && detected && DISPLAY_CURRENCY_CODES.includes(detected)) {
+          setDisplayCurrencyState(detected);
+          try {
+            localStorage.setItem(CURRENCY_STORAGE_KEY, detected);
+          } catch {
+            /* ignore */
+          }
+        }
+      } catch (e) {
+        console.warn("Currency init failed:", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleOpenProductDetailsModal = (status, item) => {
     setOpenProductDetailsModal({
@@ -788,7 +940,11 @@ function App() {
     setisFilterBtnShow,
     isFilterBtnShow,
     setOpenSearchPanel,
-    openSearchPanel
+    openSearchPanel,
+    displayCurrency,
+    setDisplayCurrency,
+    formatPrice,
+    currencyRates
   };
 
   return (

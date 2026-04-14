@@ -9,7 +9,6 @@ import axios from 'axios';
 import { useNavigate, useLocation } from "react-router-dom";
 import CircularProgress from '@mui/material/CircularProgress';
 import StripeCheckout from "../../components/StripeCheckout.jsx";
-import { formatCurrency } from "../../utils/currency";
 import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 
 const VITE_API_URL = import.meta.env.VITE_API_URL;
@@ -701,7 +700,7 @@ const Checkout = () => {
                     </div>
                     <div className="text-right">
                       <strong className="text-[16px] font-[700] text-primary">
-                        {formatCurrency(selectedShippingRate.cost || selectedShippingRate.price || 0)}
+                        {context?.formatPrice(selectedShippingRate.cost || selectedShippingRate.price || 0)}
                       </strong>
                     </div>
                   </div>
@@ -742,7 +741,7 @@ const Checkout = () => {
                           </div>
                         </div>
 
-                        <span className="text-[14px] font-[500]">{formatCurrency(item?.quantity * item?.price)}</span>
+                        <span className="text-[14px] font-[500]">{context?.formatPrice(item?.quantity * item?.price)}</span>
                       </div>
                     )
                   })
@@ -758,13 +757,13 @@ const Checkout = () => {
                   <span className="text-[14px] font-[500]">Subtotal</span>
                   <div className="flex items-center gap-1">
                     <span className="text-[14px] font-[600]">
-                      {formatCurrency(
+                      {context?.formatPrice(
                         context.cartData?.length !== 0 ?
                           context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
                             .reduce((total, value) => total + value, 0) : 0
                       )}
                     </span>
-                    <span className="text-[11px] text-gray-600 font-[500]">USD</span>
+                    <span className="text-[11px] text-gray-600 font-[500]">{context?.displayCurrency || "USD"}</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between mb-2">
@@ -774,7 +773,7 @@ const Checkout = () => {
                       discounts?.freeShipping ? (
                         <span className="text-green-600">FREE</span>
                       ) : (
-                        formatCurrency(selectedShippingRate.cost || selectedShippingRate.price || 0)
+                        context?.formatPrice(selectedShippingRate.cost || selectedShippingRate.price || 0)
                       )
                     ) : (
                       <span className="text-gray-400">Select address</span>
@@ -787,20 +786,20 @@ const Checkout = () => {
                     {discounts.couponDiscount > 0 && (
                       <div className="flex items-center justify-between mb-2 text-green-600">
                         <span className="text-[14px] font-[500]">Coupon ({discounts.coupon?.code})</span>
-                        <span className="text-[14px] font-[600]">-{formatCurrency(discounts.couponDiscount)}</span>
+                        <span className="text-[14px] font-[600]">-{context?.formatPrice(discounts.couponDiscount)}</span>
                       </div>
                     )}
                     {discounts.giftCardDiscount > 0 && (
                       <div className="flex items-center justify-between mb-2 text-green-600">
                         <span className="text-[14px] font-[500]">Gift Card</span>
-                        <span className="text-[14px] font-[600]">-{formatCurrency(discounts.giftCardDiscount)}</span>
+                        <span className="text-[14px] font-[600]">-{context?.formatPrice(discounts.giftCardDiscount)}</span>
                       </div>
                     )}
                     {discounts.automaticDiscounts?.length > 0 && discounts.automaticDiscounts.reduce((sum, d) => sum + d.discount, 0) > 0 && (
                       <div className="flex items-center justify-between mb-2 text-green-600">
                         <span className="text-[14px] font-[500]">Automatic Discounts</span>
                         <span className="text-[14px] font-[600]">
-                          -{formatCurrency(discounts.automaticDiscounts.reduce((sum, d) => sum + d.discount, 0))}
+                          -{context?.formatPrice(discounts.automaticDiscounts.reduce((sum, d) => sum + d.discount, 0))}
                         </span>
                       </div>
                     )}
@@ -810,9 +809,9 @@ const Checkout = () => {
                   <span className="text-[16px] font-[700]">Total</span>
                   <div className="flex items-center gap-1">
                     <span className="text-[16px] font-[700] text-primary">
-                      {formatCurrency(totalAmount)}
+                      {context?.formatPrice(totalAmount)}
                     </span>
-                    <span className="text-[12px] text-gray-600 font-[500]">USD</span>
+                    <span className="text-[12px] text-gray-600 font-[500]">{context?.displayCurrency || "USD"}</span>
                   </div>
                 </div>
               </div>
@@ -874,6 +873,11 @@ const Checkout = () => {
                       <p className="text-[13px] text-center mt-3 text-gray-600">
                         💳 All payments are securely processed by Stripe.
                       </p>
+                      {context?.displayCurrency && context.displayCurrency !== "USD" && (
+                        <p className="text-[12px] text-center mt-2 text-gray-500">
+                          Totals above are estimates in {context.displayCurrency}. Your card is charged in US dollars (USD).
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

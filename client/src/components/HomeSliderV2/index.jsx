@@ -12,7 +12,6 @@ import { EffectFade, Navigation, Pagination, Autoplay } from "swiper/modules";
 import Button from "@mui/material/Button";
 import { Link } from "react-router-dom";
 import { MyContext } from "../../App";
-import { formatCurrency } from "../../utils/currency";
 
 const HomeBannerV2 = (props) => {
 
@@ -100,17 +99,17 @@ const HomeBannerV2 = (props) => {
                                 .filter(p => p && p > 0);
                               
                               if (validPrices.length > 0) {
-                                return formatCurrency(Math.min(...validPrices));
+                                return context?.formatPrice(Math.min(...validPrices));
                               }
                             }
                             // Fallback to priceRange if available
                             if (item?.priceRange?.min && item.priceRange.min > 0) {
-                              return formatCurrency(item.priceRange.min);
+                              return context?.formatPrice(item.priceRange.min);
                             }
                           }
                           // For simple products or fallback
                           const displayPrice = item?.price || item?.pricing?.price || item?.pricing?.regularPrice || 0;
-                          return formatCurrency(displayPrice > 0 ? displayPrice : 0);
+                          return context?.formatPrice(displayPrice > 0 ? displayPrice : 0);
                         })()}
                       </span>
                     </h3>

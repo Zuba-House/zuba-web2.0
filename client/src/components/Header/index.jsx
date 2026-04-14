@@ -215,8 +215,21 @@ const Header = () => {
               <Search />
             </div>
 
-            <div className="col3 w-auto lg:w-[30%] flex items-center pl-2 pr-2 lg:pl-7 lg:pr-0">
-              <ul className="flex items-center justify-end gap-2 lg:gap-3 w-full">
+            <div className="col3 w-auto min-w-0 lg:w-[30%] flex items-center pl-2 pr-2 lg:pl-7 lg:pr-0">
+              <ul className="flex flex-wrap items-center justify-end gap-x-1 gap-y-2 sm:gap-2 lg:gap-3 w-full min-w-0">
+                <li className="list-none lg:hidden flex items-center shrink-0">
+                  <label htmlFor="header-mobile-currency" className="sr-only">Display currency</label>
+                  <select
+                    id="header-mobile-currency"
+                    value={context?.displayCurrency || "USD"}
+                    onChange={(e) => context?.setDisplayCurrency?.(e.target.value)}
+                    className="bg-[#0b2735] text-[#e5e2db] border border-[#e5e2db]/35 rounded px-2 py-2 text-[12px] min-h-[44px] min-w-[3.5rem] max-w-[4.25rem] touch-manipulation cursor-pointer"
+                  >
+                    <option value="USD">USD</option>
+                    <option value="CAD">CAD</option>
+                    <option value="EUR">EUR</option>
+                  </select>
+                </li>
                 {context.isLogin === false && context?.windowWidth > 992 ? (
                   <li className="list-none">
                     <Link

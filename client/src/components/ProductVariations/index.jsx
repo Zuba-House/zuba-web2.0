@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { formatCurrency } from '../../utils/currency';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
+import { MyContext } from '../../App';
 import './ProductVariations.css';
 
 const ProductVariations = ({ product, onVariationSelect, selectedVariation }) => {
+  const context = useContext(MyContext);
   const [selectedAttributes, setSelectedAttributes] = useState({});
   const [availableVariations, setAvailableVariations] = useState([]);
   const [currentVariation, setCurrentVariation] = useState(null);
@@ -485,15 +486,15 @@ const ProductVariations = ({ product, onVariationSelect, selectedVariation }) =>
                       <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1">
                           <span className="oldPrice line-through text-gray-500 text-[16px] font-[500]">
-                            {formatCurrency(regularPrice)}
+                            {context?.formatPrice(regularPrice)}
                           </span>
-                          <span className="text-[12px] text-gray-400 font-[400] line-through">USD</span>
+                          <span className="text-[12px] text-gray-400 font-[400] line-through">{context?.displayCurrency || 'USD'}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <span className="price text-primary text-[18px] font-[600]">
-                            {formatCurrency(salePrice)}
+                            {context?.formatPrice(salePrice)}
                           </span>
-                          <span className="text-[13px] text-gray-600 font-[500]">USD</span>
+                          <span className="text-[13px] text-gray-600 font-[500]">{context?.displayCurrency || 'USD'}</span>
                         </div>
                       </div>
                     );
@@ -502,9 +503,9 @@ const ProductVariations = ({ product, onVariationSelect, selectedVariation }) =>
                   return (
                     <div className="flex items-center gap-1">
                       <span className="price text-primary text-[18px] font-[600]">
-                        {formatCurrency(regularPrice)}
+                        {context?.formatPrice(regularPrice)}
                       </span>
-                      <span className="text-[13px] text-gray-600 font-[500]">USD</span>
+                      <span className="text-[13px] text-gray-600 font-[500]">{context?.displayCurrency || 'USD'}</span>
                     </div>
                   );
                 })()}

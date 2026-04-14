@@ -138,12 +138,29 @@ const Navigation = (props) => {
             </ul>
           </div>
 
-          {/* Currency Notice */}
-          <div className="col_3 w-[20%] hidden lg:block">
-            <p className="text-[14px] font-[500] flex items-center gap-3 mb-0 mt-0 text-[#e5e2db]">
-              <GoRocket className="text-[18px] text-[#efb291]" />
-              All prices in USD
-            </p>
+          {/* Currency: display estimates; checkout stays USD (desktop lg+) */}
+          <div className="col_3 hidden lg:flex w-full lg:w-[20%] lg:min-w-0 lg:max-w-[26%] xl:max-w-[22%] shrink-0 justify-end">
+            <div className="text-[13px] font-[500] flex flex-col items-end gap-1.5 xl:flex-row xl:items-center xl:gap-2 mb-0 mt-0 text-[#e5e2db] max-w-full">
+              <div className="flex items-center gap-2 shrink-0">
+                <GoRocket className="text-[18px] text-[#efb291] shrink-0" aria-hidden />
+                <label className="sr-only" htmlFor="nav-display-currency">Display currency</label>
+                <select
+                  id="nav-display-currency"
+                  value={context?.displayCurrency || "USD"}
+                  onChange={(e) => context?.setDisplayCurrency?.(e.target.value)}
+                  className="bg-[#0b2735] text-[#e5e2db] border border-[#e5e2db]/35 rounded px-2 py-1.5 text-[12px] min-h-[40px] min-w-[4.25rem] max-w-[5rem] touch-manipulation cursor-pointer"
+                >
+                  <option value="USD">USD</option>
+                  <option value="CAD">CAD</option>
+                  <option value="EUR">EUR</option>
+                </select>
+              </div>
+              <span className="text-[10px] xl:text-[11px] font-[400] opacity-90 leading-snug text-right max-w-[14rem] xl:max-w-none">
+                {context?.displayCurrency === "USD"
+                  ? "Prices in USD"
+                  : "Approx. · charged in USD"}
+              </span>
+            </div>
           </div>
         </div>
       </nav>

@@ -9,7 +9,6 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { postData } from "../../utils/api";
 import { FaCheckDouble } from "react-icons/fa";
 import { IoMdHeart } from "react-icons/io";
-import { formatCurrency } from "../../utils/currency";
 import { normalizeProduct } from "../../utils/productNormalizer";
 import ProductVariations from "../ProductVariations";
 import { MdExpandMore, MdExpandLess } from "react-icons/md";
@@ -282,15 +281,15 @@ export const ProductDetailsComponent = (props) => {
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center gap-1">
                     <span className="oldPrice line-through text-gray-400 text-[20px] sm:text-[22px] font-[500]">
-                      {formatCurrency(regularPrice)}
+                      {context?.formatPrice(regularPrice)}
                     </span>
-                    <span className="text-[12px] sm:text-[14px] text-gray-400 font-[400] line-through">USD</span>
+                    <span className="text-[12px] sm:text-[14px] text-gray-400 font-[400] line-through">{context?.displayCurrency || "USD"}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <span className="price text-primary text-[24px] sm:text-[28px] font-[700]">
-                      {formatCurrency(salePrice)}
+                      {context?.formatPrice(salePrice)}
                     </span>
-                    <span className="text-[14px] sm:text-[16px] text-gray-600 font-[500]">USD</span>
+                    <span className="text-[14px] sm:text-[16px] text-gray-600 font-[500]">{context?.displayCurrency || "USD"}</span>
                   </div>
                 </div>
               );
@@ -299,9 +298,9 @@ export const ProductDetailsComponent = (props) => {
               return (
                 <div className="flex items-center gap-2">
                   <span className="price text-primary text-[24px] sm:text-[28px] font-[700]">
-                    {formatCurrency(regularPrice)}
+                    {context?.formatPrice(regularPrice)}
                   </span>
-                  <span className="text-[14px] sm:text-[16px] text-gray-600 font-[500]">USD</span>
+                  <span className="text-[14px] sm:text-[16px] text-gray-600 font-[500]">{context?.displayCurrency || "USD"}</span>
                 </div>
               );
             }

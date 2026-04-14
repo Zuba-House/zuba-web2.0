@@ -7,7 +7,6 @@ import CartItems from "./cartItems";
 import { MyContext } from "../../App";
 import { fetchDataFromApi, postData } from "../../utils/api";
 import { Link, useNavigate } from "react-router-dom";
-import { formatCurrency } from "../../utils/currency";
 import ShippingAddressInput from "../../components/ShippingAddressInput/ShippingAddressInput";
 import DiscountInput from "../../components/DiscountInput/DiscountInput";
 
@@ -329,13 +328,13 @@ const CartPage = () => {
               <span className="text-[14px] font-[500]">Subtotal</span>
               <div className="flex items-center gap-1">
                 <span className="text-primary font-bold">
-                  {formatCurrency(
+                  {context?.formatPrice(
                     (context.cartData?.length !== 0 ?
                       context.cartData?.map(item => parseFloat(item.price || 0) * (item.quantity || 0))
                         .reduce((total, value) => total + value, 0) : 0)
                   )}
                 </span>
-                <span className="text-[11px] text-gray-600 font-[500]">USD</span>
+                <span className="text-[11px] text-gray-600 font-[500]">{context?.displayCurrency || "USD"}</span>
               </div>
             </p>
 
@@ -415,7 +414,7 @@ const CartPage = () => {
                           </div>
                           <div className="text-right ml-3">
                             <strong className="text-[16px] font-[700] text-primary">
-                              {formatCurrency(option.price)}
+                              {context?.formatPrice(option.price)}
                             </strong>
                           </div>
                         </div>
@@ -466,7 +465,7 @@ const CartPage = () => {
                   discounts?.freeShipping ? (
                     <span className="text-green-600">FREE</span>
                   ) : (
-                    formatCurrency(selectedShippingRate.cost)
+                    context?.formatPrice(selectedShippingRate.cost)
                   )
                 ) : (
                   <span className="text-gray-400">Enter address</span>
@@ -480,20 +479,20 @@ const CartPage = () => {
                 {discounts.couponDiscount > 0 && (
                   <p className="flex items-center justify-between text-green-600">
                     <span className="text-[14px] font-[500]">Coupon Discount ({discounts.coupon?.code})</span>
-                    <span className="font-bold">-{formatCurrency(discounts.couponDiscount)}</span>
+                    <span className="font-bold">-{context?.formatPrice(discounts.couponDiscount)}</span>
                   </p>
                 )}
                 {discounts.giftCardDiscount > 0 && (
                   <p className="flex items-center justify-between text-green-600">
                     <span className="text-[14px] font-[500]">Gift Card</span>
-                    <span className="font-bold">-{formatCurrency(discounts.giftCardDiscount)}</span>
+                    <span className="font-bold">-{context?.formatPrice(discounts.giftCardDiscount)}</span>
                   </p>
                 )}
                 {discounts.automaticDiscounts?.length > 0 && discounts.automaticDiscounts.reduce((sum, d) => sum + d.discount, 0) > 0 && (
                   <p className="flex items-center justify-between text-green-600">
                     <span className="text-[14px] font-[500]">Automatic Discounts</span>
                     <span className="font-bold">
-                      -{formatCurrency(discounts.automaticDiscounts.reduce((sum, d) => sum + d.discount, 0))}
+                      -{context?.formatPrice(discounts.automaticDiscounts.reduce((sum, d) => sum + d.discount, 0))}
                     </span>
                   </p>
                 )}
@@ -504,7 +503,7 @@ const CartPage = () => {
               <span className="text-[16px] font-[700]">Total</span>
               <div className="flex items-center gap-1">
                 <span className="text-primary font-bold text-[16px]">
-                  {formatCurrency(
+                  {context?.formatPrice(
                     discounts?.finalTotal !== undefined 
                       ? discounts.finalTotal 
                       : ((context.cartData?.length !== 0 ?
@@ -513,9 +512,14 @@ const CartPage = () => {
                         (selectedShippingRate && !discounts?.freeShipping ? (selectedShippingRate.cost || 0) : 0))
                   )}
                 </span>
-                <span className="text-[11px] text-gray-600 font-[500]">USD</span>
+                <span className="text-[11px] text-gray-600 font-[500]">{context?.displayCurrency || "USD"}</span>
               </div>
             </p>
+            {context?.displayCurrency && context.displayCurrency !== "USD" && (
+              <p className="text-[11px] text-gray-500 mt-2 mb-0">
+                Estimated in {context.displayCurrency}. Your card is charged in USD at checkout.
+              </p>
+            )}
 
             <br />
 

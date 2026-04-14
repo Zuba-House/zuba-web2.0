@@ -39,6 +39,7 @@ import giftCardRouter from './route/giftCard.route.js';
 import discountRouter from './route/discount.route.js';
 import jobApplicationRouter from './route/jobApplication.route.js';
 import reviewRequestRouter from './route/reviewRequest.route.js';
+import currencyRouter from './route/currency.route.js';
 import { expireSales, activateScheduledSales } from './utils/expireSales.js';
 
 // Validate environment variables at startup
@@ -384,6 +385,7 @@ app.use("/api/seo", seoRouter);
 app.use("/api/coupons", couponRouter);
 app.use("/api/gift-cards", giftCardRouter);
 app.use("/api/discounts", discountRouter);
+app.use("/api/currency", currencyRouter);
 app.use("/api/job-application", jobApplicationRouter);
 
 // Serve robots.txt at root level (fallback - frontend proxies to /api/seo/robots.txt)
