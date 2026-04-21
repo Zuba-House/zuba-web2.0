@@ -1571,3 +1571,59 @@ img {
         padding: 4px 8px !important;
     }
 }
+
+/* ========================================
+   🧾 CHECKOUT/CART EXTRA SMALL POLISH
+   ======================================== */
+@media (max-width: 420px) {
+    .cart-page .cart-page-layout {
+        gap: 12px !important;
+    }
+
+    .cart-page .cart-totals-card {
+        padding: 12px !important;
+        border-radius: 10px !important;
+    }
+
+    .cart-page .cart-totals-card h3 {
+        font-size: 16px !important;
+        margin-bottom: 8px !important;
+    }
+
+    .cart-page .rightPart {
+        margin-top: 8px !important;
+    }
+
+    .cart-page .shipping-address-input {
+        padding: 8px !important;
+    }
+
+    .cart-page .shipping-address-input + div {
+        margin-top: 10px !important;
+    }
+
+    .checkout-page .checkout-page-layout {
+        gap: 12px !important;
+    }
+
+    .checkout-page .checkout-delivery-card,
+    .checkout-page .checkout-order-card {
+        padding: 12px !important;
+        border-radius: 10px !important;
+    }
+
+    .checkout-page .checkout-items {
+        max-height: 210px !important;
+        padding-right: 4px !important;
+    }
+
+    .checkout-page .checkout-items .info h4 {
+        max-width: 120px !important;
+    }
+
+    .checkout-page .checkout-order-card .btn-lg {
+        min-height: 46px !important;
+        font-size: 14px !important;
+        padding: 10px 12px !important;
+    }
+}

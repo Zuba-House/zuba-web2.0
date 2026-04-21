@@ -635,11 +635,11 @@ const Checkout = () => {
   }
 
   return (
-    <section className="py-3 lg:py-10 px-3">
+    <section className="checkout-page py-3 lg:py-10 px-3">
       <div>
-        <div className="w-full lg:w-[70%] m-auto flex flex-col md:flex-row gap-5">
+        <div className="checkout-page-layout w-full lg:w-[70%] m-auto flex flex-col md:flex-row gap-5">
           <div className="leftCol w-full md:w-[60%]">
-            <div className="card bg-white shadow-md p-5 rounded-md w-full">
+            <div className="checkout-delivery-card card bg-white shadow-md p-5 rounded-md w-full">
               <h2>Delivery Information</h2>
               <br />
 
@@ -721,7 +721,7 @@ const Checkout = () => {
           </div>
 
           <div className="rightCol w-full  md:w-[40%]">
-            <div className="card shadow-md bg-white p-5 rounded-md">
+            <div className="checkout-order-card card shadow-md bg-white p-5 rounded-md">
               <h2 className="mb-4">Your Order</h2>
 
               <div className="flex items-center justify-between py-3 border-t border-b border-[rgba(0,0,0,0.1)]">
