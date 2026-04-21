@@ -1,11 +1,15 @@
 import React, { useState, useEffect, memo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { FaTimes } from 'react-icons/fa';
 import './PromoBanner.css';
 
 const PromoBanner = memo(() => {
-  const [isVisible, setIsVisible] = useState(true);
+  const location = useLocation();
+  const [isVisible, setIsVisible] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const shouldHideForCheckoutFlow =
+    location.pathname.startsWith('/checkout') ||
+    location.pathname.startsWith('/cart');
 
   const promotions = [
     {
@@ -32,19 +36,35 @@ const PromoBanner = memo(() => {
 
   // Rotate through promotions every 5 seconds
   useEffect(() => {
+    if (!isVisible) return undefined;
+
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % promotions.length);
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [promotions.length]);
+  }, [isVisible, promotions.length]);
 
-  // Check if banner was dismissed
+  // Show/hide behavior with dismissal support
   useEffect(() => {
     const dismissed = sessionStorage.getItem('promoBannerDismissed');
     if (dismissed === 'true') {
       setIsVisible(false);
+      return;
     }
+
+    const showTimer = setTimeout(() => {
+      setIsVisible(true);
+    }, 600);
+
+    const hideTimer = setTimeout(() => {
+      setIsVisible(false);
+    }, 12000);
+
+    return () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+    };
   }, []);
 
   const handleClose = () => {
@@ -52,7 +72,7 @@ const PromoBanner = memo(() => {
     sessionStorage.setItem('promoBannerDismissed', 'true');
   };
 
-  if (!isVisible) return null;
+  if (!isVisible || shouldHideForCheckoutFlow) return null;
 
   const currentPromo = promotions[currentIndex];
 

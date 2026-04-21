@@ -16,11 +16,14 @@
 
 .promo-text-container {
   overflow: hidden;
+  min-width: 0;
 }
 
 .promo-text {
   font-size: 13px;
   font-weight: 500;
+  display: block;
+  word-break: break-word;
 }
 
 .promo-cta {
@@ -76,6 +79,10 @@
   .promo-cta {
     font-size: 10px;
     padding: 3px 10px;
+  }
+
+  .promo-close {
+    right: 8px;
   }
 }
 

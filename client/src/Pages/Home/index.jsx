@@ -273,7 +273,7 @@ const Home = () => {
 
           {/* Side banners - adjust width when product banner is not shown */}
           {bannerV1Data?.length >= 2 && (
-            <div className={`part2 scrollableBox w-full ${hasValidBannerProducts ? 'lg:w-[30%]' : 'lg:w-full'} flex items-center gap-5 justify-between flex-row ${hasValidBannerProducts ? 'lg:flex-col' : 'lg:flex-row'}`}>
+            <div className={`part2 w-full ${hasValidBannerProducts ? 'lg:w-[30%]' : 'lg:w-full'} flex items-stretch gap-4 sm:gap-5 justify-between flex-col sm:flex-row ${hasValidBannerProducts ? 'lg:flex-col' : 'lg:flex-row'}`}>
               <BannerBoxV2 info={bannerV1Data[bannerV1Data?.length - 1]?.alignInfo} image={bannerV1Data[bannerV1Data?.length - 1]?.images[0]} item={bannerV1Data[bannerV1Data?.length - 1]} />
 
               <BannerBoxV2 info={bannerV1Data[bannerV1Data?.length - 2]?.alignInfo} image={bannerV1Data[bannerV1Data?.length - 2]?.images[0]} item={bannerV1Data[bannerV1Data?.length - 2]} />
@@ -418,25 +418,21 @@ const Home = () => {
               modules={[Navigation, FreeMode]}
               freeMode={true}
               breakpoints={{
-                250: {
+                0: {
                   slidesPerView: 1,
-                  spaceBetween: 10,
+                  spaceBetween: 12,
                 },
-                330: {
-                  slidesPerView: 1,
-                  spaceBetween: 10,
-                },
-                500: {
+                576: {
                   slidesPerView: 2,
-                  spaceBetween: 20,
+                  spaceBetween: 16,
                 },
-                700: {
+                900: {
                   slidesPerView: 3,
                   spaceBetween: 20,
                 },
-                1100: {
+                1200: {
                   slidesPerView: 4,
-                  spaceBetween: 30,
+                  spaceBetween: 24,
                 },
               }}
               className="blogSlider"

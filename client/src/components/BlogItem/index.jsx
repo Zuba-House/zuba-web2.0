@@ -37,7 +37,7 @@ const BlogItem = (props) => {
       </div>
 
       <div className="info p-3 sm:p-4 flex-1 flex flex-col">
-        <h2 className="text-[14px] sm:text-[15px] lg:text-[16px] font-[600] text-black mb-2 sm:mb-3 line-clamp-2 min-h-[2.5em]">
+        <h2 className="text-[14px] sm:text-[15px] lg:text-[16px] font-[600] text-black mb-2 sm:mb-3 line-clamp-2 min-h-[2.5em] break-words">
           <Link 
             to={`/blog/${props?.item?._id}`} 
             className="link hover:text-primary transition-colors"
@@ -48,7 +48,7 @@ const BlogItem = (props) => {
         </h2>
 
         <div 
-          className="mb-3 sm:mb-4 text-[12px] sm:text-[13px] lg:text-[14px] text-gray-600 leading-relaxed line-clamp-3 flex-1"
+          className="mb-3 sm:mb-4 text-[12px] sm:text-[13px] lg:text-[14px] text-gray-600 leading-relaxed line-clamp-3 flex-1 break-words"
           dangerouslySetInnerHTML={{ __html: excerpt }}
         />
 

@@ -77,7 +77,7 @@ const ResponsiveHeroBanner = () => {
     return (
       <div className={`homeSlider pb-3 pt-4 lg:pb-5 lg:pt-5 relative z-[99] ${isMobile ? 'mt-[130px] lg:mt-0' : ''}`}>
         <div className="container">
-          <div className="item rounded-[10px] overflow-hidden bg-gray-200 animate-pulse" style={{ height: isMobile ? '250px' : '400px' }}></div>
+          <div className="item rounded-[10px] overflow-hidden bg-gray-200 animate-pulse h-[220px] sm:h-[280px] lg:h-[400px]"></div>
         </div>
       </div>
     );
@@ -111,12 +111,12 @@ const ResponsiveHeroBanner = () => {
                     <img
                       src={getOptimizedImageUrl(banner.imageUrl, { width: 1200, height: isMobile ? 500 : 800, quality: 'auto', format: 'auto' })}
                       alt={banner.title || "Banner"}
-                      className={`w-full ${isMobile ? 'h-[250px]' : 'h-[400px]'} object-cover`}
+                      className="w-full h-[220px] sm:h-[280px] lg:h-[400px] object-cover"
                       loading={index === 0 ? "eager" : "lazy"}
                       fetchPriority={index === 0 ? "high" : undefined}
                     />
                     {hasContent && (
-                      <div className={`absolute inset-0 bg-black bg-opacity-40 flex items-center ${isMobile ? 'justify-center text-center' : 'justify-center text-center'} p-4 sm:p-6 lg:p-8 lg:p-12`}>
+                      <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center text-center p-4 sm:p-6 lg:p-8">
                         <div className={`text-white ${isMobile ? 'max-w-[90%]' : 'max-w-2xl'}`}>
                           {banner.title && (
                             <h1 className={`${isMobile ? 'text-xl sm:text-2xl' : 'text-3xl lg:text-5xl'} font-bold mb-2 lg:mb-4 leading-tight ${isMobile ? 'text-center' : 'text-center'}`}>
@@ -165,11 +165,11 @@ const ResponsiveHeroBanner = () => {
           <img
             src={getOptimizedImageUrl(displayBanner.imageUrl, { width: 1200, height: isMobile ? 500 : 800, quality: 'auto', format: 'auto' })}
             alt={displayBanner.title || "Banner"}
-            className={`w-full ${isMobile ? 'h-[250px]' : 'h-[400px]'} object-cover`}
+            className="w-full h-[220px] sm:h-[280px] lg:h-[400px] object-cover"
             fetchPriority="high"
           />
           {hasContent && (
-                <div className={`absolute inset-0 bg-black bg-opacity-40 flex items-center ${isMobile ? 'justify-center text-center' : 'justify-center text-center'} ${isMobile ? 'p-4 sm:p-6' : 'p-8 lg:p-12'}`}>
+                <div className={`absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center text-center ${isMobile ? 'p-4 sm:p-6' : 'p-8 lg:p-10'}`}>
                   <div className={`text-white ${isMobile ? 'max-w-[90%]' : 'max-w-2xl'}`}>
                     {displayBanner.title && (
                       <h1 className={`${isMobile ? 'text-xl sm:text-2xl' : 'text-3xl lg:text-5xl'} font-bold mb-2 lg:mb-4 leading-tight ${isMobile ? 'text-center' : 'text-center'}`}>

@@ -1,6 +1,6 @@
 .floating-sale-badge {
   position: fixed;
-  bottom: 90px;
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
   right: 16px;
   z-index: 998;
 }
@@ -12,20 +12,21 @@
   background: #efb291;
   color: #fff;
   text-decoration: none;
-  padding: 10px 16px;
+  padding: 10px 36px 10px 16px;
   border-radius: 24px;
   box-shadow: 0 4px 12px rgba(239, 178, 145, 0.3);
   position: relative;
+  max-width: min(92vw, 330px);
 }
 
 .sale-badge-content:hover {
   background: #e5a67d;
 }
 
-.minimize-btn {
+.dismiss-btn {
   position: absolute;
   top: -6px;
-  right: -6px;
+  left: -6px;
   width: 20px;
   height: 20px;
   background: #fff;
@@ -37,11 +38,25 @@
   align-items: center;
   justify-content: center;
   font-size: 10px;
-  opacity: 0;
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
-.sale-badge-content:hover .minimize-btn {
+.minimize-btn {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
   opacity: 1;
 }
 
@@ -106,12 +121,12 @@
 
 @media (max-width: 768px) {
   .floating-sale-badge {
-    bottom: 75px;
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
     right: 10px;
   }
 
   .sale-badge-content {
-    padding: 8px 12px;
+    padding: 8px 30px 8px 10px;
   }
 
   .badge-icon {
@@ -127,5 +142,22 @@
   .badge-cta {
     padding: 3px 8px;
     font-size: 9px;
+  }
+
+  .dismiss-btn,
+  .minimize-btn {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 420px) {
+  .floating-sale-badge {
+    right: 8px;
+  }
+
+  .sale-badge-content {
+    max-width: min(94vw, 290px);
   }
 }

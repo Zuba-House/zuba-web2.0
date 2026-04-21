@@ -1,12 +1,16 @@
 import React, { useState, useEffect, memo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { FaTimes, FaCopy, FaCheck } from 'react-icons/fa';
 import './PromoPopup.css';
 
 const PromoPopup = memo(() => {
+  const location = useLocation();
   const [isVisible, setIsVisible] = useState(false);
   const [copied, setCopied] = useState(false);
   const [currentPromo, setCurrentPromo] = useState(null);
+  const shouldHideForCheckoutFlow =
+    location.pathname.startsWith('/checkout') ||
+    location.pathname.startsWith('/cart');
 
   // Default promos - can be fetched from API
   const promos = [
@@ -64,7 +68,7 @@ const PromoPopup = memo(() => {
     }
   };
 
-  if (!isVisible || !currentPromo) return null;
+  if (!isVisible || !currentPromo || shouldHideForCheckoutFlow) return null;
 
   return (
     <div className="promo-popup-overlay" onClick={handleClose}>
