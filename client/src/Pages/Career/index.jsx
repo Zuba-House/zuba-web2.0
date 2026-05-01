@@ -617,7 +617,7 @@ const Career = () => {
 
                     <div className="bg-[#efb291] bg-opacity-10 border border-[#efb291] rounded-lg p-4 text-center">
                       <p className="text-[#0b2735] font-semibold">
-                        Applications open <span className="text-[#efb291]">May 2026</span>
+                        Applications open <span className="text-[#efb291]">June 2026</span>
                       </p>
                     </div>
                   </div>
@@ -662,7 +662,7 @@ const Career = () => {
                 </p>
 
                 <p className="text-base lg:text-lg leading-relaxed">
-                  <strong className="text-[#efb291]">Internship Timeline:</strong> Our professional internship program will launch in <strong>Summer 2026</strong>. Applications will open in <strong>May 2026</strong>.
+                  <strong className="text-[#efb291]">Internship Timeline:</strong> Our professional internship program will launch in <strong>Summer 2026</strong>. Applications will open in <strong>June 2026</strong>.
                 </p>
 
                 <p className="text-base lg:text-lg leading-relaxed">
