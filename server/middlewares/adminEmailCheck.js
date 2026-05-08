@@ -154,7 +154,8 @@ export const requireProductManagementAccess = async (req, res, next) => {
 
     // Super admin email (only full admin)
     const SUPER_ADMIN_EMAIL = 'olivier.niyo250@gmail.com';
-    const isSuperAdmin = user.email.toLowerCase().trim() === SUPER_ADMIN_EMAIL.toLowerCase().trim();
+    const normalizedEmail = (user.email || '').toLowerCase().trim();
+    const isSuperAdmin = normalizedEmail === SUPER_ADMIN_EMAIL.toLowerCase().trim();
     
     // Check if user is super admin OR has ADMIN/MARKETING_MANAGER role
     // If not super admin and role is not ADMIN/MARKETING_MANAGER, automatically treat as MARKETING_MANAGER
@@ -170,7 +171,7 @@ export const requireProductManagementAccess = async (req, res, next) => {
         // User doesn't have admin/marketing manager role - assign it
         userRole = 'MARKETING_MANAGER';
         shouldUpdateRole = true;
-        console.log('🔄 Auto-assigning MARKETING_MANAGER role to user:', user.email);
+        console.log('🔄 Auto-assigning MARKETING_MANAGER role to user:', user.email || 'unknown-email');
       }
     }
 
@@ -179,7 +180,7 @@ export const requireProductManagementAccess = async (req, res, next) => {
       UserModel.findByIdAndUpdate(req.userId, { role: 'MARKETING_MANAGER' }, { new: true })
         .then(updatedUser => {
           if (updatedUser) {
-            console.log('✅ Successfully updated user role to MARKETING_MANAGER:', user.email);
+            console.log('✅ Successfully updated user role to MARKETING_MANAGER:', user.email || 'unknown-email');
           }
         })
         .catch(err => {
@@ -195,7 +196,7 @@ export const requireProductManagementAccess = async (req, res, next) => {
 
     console.log('✅ Product management access granted:', {
       userId: req.userId,
-      email: user.email,
+      email: user.email || 'unknown-email',
       role: userRole,
       isSuperAdmin: isSuperAdmin,
       isFullAdmin: req.isFullAdmin,
