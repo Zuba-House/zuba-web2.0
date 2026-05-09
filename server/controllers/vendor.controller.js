@@ -1037,7 +1037,10 @@ export const vendorLogin = async (req, res) => {
     const normalizedEmail = String(email).toLowerCase().trim();
     console.log('🔐 Vendor login attempt:', normalizedEmail);
 
-    // Case-insensitive email match (legacy accounts may not store lowercase email)
+    const escapedEmail = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const emailRegex = new RegExp(`^${escapedEmail}$`, 'i');
+
+    // Case-insensitive user lookup (legacy accounts may not store lowercase email)
     let user = null;
     try {
       user = await UserModel.findOne({ email: normalizedEmail }).collation({
@@ -1048,8 +1051,26 @@ export const vendorLogin = async (req, res) => {
       console.warn('Vendor login: collation lookup skipped:', lookupErr?.message || lookupErr);
     }
     if (!user) {
-      const escaped = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      user = await UserModel.findOne({ email: { $regex: new RegExp(`^${escaped}$`, 'i') } });
+      user = await UserModel.findOne({ email: { $regex: emailRegex } });
+    }
+
+    // Vendor lookup is independent: resolve by ownerUser, then by email.
+    // This covers cases where the linked User row exists but role was reset
+    // to USER, or where the vendor email and user email casing diverge.
+    let vendor = null;
+    if (user) {
+      vendor = await VendorModel.findOne({ ownerUser: user._id });
+      if (!vendor && (user.vendor || user.vendorId)) {
+        vendor = await VendorModel.findById(user.vendor || user.vendorId);
+      }
+    }
+    if (!vendor) {
+      vendor = await VendorModel.findOne({ email: { $regex: emailRegex } });
+    }
+
+    // If we found a vendor but no user yet, recover via vendor.ownerUser
+    if (!user && vendor?.ownerUser) {
+      user = await UserModel.findById(vendor.ownerUser);
     }
 
     if (!user) {
@@ -1060,9 +1081,41 @@ export const vendorLogin = async (req, res) => {
       });
     }
 
-    // Check if user is a vendor (tolerate legacy casing)
-    const roleUpper = String(user.role || '').toUpperCase();
-    if (roleUpper !== 'VENDOR') {
+    // Self-heal user/vendor linkage when a vendor row exists for this account
+    // but the user role/links got desynced. Admin-created vendors are the most
+    // common case where this occurs.
+    if (vendor) {
+      let userDirty = false;
+      if (String(user.role || '').toUpperCase() !== 'VENDOR') {
+        user.role = 'VENDOR';
+        userDirty = true;
+      }
+      if (!user.vendor || user.vendor.toString() !== vendor._id.toString()) {
+        user.vendor = vendor._id;
+        userDirty = true;
+      }
+      if (!user.vendorId || user.vendorId.toString() !== vendor._id.toString()) {
+        user.vendorId = vendor._id;
+        userDirty = true;
+      }
+      if (!vendor.ownerUser || vendor.ownerUser.toString() !== user._id.toString()) {
+        vendor.ownerUser = user._id;
+        try {
+          await vendor.save();
+        } catch (e) {
+          console.warn('Vendor login: could not sync vendor.ownerUser:', e?.message || e);
+        }
+      }
+      if (userDirty) {
+        try {
+          await user.save();
+          console.log('🩹 Vendor login: healed user role/links for', normalizedEmail);
+        } catch (e) {
+          console.warn('Vendor login: could not heal user record:', e?.message || e);
+        }
+      }
+    } else {
+      // No vendor row at all -> truly not a vendor
       return res.status(400).json({
         error: true,
         success: false,
@@ -1101,20 +1154,6 @@ export const vendorLogin = async (req, res) => {
         error: true,
         success: false,
         message: 'Invalid email or password'
-      });
-    }
-
-    // Vendor profile: prefer ownerUser link; fall back to User.vendor / User.vendorId
-    let vendor = await VendorModel.findOne({ ownerUser: user._id });
-    if (!vendor && (user.vendor || user.vendorId)) {
-      const linkedId = user.vendor || user.vendorId;
-      vendor = await VendorModel.findById(linkedId);
-    }
-    if (!vendor) {
-      return res.status(400).json({
-        error: true,
-        success: false,
-        message: 'Vendor profile not found. Please contact support.'
       });
     }
 
