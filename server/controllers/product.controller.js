@@ -9,10 +9,17 @@ import fs from 'fs';
 import { request } from 'http';
 
 
+const cloudinaryCloudName =
+    process.env.cloudinary_Config_Cloud_Name || process.env.CLOUDINARY_CLOUD_NAME || '';
+const cloudinaryApiKey =
+    process.env.cloudinary_Config_api_key || process.env.CLOUDINARY_API_KEY || '';
+const cloudinaryApiSecret =
+    process.env.cloudinary_Config_api_secret || process.env.CLOUDINARY_API_SECRET || '';
+
 cloudinary.config({
-    cloud_name: process.env.cloudinary_Config_Cloud_Name,
-    api_key: process.env.cloudinary_Config_api_key,
-    api_secret: process.env.cloudinary_Config_api_secret,
+    cloud_name: cloudinaryCloudName,
+    api_key: cloudinaryApiKey,
+    api_secret: cloudinaryApiSecret,
     secure: true,
 });
 
@@ -73,6 +80,14 @@ const ensureAttributesFromVariations = (productData) => {
 var imagesArr = [];
 export async function uploadImages(request, response) {
     try {
+        if (!cloudinaryCloudName || !cloudinaryApiKey || !cloudinaryApiSecret) {
+            return response.status(500).json({
+                error: true,
+                success: false,
+                message: "Cloudinary is not configured correctly. Missing cloud name or API credentials."
+            });
+        }
+
         imagesArr = [];
 
         const image = request.files;
@@ -169,8 +184,12 @@ export async function uploadImages(request, response) {
 
     } catch (error) {
         console.error('Upload images error:', error);
+        const cloudinaryMessage = String(error?.message || '');
+        const isCloudinaryDisabled = cloudinaryMessage.toLowerCase().includes('cloud_name is disabled');
         return response.status(500).json({
-            message: error.message || error,
+            message: isCloudinaryDisabled
+                ? "Cloudinary rejected this cloud name. Please verify your Cloudinary account is active and your cloud name is correct."
+                : (error.message || error),
             error: true,
             success: false
         })
