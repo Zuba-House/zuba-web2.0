@@ -1034,11 +1034,23 @@ export const vendorLogin = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = String(email).toLowerCase().trim();
     console.log('🔐 Vendor login attempt:', normalizedEmail);
 
-    // Find user with vendor role
-    const user = await UserModel.findOne({ email: normalizedEmail });
+    // Case-insensitive email match (legacy accounts may not store lowercase email)
+    let user = null;
+    try {
+      user = await UserModel.findOne({ email: normalizedEmail }).collation({
+        locale: 'en',
+        strength: 2
+      });
+    } catch (lookupErr) {
+      console.warn('Vendor login: collation lookup skipped:', lookupErr?.message || lookupErr);
+    }
+    if (!user) {
+      const escaped = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      user = await UserModel.findOne({ email: { $regex: new RegExp(`^${escaped}$`, 'i') } });
+    }
 
     if (!user) {
       return res.status(400).json({
@@ -1048,8 +1060,9 @@ export const vendorLogin = async (req, res) => {
       });
     }
 
-    // Check if user is a vendor
-    if (user.role !== 'VENDOR') {
+    // Check if user is a vendor (tolerate legacy casing)
+    const roleUpper = String(user.role || '').toUpperCase();
+    if (roleUpper !== 'VENDOR') {
       return res.status(400).json({
         error: true,
         success: false,
@@ -1057,8 +1070,9 @@ export const vendorLogin = async (req, res) => {
       });
     }
 
-    // Check account status
-    if (user.status !== 'Active') {
+    // Check account status (tolerate legacy casing)
+    const statusLower = String(user.status || '').toLowerCase();
+    if (statusLower !== 'active') {
       return res.status(400).json({
         error: true,
         success: false,
@@ -1066,8 +1080,22 @@ export const vendorLogin = async (req, res) => {
       });
     }
 
-    // Verify password
-    const isPasswordValid = await bcryptjs.compare(password, user.password);
+    if (!user.password || typeof user.password !== 'string') {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'No password is set for this account. Use Forgot password to create one.'
+      });
+    }
+
+    // Verify password (malformed hashes should not become 500s)
+    let isPasswordValid = false;
+    try {
+      isPasswordValid = await bcryptjs.compare(password, user.password);
+    } catch (compareErr) {
+      console.error('Vendor login bcrypt compare error:', compareErr?.message || compareErr);
+      isPasswordValid = false;
+    }
     if (!isPasswordValid) {
       return res.status(400).json({
         error: true,
@@ -1076,8 +1104,12 @@ export const vendorLogin = async (req, res) => {
       });
     }
 
-    // Get vendor profile
-    const vendor = await VendorModel.findOne({ ownerUser: user._id });
+    // Vendor profile: prefer ownerUser link; fall back to User.vendor / User.vendorId
+    let vendor = await VendorModel.findOne({ ownerUser: user._id });
+    if (!vendor && (user.vendor || user.vendorId)) {
+      const linkedId = user.vendor || user.vendorId;
+      vendor = await VendorModel.findById(linkedId);
+    }
     if (!vendor) {
       return res.status(400).json({
         error: true,
