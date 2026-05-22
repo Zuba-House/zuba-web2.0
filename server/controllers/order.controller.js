@@ -1,4 +1,3 @@
-import mongoose from "mongoose";
 import OrderModel from "../models/order.model.js";
 import ProductModel from '../models/product.model.js';
 import UserModel from '../models/user.model.js';
@@ -12,289 +11,6 @@ import AdminOrderNotificationEmail from "../utils/adminOrderNotificationEmailTem
 import sendEmailFun from "../config/sendEmail.js";
 import { calculateOrderCommissions, creditVendorBalance } from "../utils/commissionCalculator.js";
 import { sendVendorNewOrder } from "../utils/vendorEmails.js";
-import { FailedOrderEmailTemplate } from "../utils/failedOrderEmailTemplate.js";
-
-// ========================================
-// HELPER FUNCTION: Send order emails (customer + admin)
-// This MUST be called for every order
-// ========================================
-async function sendOrderEmails(order, emailData) {
-    try {
-        console.log('📧 Starting email sending process for order:', order._id);
-        
-        // Get user email - either from logged-in user or guest customer
-        // emailData can be minimal object with userId, guestCustomer, customerName
-        // or full requestBody (for backward compatibility)
-        let userEmail = null;
-        let userName = null;
-        let userInfo = null;
-        
-        if (emailData?.userId) {
-            try {
-                const user = await UserModel.findOne({ _id: emailData.userId });
-                if (user?.email) {
-                    userEmail = user.email;
-                    userName = user.name;
-                    userInfo = {
-                        name: user.name,
-                        email: user.email,
-                        mobile: user.mobile,
-                        phone: user.mobile
-                    };
-                }
-            } catch (userError) {
-                console.warn('⚠️ Could not fetch user for email:', userError.message);
-            }
-        } else if (emailData?.guestCustomer?.email) {
-            // Guest checkout
-            userEmail = emailData.guestCustomer.email;
-            userName = emailData.guestCustomer.name || emailData.customerName;
-            userInfo = {
-                name: emailData.guestCustomer.name || emailData.customerName,
-                email: emailData.guestCustomer.email,
-                phone: emailData.guestCustomer.phone
-            };
-        }
-        
-        // Send customer confirmation email
-        if (userEmail) {
-            try {
-                console.log('📧 Sending customer confirmation email to:', userEmail);
-                console.log('📧 Order details for email:', {
-                    orderId: order._id,
-                    productsCount: order.products?.length || 0,
-                    totalAmt: order.totalAmt
-                });
-                
-                const emailHtml = OrderConfirmationEmail(userName || 'Customer', order);
-                
-                if (!emailHtml || emailHtml.trim().length === 0) {
-                    console.error('❌ Email HTML template is empty!');
-                    throw new Error('Email HTML template is empty');
-                }
-                
-                console.log('📧 Email HTML generated, length:', emailHtml.length);
-                
-                const emailResult = await sendEmailFun({
-                    sendTo: [userEmail],
-                    subject: "Order Confirmation - Zuba House",
-                    text: "",
-                    html: emailHtml
-                });
-                
-                if (emailResult) {
-                    console.log('✅ Customer confirmation email sent successfully to:', userEmail);
-                } else {
-                    console.error('❌ Customer confirmation email failed (sendEmailFun returned false)');
-                    console.error('❌ This usually means SendGrid API key is missing or invalid');
-                }
-            } catch (emailError) {
-                console.error('❌ Failed to send customer confirmation email:', {
-                    to: userEmail,
-                    error: emailError.message,
-                    stack: emailError.stack,
-                    response: emailError.response?.body || emailError.response
-                });
-            }
-        } else {
-            console.warn('⚠️ No user email found - skipping customer confirmation email');
-            console.warn('⚠️ Email data:', {
-                hasUserId: !!emailData?.userId,
-                hasGuestCustomer: !!emailData?.guestCustomer,
-                guestEmail: emailData?.guestCustomer?.email
-            });
-        }
-
-        // Send admin notification email
-        try {
-            const adminEmail = process.env.ADMIN_EMAIL || process.env.ADMIN_EMAIL_ADDRESS || 'sales@zubahouse.com';
-            console.log('📧 Sending admin notification email to:', adminEmail);
-            console.log('📧 Checking SendGrid configuration...');
-            
-            if (!process.env.SENDGRID_API_KEY) {
-                console.error('❌ SENDGRID_API_KEY is not set in environment variables!');
-                console.error('❌ Emails will fail. Please set SENDGRID_API_KEY in your environment.');
-            } else {
-                console.log('✅ SENDGRID_API_KEY is configured');
-            }
-            
-            // Get shipping address if available
-            let shippingAddress = null;
-            if (order.shippingAddress) {
-                shippingAddress = order.shippingAddress;
-            } else if (order.delivery_address) {
-                try {
-                    shippingAddress = await AddressModel.findById(order.delivery_address);
-                } catch (addrError) {
-                    console.log('Could not fetch shipping address:', addrError.message);
-                }
-            }
-
-            const adminEmailHtml = AdminOrderNotificationEmail(order, userInfo, shippingAddress);
-            
-            if (!adminEmailHtml || adminEmailHtml.trim().length === 0) {
-                console.error('❌ Admin email HTML template is empty!');
-                throw new Error('Admin email HTML template is empty');
-            }
-            
-            console.log('📧 Admin email HTML generated, length:', adminEmailHtml.length);
-            
-            const adminEmailResult = await sendEmailFun({
-                sendTo: [adminEmail],
-                subject: `New Order #${order._id} - ${userName || 'Guest Customer'}`,
-                text: "",
-                html: adminEmailHtml
-            });
-            
-            if (adminEmailResult) {
-                console.log('✅ Admin notification email sent successfully to:', adminEmail);
-            } else {
-                console.error('❌ Admin notification email failed (sendEmailFun returned false)');
-                console.error('❌ This usually means SendGrid API key is missing or invalid');
-            }
-        } catch (adminEmailError) {
-            console.error('❌ Error sending admin notification email:', {
-                error: adminEmailError.message,
-                stack: adminEmailError.stack,
-                response: adminEmailError.response?.body || adminEmailError.response
-            });
-        }
-        
-        console.log('✅ Email sending process completed for order:', order._id);
-    } catch (error) {
-        console.error('❌ Critical error in sendOrderEmails function:', {
-            error: error.message,
-            stack: error.stack,
-            orderId: order?._id
-        });
-        // Don't throw - emails are non-critical but we want to log the error
-    }
-}
-
-// ========================================
-// HELPER FUNCTION: Run background task with timeout and memory cleanup
-// Prevents memory leaks from hanging background operations
-// ========================================
-function runBackgroundTask(taskFn, timeoutMs = 30000) {
-    return new Promise((resolve) => {
-        const timeout = setTimeout(() => {
-            console.warn('⚠️ Background task timed out after', timeoutMs, 'ms');
-            resolve(null);
-        }, timeoutMs);
-        
-        Promise.resolve(taskFn())
-            .then((result) => {
-                clearTimeout(timeout);
-                resolve(result);
-            })
-            .catch((error) => {
-                clearTimeout(timeout);
-                console.error('⚠️ Background task error:', error.message);
-                resolve(null);
-            });
-    });
-}
-
-// ========================================
-// HELPER FUNCTION: Update stock and commissions (non-blocking)
-// This runs in background after order is saved
-// ========================================
-async function updateOrderStockAndCommissions(order, products, shouldAffectInventory) {
-    try {
-        // Update commissions
-        try {
-            const vendorProducts = products.filter(p => p.vendor || p.vendorId);
-            if (vendorProducts.length > 0) {
-                const commissionResult = await calculateOrderCommissions(products);
-                
-                // Update order with commission data
-                for (let i = 0; i < order.products.length; i++) {
-                    const updatedItem = commissionResult.items.find(item => 
-                        (item.productId?.toString() || item.productId) === (order.products[i].productId?.toString() || order.products[i].productId)
-                    );
-                    if (updatedItem) {
-                        order.products[i].vendorEarning = updatedItem.vendorEarning || 0;
-                        order.products[i].platformCommission = updatedItem.platformCommission || 0;
-                        order.products[i].commissionRate = updatedItem.commissionRate || 15;
-                    }
-                }
-                
-                if (commissionResult.vendorSummary?.length > 0) {
-                    order.vendorSummary = commissionResult.vendorSummary.map(vs => ({
-                        vendor: vs.vendorId,
-                        vendorShopName: vs.vendorName || '',
-                        totalAmount: vs.totalAmount,
-                        commission: vs.commission,
-                        vendorEarning: vs.vendorEarning
-                    }));
-                }
-                
-                await order.save();
-                console.log('✅ Order updated with commission data (background)');
-            }
-        } catch (commissionError) {
-            console.error('⚠️ Commission calculation error (background, non-critical):', commissionError);
-        }
-        
-        // Update stock
-        if (shouldAffectInventory) {
-            for (const orderProduct of products) {
-                try {
-                    const product = await ProductModel.findById(orderProduct.productId);
-                    if (!product) {
-                        console.error(`Product not found for stock update: ${orderProduct.productId}`);
-                        continue;
-                    }
-                    
-                    if (orderProduct.productType === 'variable' && orderProduct.variationId) {
-                        const variation = product.variations?.find(
-                            v => v._id?.toString() === orderProduct.variationId.toString()
-                        );
-                        if (variation && !variation.endlessStock) {
-                            variation.stock = Math.max(0, (variation.stock || 0) - orderProduct.quantity);
-                            if (variation.stock <= 0) variation.stockStatus = 'out_of_stock';
-                            else variation.stockStatus = 'in_stock';
-                            
-                            // Update total product stock
-                            const totalStock = product.variations.reduce((sum, v) => {
-                                if (v.endlessStock) return sum + 999999;
-                                return sum + (v.stock || 0);
-                            }, 0);
-                            
-                            if (product.inventory) {
-                                product.inventory.stock = totalStock;
-                                product.inventory.stockStatus = totalStock <= 0 ? 'out_of_stock' : 'in_stock';
-                            }
-                            product.countInStock = totalStock;
-                            product.stockStatus = totalStock <= 0 ? 'out_of_stock' : 'in_stock';
-                        }
-                    } else if (!product.inventory?.endlessStock && !product.endlessStock) {
-                        const currentStock = product.inventory?.stock !== undefined 
-                            ? product.inventory.stock 
-                            : (product.countInStock !== undefined ? product.countInStock : 0);
-                        const newStock = Math.max(0, currentStock - orderProduct.quantity);
-                        
-                        if (product.inventory) {
-                            product.inventory.stock = newStock;
-                            product.inventory.stockStatus = newStock <= 0 ? 'out_of_stock' : 'in_stock';
-                        }
-                        product.countInStock = newStock;
-                        product.stockStatus = newStock <= 0 ? 'out_of_stock' : 'in_stock';
-                    }
-                    
-                    product.sale = (product.sale || 0) + orderProduct.quantity;
-                    product.totalSales = (product.totalSales || 0) + orderProduct.quantity;
-                    await product.save();
-                } catch (productError) {
-                    console.error(`⚠️ Stock update failed for product ${orderProduct.productId} (non-critical):`, productError);
-                }
-            }
-            console.log('✅ Stock updated (background)');
-        }
-    } catch (error) {
-        console.error('⚠️ Background operations error (non-critical, order already saved):', error);
-    }
-}
 
 export const createOrderController = async (request, response) => {
     try {
@@ -316,34 +32,6 @@ export const createOrderController = async (request, response) => {
             });
         }
 
-        // Validate each product has required fields
-        for (let i = 0; i < request.body.products.length; i++) {
-            const product = request.body.products[i];
-            const missingFields = [];
-            
-            if (!product.productId) missingFields.push('productId');
-            if (!product.productTitle && !product.name) missingFields.push('productTitle');
-            if (!product.quantity || product.quantity <= 0) missingFields.push('quantity');
-            if (!product.price || product.price <= 0) missingFields.push('price');
-            if (!product.subTotal || product.subTotal <= 0) {
-                // Try to calculate subTotal if missing
-                if (product.price && product.quantity) {
-                    product.subTotal = parseFloat((product.price * product.quantity).toFixed(2));
-                } else {
-                    missingFields.push('subTotal');
-                }
-            }
-            
-            if (missingFields.length > 0) {
-                console.error(`❌ Order creation failed: Product ${i + 1} missing required fields:`, missingFields);
-                return response.status(400).json({
-                    error: true,
-                    success: false,
-                    message: `Product ${i + 1} is missing required fields: ${missingFields.join(', ')}`
-                });
-            }
-        }
-
         // Handle guest checkout
         const isGuestOrder = request.body.isGuestOrder || (!request.body.userId && request.body.guestCustomer);
         
@@ -355,26 +43,6 @@ export const createOrderController = async (request, response) => {
                 success: false,
                 message: 'Guest customer information is required'
             });
-        }
-        
-        // Ensure guestCustomer has all required fields if it's a guest order
-        if (isGuestOrder && request.body.guestCustomer) {
-            // If email is missing, use a placeholder or phone-based email
-            if (!request.body.guestCustomer.email || request.body.guestCustomer.email.trim() === '') {
-                // Use phone number to create a temporary email if no email provided
-                const phoneForEmail = (request.body.guestCustomer.phone || request.body.phone || '').replace(/\D/g, '');
-                request.body.guestCustomer.email = phoneForEmail 
-                    ? `guest-${phoneForEmail}@zubahouse.com` 
-                    : `guest-${Date.now()}@zubahouse.com`;
-                console.log('⚠️ Guest order missing email, using generated email:', request.body.guestCustomer.email);
-            }
-            // Ensure name and phone are present
-            if (!request.body.guestCustomer.name || request.body.guestCustomer.name.trim() === '') {
-                request.body.guestCustomer.name = request.body.customerName || 'Guest Customer';
-            }
-            if (!request.body.guestCustomer.phone || request.body.guestCustomer.phone.trim() === '') {
-                request.body.guestCustomer.phone = request.body.phone || '';
-            }
         }
         
         // Calculate total amount including shipping
@@ -393,25 +61,8 @@ export const createOrderController = async (request, response) => {
             shippingCost,
             providedTotalAmt: request.body.totalAmt,
             calculatedTotal,
-            finalTotal,
-            paymentId: request.body.paymentId
+            finalTotal
         });
-
-        // Optional: Validate payment amount matches order total (if payment ID provided)
-        // This helps catch calculation mismatches between frontend and backend
-        if (request.body.paymentId && request.body.totalAmt) {
-            // Note: We don't have direct access to payment intent amount here
-            // But we can log for debugging if needed
-            const amountDifference = Math.abs(finalTotal - request.body.totalAmt);
-            if (amountDifference > 0.01) {
-                console.warn('⚠️ Order total mismatch detected:', {
-                    providedTotal: request.body.totalAmt,
-                    calculatedTotal: finalTotal,
-                    difference: amountDifference
-                });
-                // Don't fail order - use provided total as it matches payment
-            }
-        }
 
         // Update address with phone number if provided
         if (request.body.phone && request.body.delivery_address) {
@@ -450,121 +101,7 @@ export const createOrderController = async (request, response) => {
             };
         }
 
-        // ========================================
-        // CRITICAL FIX: VALIDATE STOCK AVAILABILITY BEFORE ORDER CREATION
-        // ========================================
-        // This prevents race conditions where orders are saved but stock validation fails
-        // Validate stock BEFORE creating order to prevent overselling and failed orders
-        console.log('🔍 Validating stock availability before order creation...');
-        for (let i = 0; i < request.body.products.length; i++) {
-            const orderProduct = request.body.products[i];
-            
-            // Get product from database with fresh read
-            const product = await ProductModel.findById(orderProduct.productId);
-            
-            if (!product) {
-                console.error(`❌ Order creation failed: Product not found: ${orderProduct.productId}`);
-                return response.status(400).json({
-                    error: true,
-                    success: false,
-                    message: `Product "${orderProduct.productTitle || orderProduct.name || 'Unknown'}" is no longer available. Please remove it from your cart.`
-                });
-            }
-
-            // Check if product is published/active
-            if (product.status !== 'published') {
-                console.error(`❌ Order creation failed: Product not published: ${orderProduct.productId}`);
-                return response.status(400).json({
-                    error: true,
-                    success: false,
-                    message: `Product "${orderProduct.productTitle || orderProduct.name || 'Unknown'}" is no longer available for purchase.`
-                });
-            }
-
-            // Validate stock for variable products
-            if (orderProduct.productType === 'variable' && orderProduct.variationId) {
-                const variation = product.variations?.find(
-                    v => v._id && v._id.toString() === orderProduct.variationId.toString()
-                );
-                
-                if (!variation) {
-                    console.error(`❌ Order creation failed: Variation not found: ${orderProduct.variationId}`);
-                    return response.status(400).json({
-                        error: true,
-                        success: false,
-                        message: `Product variation for "${orderProduct.productTitle || orderProduct.name || 'Unknown'}" is no longer available.`
-                    });
-                }
-
-                const variationStock = variation.stock || 0;
-                const hasEndlessStock = variation.endlessStock === true;
-                
-                if (!hasEndlessStock && variationStock < orderProduct.quantity) {
-                    console.error(`❌ Order creation failed: Insufficient stock for variation: ${orderProduct.variationId}, requested: ${orderProduct.quantity}, available: ${variationStock}`);
-                    return response.status(400).json({
-                        error: true,
-                        success: false,
-                        message: `Insufficient stock for "${orderProduct.productTitle || orderProduct.name || 'Unknown'}". Only ${variationStock} item(s) available.`
-                    });
-                }
-
-                if (!hasEndlessStock && variation.stockStatus === 'out_of_stock') {
-                    console.error(`❌ Order creation failed: Variation out of stock: ${orderProduct.variationId}`);
-                    return response.status(400).json({
-                        error: true,
-                        success: false,
-                        message: `"${orderProduct.productTitle || orderProduct.name || 'Unknown'}" is out of stock. Please remove it from your cart.`
-                    });
-                }
-            }
-            // Validate stock for simple products
-            else {
-                // Check stock from multiple possible locations (new and old structure)
-                const productStock = product.inventory?.stock !== undefined 
-                    ? product.inventory.stock 
-                    : (product.countInStock !== undefined 
-                        ? product.countInStock 
-                        : (product.stock !== undefined ? product.stock : 0));
-                
-                // Check if product has endless stock
-                const hasEndlessStock = product.inventory?.endlessStock === true || product.endlessStock === true;
-                
-                if (!hasEndlessStock && productStock < orderProduct.quantity) {
-                    console.error(`❌ Order creation failed: Insufficient stock for product: ${orderProduct.productId}, requested: ${orderProduct.quantity}, available: ${productStock}`);
-                    return response.status(400).json({
-                        error: true,
-                        success: false,
-                        message: `Insufficient stock for "${orderProduct.productTitle || orderProduct.name || 'Unknown'}". Only ${productStock} item(s) available.`
-                    });
-                }
-
-                // Check stock status for simple products (only if not endless stock)
-                if (!hasEndlessStock && (product.inventory?.stockStatus === 'out_of_stock' || product.stockStatus === 'out_of_stock')) {
-                    console.error(`❌ Order creation failed: Product out of stock: ${orderProduct.productId}`);
-                    return response.status(400).json({
-                        error: true,
-                        success: false,
-                        message: `"${orderProduct.productTitle || orderProduct.name || 'Unknown'}" is out of stock. Please remove it from your cart.`
-                    });
-                }
-            }
-        }
-        console.log('✅ Stock validation passed - all products have sufficient stock');
-
-        // Determine if inventory should be affected (before transaction)
-        const paymentStatus = (request.body.payment_status || '').toUpperCase();
-        const shouldAffectInventory = paymentStatus !== 'FAILED';
-        const paymentSucceeded = paymentStatus === 'COMPLETED' || paymentStatus === 'SUCCEEDED' || request.body.paymentId;
-
-        // ========================================
-        // CRITICAL: SAVE ORDER FIRST (BEFORE ANYTHING ELSE)
-        // If payment succeeded, order MUST be saved immediately
-        // All other operations (stock, commissions) are non-blocking
-        // ========================================
-        let order = null;
-        
-        // Create order object
-        const orderData = {
+        let order = new OrderModel({
             userId: request.body.userId || null,
             products: request.body.products,
             paymentId: request.body.paymentId,
@@ -592,654 +129,256 @@ export const createOrderController = async (request, response) => {
                 timestamp: new Date(),
                 updatedBy: request.userId || null
             }]
-        };
+        });
 
-        // CRITICAL: Save order FIRST (without transaction) if payment succeeded
-        // This ensures order is NEVER lost if payment succeeded
-        if (paymentSucceeded) {
-            try {
-                order = new OrderModel(orderData);
-                order = await order.save(); // Save WITHOUT transaction first
-                console.log('✅ Order saved IMMEDIATELY (payment succeeded):', order._id);
-                
-                // Return success immediately - order is saved, customer is protected
-                // All other operations will happen in background
-                response.status(200).json({
-                    error: false,
-                    success: true,
-                    message: "Order Placed Successfully",
-                    order: order,
-                    orderId: order._id
-                });
-                
-                // Now do all other operations in background (non-blocking)
-                // Stock updates, commissions, emails - all happen after response is sent
-                // Use process.nextTick to defer execution and allow response to be sent first
-                // This helps with memory management by not keeping request.body in closure
-                process.nextTick(() => {
-                    runBackgroundTask(async () => {
-                        // Extract only necessary data to avoid keeping entire request.body in memory
-                        const emailData = {
-                            userId: request.body.userId || null,
-                            guestCustomer: request.body.guestCustomer || null,
-                            customerName: request.body.customerName || null
-                        };
-                        
-                        // Send emails FIRST (most important - must happen for every order)
-                        await sendOrderEmails(order, emailData);
-                        
-                        // Then update stock and commissions (only pass products array, not full request.body)
-                        await updateOrderStockAndCommissions(order, request.body.products, shouldAffectInventory);
-                    }, 60000); // 60 second timeout
-                });
-                
-                return; // Exit early - order is saved, customer is happy
-            } catch (saveError) {
-                console.error('❌ Failed to save order immediately:', saveError);
-                console.error('❌ Save error details:', {
-                    message: saveError.message,
-                    name: saveError.name,
-                    errors: saveError.errors,
-                    stack: saveError.stack
-                });
-                
-                // If it's a validation error, try to fix the data and retry
-                if (saveError.name === 'ValidationError' && saveError.errors) {
-                    console.log('🔄 Validation error detected, attempting to fix data...');
-                    try {
-                        // Fix any validation errors in orderData
-                        if (isGuestOrder && orderData.guestCustomer) {
-                            // Ensure all guest customer fields are present
-                            if (!orderData.guestCustomer.email || orderData.guestCustomer.email.trim() === '') {
-                                const phoneForEmail = (orderData.guestCustomer.phone || orderData.phone || '').replace(/\D/g, '');
-                                orderData.guestCustomer.email = phoneForEmail 
-                                    ? `guest-${phoneForEmail}@zubahouse.com` 
-                                    : `guest-${Date.now()}@zubahouse.com`;
-                            }
-                            if (!orderData.guestCustomer.name || orderData.guestCustomer.name.trim() === '') {
-                                orderData.guestCustomer.name = orderData.customerName || 'Guest Customer';
-                            }
-                            if (!orderData.guestCustomer.phone || orderData.guestCustomer.phone.trim() === '') {
-                                orderData.guestCustomer.phone = orderData.phone || '';
-                            }
-                        }
-                        
-                        // Retry save with fixed data
-                        order = new OrderModel(orderData);
-                        order = await order.save();
-                        console.log('✅ Order saved after fixing validation errors:', order._id);
-                        
-                        response.status(200).json({
-                            error: false,
-                            success: true,
-                            message: "Order Placed Successfully",
-                            order: order,
-                            orderId: order._id
-                        });
-                        
-                        // Background operations
-                        process.nextTick(() => {
-                            runBackgroundTask(async () => {
-                                const emailData = {
-                                    userId: request.body.userId || null,
-                                    guestCustomer: request.body.guestCustomer || null,
-                                    customerName: request.body.customerName || null
-                                };
-                                await sendOrderEmails(order, emailData);
-                                await updateOrderStockAndCommissions(order, request.body.products, shouldAffectInventory);
-                            }, 60000);
-                        });
-                        
-                        return;
-                    } catch (fixError) {
-                        console.error('❌ Failed to fix and save order:', fixError);
-                        // Fall through to emergency save
-                    }
-                }
-                
-                // Try one more time with minimal validation
-                try {
-                    console.log('🔄 Attempting emergency save...');
-                    order = new OrderModel(orderData);
-                    order = await order.save();
-                    console.log('✅ Emergency save succeeded:', order._id);
-                    
-                    response.status(200).json({
-                        error: false,
-                        success: true,
-                        message: "Order Placed Successfully",
-                        order: order,
-                        orderId: order._id
-                    });
-                    
-                    // Background operations - emails FIRST, then stock/commissions
-                    process.nextTick(() => {
-                        runBackgroundTask(async () => {
-                            const emailData = {
-                                userId: request.body.userId || null,
-                                guestCustomer: request.body.guestCustomer || null,
-                                customerName: request.body.customerName || null
-                            };
-                            await sendOrderEmails(order, emailData);
-                            await updateOrderStockAndCommissions(order, request.body.products, shouldAffectInventory);
-                        }, 60000);
-                    });
-                    
-                    return;
-                } catch (emergencyError) {
-                    console.error('❌ Emergency save also failed:', emergencyError);
-                    // Fall through to transaction-based approach as last resort
-                }
-            }
-        }
-
-        // If payment didn't succeed or immediate save failed, use transaction approach
-        // Start MongoDB session for transaction support
-        const session = await mongoose.startSession();
-        session.startTransaction();
-
+        // Save order to database
         try {
-            // Create order object
-            order = new OrderModel(orderData);
-
-            // Save order to database within transaction
-            order = await order.save({ session });
+            order = await order.save();
             console.log('✅ Order saved successfully:', order._id);
-
-            // ========================================
-            // CALCULATE VENDOR COMMISSIONS
-            // ========================================
-            try {
-                // Check if any products belong to vendors
-                const vendorProducts = request.body.products.filter(p => p.vendor || p.vendorId);
-                
-                if (vendorProducts.length > 0) {
-                    console.log('💰 Calculating vendor commissions for', vendorProducts.length, 'vendor products');
-                    
-                    // Calculate commissions for all order items
-                    const commissionResult = await calculateOrderCommissions(request.body.products);
-                    
-                    // Update order products with commission info
-                    for (let i = 0; i < order.products.length; i++) {
-                        const updatedItem = commissionResult.items.find(item => 
-                            (item.productId?.toString() || item.productId) === (order.products[i].productId?.toString() || order.products[i].productId)
-                        );
-                        if (updatedItem) {
-                            order.products[i].vendorEarning = updatedItem.vendorEarning || 0;
-                            order.products[i].platformCommission = updatedItem.platformCommission || 0;
-                            order.products[i].commissionRate = updatedItem.commissionRate || 15;
-                        }
-                    }
-                    
-                    // Add vendor summary to order
-                    if (commissionResult.vendorSummary?.length > 0) {
-                        order.vendorSummary = commissionResult.vendorSummary.map(vs => ({
-                            vendor: vs.vendorId,
-                            vendorShopName: vs.vendorName || '',
-                            totalAmount: vs.totalAmount,
-                            commission: vs.commission,
-                            vendorEarning: vs.vendorEarning
-                        }));
-                    }
-                    
-                    // Save order with commission data within transaction
-                    await order.save({ session });
-                    console.log('✅ Order updated with commission data');
-                    
-                    // Send email notifications to vendors (non-blocking, outside transaction)
-                    for (const vendorSum of (commissionResult.vendorSummary || [])) {
-                        try {
-                            const vendor = await VendorModel.findById(vendorSum.vendorId);
-                            if (vendor?.email) {
-                                const vendorItems = order.products.filter(p => 
-                                    (p.vendor?.toString() || p.vendorId?.toString()) === vendorSum.vendorId.toString()
-                                );
-                                sendVendorNewOrder(vendor, order, vendorItems).catch(err => {
-                                    console.error('Failed to send vendor order notification:', err);
-                                });
-                            }
-                        } catch (vendorEmailErr) {
-                            console.error('Error sending vendor notification:', vendorEmailErr);
-                        }
-                    }
-                }
-            } catch (commissionError) {
-                console.error('⚠️ Commission calculation error (non-blocking):', commissionError);
-                // Don't fail order creation if commission calculation fails
-            }
-
-            // Update inventory only for successful or COD orders
-            if (shouldAffectInventory) {
-                console.log('📦 Updating inventory for order...');
-                for (let i = 0; i < request.body.products.length; i++) {
-                    const orderProduct = request.body.products[i];
-                    
-                    // Get product from database within transaction (with fresh read to prevent race conditions)
-                    const product = await ProductModel.findById(orderProduct.productId).session(session);
-                    
-                    if (!product) {
-                        console.error(`Product not found during stock update: ${orderProduct.productId}`);
-                        throw new Error(`Product not found during stock update: ${orderProduct.productId}`);
-                    }
-                    
-                    // Re-validate stock one more time within transaction to prevent race conditions
-                    if (orderProduct.productType === 'variable' && orderProduct.variationId) {
-                        const variation = product.variations?.find(
-                            v => v._id && v._id.toString() === orderProduct.variationId.toString()
-                        );
-                        
-                        if (!variation) {
-                            console.error(`Variation not found during transaction: ${orderProduct.variationId}`);
-                            throw new Error(`Variation not found: ${orderProduct.variationId}`);
-                        }
-                        
-                        // Check if variation has endless stock
-                        const hasEndlessStock = variation.endlessStock === true;
-                        const variationStock = variation.stock || 0;
-                        
-                        if (!hasEndlessStock && variationStock < orderProduct.quantity) {
-                            throw new Error(`Insufficient stock for variation ${orderProduct.variationId}: requested ${orderProduct.quantity}, available ${variationStock}`);
-                        }
-                    } else {
-                        // Check stock from multiple possible locations (new and old structure)
-                        const productStock = product.inventory?.stock !== undefined 
-                            ? product.inventory.stock 
-                            : (product.countInStock !== undefined 
-                                ? product.countInStock 
-                                : (product.stock !== undefined ? product.stock : 0));
-                        
-                        // Check if product has endless stock
-                        const hasEndlessStock = product.inventory?.endlessStock === true || product.endlessStock === true;
-                        
-                        if (!hasEndlessStock && productStock < orderProduct.quantity) {
-                            throw new Error(`Insufficient stock for product ${orderProduct.productId}: requested ${orderProduct.quantity}, available ${productStock}`);
-                        }
-                    }
-                    
-                    // ========================================
-                    // HANDLE VARIABLE PRODUCTS
-                    // ========================================
-                    if (orderProduct.productType === 'variable' && orderProduct.variationId) {
-                        // Find the specific variation
-                        const variationIndex = product.variations?.findIndex(
-                            v => v._id && v._id.toString() === orderProduct.variationId
-                        );
-                        
-                        if (variationIndex !== -1 && product.variations) {
-                            const variation = product.variations[variationIndex];
-                            const hasEndlessStock = variation.endlessStock === true;
-                            
-                            if (!hasEndlessStock) {
-                                // Update variation stock
-                                const currentVariationStock = variation.stock || 0;
-                                const newVariationStock = Math.max(0, currentVariationStock - orderProduct.quantity);
-                                
-                                product.variations[variationIndex].stock = newVariationStock;
-                                
-                                // Update variation stock status
-                                if (newVariationStock <= 0) {
-                                    product.variations[variationIndex].stockStatus = 'out_of_stock';
-                                } else {
-                                    product.variations[variationIndex].stockStatus = 'in_stock';
-                                }
-                                
-                                // Also update total product stock (sum of all variations)
-                                const totalStock = product.variations.reduce((sum, v) => {
-                                    if (v.endlessStock) return sum + 999999; // Count endless stock as high number
-                                    return sum + (v.stock || 0);
-                                }, 0);
-                                
-                                // Update in new structure if it exists
-                                if (product.inventory) {
-                                    product.inventory.stock = totalStock;
-                                    if (totalStock <= 0) {
-                                        product.inventory.stockStatus = 'out_of_stock';
-                                    } else {
-                                        product.inventory.stockStatus = 'in_stock';
-                                    }
-                                }
-                                
-                                // Update legacy fields
-                                product.countInStock = totalStock;
-                                if (product.stock !== undefined) {
-                                    product.stock = totalStock;
-                                }
-                                
-                                // Update product stock status
-                                if (totalStock <= 0) {
-                                    product.stockStatus = 'out_of_stock';
-                                } else {
-                                    product.stockStatus = 'in_stock';
-                                }
-                                
-                                console.log(`Updated variation stock: Product ${orderProduct.productId}, Variation ${orderProduct.variationId}, New stock: ${newVariationStock}`);
-                            } else {
-                                console.log(`Variation ${orderProduct.variationId} has endless stock - skipping stock update`);
-                            }
-                        } else {
-                            console.error(`Variation not found: ${orderProduct.variationId}`);
-                            throw new Error(`Variation not found: ${orderProduct.variationId}`);
-                        }
-                    }
-                    // ========================================
-                    // HANDLE SIMPLE PRODUCTS
-                    // ========================================
-                    else {
-                        // Check if product has endless stock - don't update if it does
-                        const hasEndlessStock = product.inventory?.endlessStock === true || product.endlessStock === true;
-                        
-                        if (!hasEndlessStock) {
-                            // Get current stock from multiple possible locations
-                            const currentStock = product.inventory?.stock !== undefined 
-                                ? product.inventory.stock 
-                                : (product.countInStock !== undefined 
-                                    ? product.countInStock 
-                                    : (product.stock !== undefined ? product.stock : 0));
-                            
-                            const newStock = Math.max(0, currentStock - orderProduct.quantity);
-                            
-                            // Update stock in new structure (inventory.stock) if it exists
-                            if (product.inventory) {
-                                product.inventory.stock = newStock;
-                                // Update stock status
-                                if (newStock <= 0) {
-                                    product.inventory.stockStatus = 'out_of_stock';
-                                } else {
-                                    product.inventory.stockStatus = 'in_stock';
-                                }
-                            }
-                            
-                            // Also update legacy fields for backward compatibility
-                            product.countInStock = newStock;
-                            if (product.stock !== undefined) {
-                                product.stock = newStock;
-                            }
-                            
-                            // Update top-level stock status
-                            if (newStock <= 0) {
-                                product.stockStatus = 'out_of_stock';
-                            } else {
-                                product.stockStatus = 'in_stock';
-                            }
-                            
-                            console.log(`Updated product stock: Product ${orderProduct.productId}, New stock: ${newStock}`);
-                        } else {
-                            console.log(`Product ${orderProduct.productId} has endless stock - skipping stock update`);
-                        }
-                    }
-                    
-                    // ========================================
-                    // UPDATE SALES COUNT
-                    // ========================================
-                    product.sale = (product.sale || 0) + orderProduct.quantity;
-                    product.totalSales = (product.totalSales || 0) + orderProduct.quantity;
-                    
-                    // Save product with updated stock within transaction
-                    await product.save({ session });
-                }
-                console.log('✅ Inventory updated successfully');
-            }
-
-            // Commit transaction - all operations succeed together or fail together
-            await session.commitTransaction();
-            console.log('✅ Transaction committed successfully');
-        } catch (transactionError) {
-            // Rollback transaction on any error
-            await session.abortTransaction();
-            console.error('❌ Transaction aborted due to error:', {
-                message: transactionError.message,
-                stack: transactionError.stack,
-                paymentId: request.body.paymentId,
-                paymentStatus: request.body.payment_status
+        } catch (saveError) {
+            console.error('❌ Failed to save order:', saveError);
+            return response.status(500).json({
+                error: true,
+                success: false,
+                message: 'Failed to save order to database',
+                details: process.env.NODE_ENV === 'development' ? saveError.message : undefined
             });
-            
-            // CRITICAL: If payment already succeeded, we should NOT fail the order
-            // Try to create order outside transaction to prevent payment loss
-            const paymentStatus = (request.body.payment_status || '').toUpperCase();
-            if (paymentStatus === 'COMPLETED' || paymentStatus === 'SUCCEEDED' || request.body.paymentId) {
-                console.warn('⚠️ Payment succeeded but transaction failed. Attempting to save order outside transaction...');
-                
-                try {
-                    // Try to save order without transaction (payment already succeeded)
-                    const emergencyOrder = new OrderModel({
-                        userId: request.body.userId || null,
-                        products: request.body.products,
-                        paymentId: request.body.paymentId,
-                        payment_status: request.body.payment_status,
-                        delivery_address: request.body.delivery_address,
-                        totalAmt: finalTotal,
-                        shippingCost: shippingCost,
-                        shippingRate: request.body.shippingRate || null,
-                        shippingAddress: orderShippingAddress,
-                        phone: request.body.phone || '',
-                        customerName: request.body.customerName || '',
-                        apartmentNumber: request.body.apartmentNumber || '',
-                        deliveryNote: request.body.deliveryNote || '',
-                        date: request.body.date,
-                        isGuestOrder: isGuestOrder,
-                        guestCustomer: request.body.guestCustomer || null,
-                        discounts: request.body.discounts || null,
-                        status: 'Received',
-                        statusHistory: [{
-                            status: 'Received',
-                            timestamp: new Date(),
-                            updatedBy: request.userId || null
-                        }],
-                        // Mark as emergency order for manual review
-                        notes: `Emergency order - transaction failed but payment succeeded. Error: ${transactionError.message}`
-                    });
-                    
-                    const savedEmergencyOrder = await emergencyOrder.save();
-                    console.log('✅ Emergency order saved (payment succeeded):', savedEmergencyOrder._id);
-                    
-                    // Return success immediately - order is saved
-                    response.status(200).json({
-                        error: false,
-                        success: true,
-                        message: "Order placed successfully (payment succeeded)",
-                        order: savedEmergencyOrder,
-                        orderId: savedEmergencyOrder._id
-                    });
-                    
-                    // Send emails and update stock/commissions in background (non-blocking)
-                    process.nextTick(() => {
-                        runBackgroundTask(async () => {
-                            const emailData = {
-                                userId: request.body.userId || null,
-                                guestCustomer: request.body.guestCustomer || null,
-                                customerName: request.body.customerName || null
-                            };
-                            await sendOrderEmails(savedEmergencyOrder, emailData);
-                            await updateOrderStockAndCommissions(savedEmergencyOrder, request.body.products, shouldAffectInventory);
-                        }, 60000);
-                    });
-                    
-                    return;
-                } catch (emergencyError) {
-                    console.error('❌ Emergency order creation also failed:', emergencyError);
-                    // LAST RESORT: Try one more time with absolute minimal data
-                    if (paymentSucceeded) {
-                        try {
-                            console.log('🆘 LAST RESORT: Attempting absolute minimal order save...');
-                            const lastResortOrder = new OrderModel({
-                                userId: request.body.userId || null,
-                                products: request.body.products || [],
-                                paymentId: request.body.paymentId || 'UNKNOWN',
-                                payment_status: request.body.payment_status || 'COMPLETED',
-                                totalAmt: finalTotal || 0,
-                                shippingCost: shippingCost || 0,
-                                status: 'Received',
-                                notes: `LAST RESORT ORDER - Multiple save attempts failed. Payment ID: ${request.body.paymentId}`
-                            });
-                            const saved = await lastResortOrder.save();
-                            console.log('✅ LAST RESORT order saved:', saved._id);
-                            
-                            response.status(200).json({
-                                error: false,
-                                success: true,
-                                message: "Order placed successfully",
-                                order: saved,
-                                orderId: saved._id
-                            });
-                            
-                            // Send emails in background (non-blocking)
-                            process.nextTick(() => {
-                                runBackgroundTask(async () => {
-                                    const emailData = {
-                                        userId: request.body.userId || null,
-                                        guestCustomer: request.body.guestCustomer || null,
-                                        customerName: request.body.customerName || null
-                                    };
-                                    await sendOrderEmails(saved, emailData);
-                                }, 30000);
-                            });
-                            
-                            return;
-                        } catch (lastResortError) {
-                            console.error('❌ LAST RESORT save also failed:', lastResortError);
-                        }
-                    }
-                }
-            }
-            
-            // If order was created in transaction, try to delete it (only if payment didn't succeed)
-            if (order && order._id && !paymentSucceeded) {
-                try {
-                    await OrderModel.findByIdAndDelete(order._id);
-                    console.log('✅ Cleaned up order after transaction failure:', order._id);
-                } catch (cleanupError) {
-                    console.error('⚠️ Failed to cleanup order after transaction failure:', cleanupError);
-                }
-            }
-            
-            // Return appropriate error response (only if payment didn't succeed)
-            if (!paymentSucceeded) {
-                return response.status(500).json({
-                    error: true,
-                    success: false,
-                    message: transactionError.message || 'Failed to create order. Please try again.',
-                    details: process.env.NODE_ENV === 'development' ? transactionError.stack : undefined,
-                    paymentId: request.body.paymentId || null
-                });
-            } else {
-                // Payment succeeded but all save attempts failed - this should never happen
-                // But if it does, return success with payment ID for manual recovery
-                console.error('🚨 CRITICAL: Payment succeeded but ALL order save attempts failed!');
-                return response.status(200).json({
-                    error: false,
-                    success: true,
-                    message: "Payment succeeded. Order processing in progress. Please contact support with Payment ID if order doesn't appear.",
-                    paymentId: request.body.paymentId,
-                    requiresManualReview: true
-                });
-            }
-        } finally {
-            // End session
-            session.endSession();
         }
 
-        // Send emails asynchronously (fire and forget) - NEVER block order success
-        // CRITICAL: Emails MUST be sent for ALL orders, regardless of shouldAffectInventory
-        // If payment succeeded, order MUST succeed regardless of email failures
-        if (order && order._id) {
-            // Run email sending in background - don't await
-            process.nextTick(() => {
-                runBackgroundTask(async () => {
-                    const emailData = {
-                        userId: request.body.userId || null,
-                        guestCustomer: request.body.guestCustomer || null,
-                        customerName: request.body.customerName || null
+        // ========================================
+        // CALCULATE VENDOR COMMISSIONS
+        // ========================================
+        try {
+            // Check if any products belong to vendors
+            const vendorProducts = request.body.products.filter(p => p.vendor || p.vendorId);
+            
+            if (vendorProducts.length > 0) {
+                console.log('💰 Calculating vendor commissions for', vendorProducts.length, 'vendor products');
+                
+                // Calculate commissions for all order items
+                const commissionResult = await calculateOrderCommissions(request.body.products);
+                
+                // Update order products with commission info
+                for (let i = 0; i < order.products.length; i++) {
+                    const updatedItem = commissionResult.items.find(item => 
+                        (item.productId?.toString() || item.productId) === (order.products[i].productId?.toString() || order.products[i].productId)
+                    );
+                    if (updatedItem) {
+                        order.products[i].vendorEarning = updatedItem.vendorEarning || 0;
+                        order.products[i].platformCommission = updatedItem.platformCommission || 0;
+                        order.products[i].commissionRate = updatedItem.commissionRate || 15;
+                    }
+                }
+                
+                // Add vendor summary to order
+                if (commissionResult.vendorSummary?.length > 0) {
+                    order.vendorSummary = commissionResult.vendorSummary.map(vs => ({
+                        vendor: vs.vendorId,
+                        vendorShopName: vs.vendorName || '',
+                        totalAmount: vs.totalAmount,
+                        commission: vs.commission,
+                        vendorEarning: vs.vendorEarning
+                    }));
+                }
+                
+                // Save order with commission data
+                await order.save();
+                console.log('✅ Order updated with commission data');
+                
+                // Send email notifications to vendors (non-blocking)
+                for (const vendorSum of (commissionResult.vendorSummary || [])) {
+                    try {
+                        const vendor = await VendorModel.findById(vendorSum.vendorId);
+                        if (vendor?.email) {
+                            const vendorItems = order.products.filter(p => 
+                                (p.vendor?.toString() || p.vendorId?.toString()) === vendorSum.vendorId.toString()
+                            );
+                            sendVendorNewOrder(vendor, order, vendorItems).catch(err => {
+                                console.error('Failed to send vendor order notification:', err);
+                            });
+                        }
+                    } catch (vendorEmailErr) {
+                        console.error('Error sending vendor notification:', vendorEmailErr);
+                    }
+                }
+            }
+        } catch (commissionError) {
+            console.error('⚠️ Commission calculation error (non-blocking):', commissionError);
+            // Don't fail order creation if commission calculation fails
+        }
+
+        // Update inventory only for successful or COD orders
+        const paymentStatus = (request.body.payment_status || '').toUpperCase();
+        const shouldAffectInventory = paymentStatus !== 'FAILED';
+        
+        if (shouldAffectInventory) {
+            for (let i = 0; i < request.body.products.length; i++) {
+                const orderProduct = request.body.products[i];
+                
+                // Get product from database
+                const product = await ProductModel.findById(orderProduct.productId);
+                
+                if (!product) {
+                    console.error(`Product not found: ${orderProduct.productId}`);
+                    continue;
+                }
+                
+                // ========================================
+                // HANDLE VARIABLE PRODUCTS
+                // ========================================
+                if (orderProduct.productType === 'variable' && orderProduct.variationId) {
+                    // Find the specific variation
+                    const variationIndex = product.variations?.findIndex(
+                        v => v._id && v._id.toString() === orderProduct.variationId
+                    );
+                    
+                    if (variationIndex !== -1 && product.variations) {
+                        // Update variation stock
+                        const currentVariationStock = product.variations[variationIndex].stock || 0;
+                        const newVariationStock = Math.max(0, currentVariationStock - orderProduct.quantity);
+                        
+                        product.variations[variationIndex].stock = newVariationStock;
+                        
+                        // Update variation stock status
+                        if (newVariationStock <= 0) {
+                            product.variations[variationIndex].stockStatus = 'out_of_stock';
+                        }
+                        
+                        // Also update total product stock (sum of all variations)
+                        const totalStock = product.variations.reduce((sum, v) => sum + (v.stock || 0), 0);
+                        product.countInStock = totalStock;
+                        
+                        // Update product stock status
+                        if (totalStock <= 0) {
+                            product.stockStatus = 'out_of_stock';
+                        }
+                        
+                        console.log(`Updated variation stock: Product ${orderProduct.productId}, Variation ${orderProduct.variationId}, New stock: ${newVariationStock}`);
+                    } else {
+                        console.error(`Variation not found: ${orderProduct.variationId}`);
+                    }
+                }
+                // ========================================
+                // HANDLE SIMPLE PRODUCTS
+                // ========================================
+                else {
+                    // Update product stock directly
+                    const currentStock = product.countInStock || 0;
+                    const newStock = Math.max(0, currentStock - orderProduct.quantity);
+                    
+                    product.countInStock = newStock;
+                    
+                    // Update stock status
+                    if (newStock <= 0) {
+                        product.stockStatus = 'out_of_stock';
+                    }
+                    
+                    console.log(`Updated product stock: Product ${orderProduct.productId}, New stock: ${newStock}`);
+                }
+                
+                // ========================================
+                // UPDATE SALES COUNT
+                // ========================================
+                product.sale = (product.sale || 0) + orderProduct.quantity;
+                product.totalSales = (product.totalSales || 0) + orderProduct.quantity;
+                
+                // Save product with updated stock
+                await product.save();
+            }
+        }
+
+        // Send email only for non-failed orders
+        if (shouldAffectInventory) {
+            // Get user email - either from logged-in user or guest customer
+            let userEmail = null;
+            let userName = null;
+            let userInfo = null;
+            
+            if (request.body.userId) {
+                const user = await UserModel.findOne({ _id: request.body.userId });
+                if (user?.email) {
+                    userEmail = user.email;
+                    userName = user.name;
+                    userInfo = {
+                        name: user.name,
+                        email: user.email,
+                        mobile: user.mobile,
+                        phone: user.mobile
                     };
-                    await sendOrderEmails(order, emailData);
-                }, 30000);
-            });
-        }
-
-        // Send failed order notification email if payment failed
-        // This runs asynchronously and doesn't block order creation
-        // Check if notifications are enabled (default to true for backward compatibility)
-        const notificationsEnabled = order.failedOrderNotificationEnabled !== false;
-        if (paymentStatus === 'FAILED' && notificationsEnabled) {
-            (async () => {
-                try {
-                    // Use the sendFailedOrderNotification logic but call it directly
-                    // to avoid HTTP overhead since we're already in the controller
-                    let customerEmail = null;
-                    let customerName = 'Customer';
-
-                    if (order.userId) {
-                        try {
-                            const user = await UserModel.findById(order.userId).select('name email');
-                            if (user?.email) {
-                                customerEmail = user.email;
-                                customerName = user.name || customerName;
-                            }
-                        } catch (userError) {
-                            console.warn('⚠️ Could not fetch user for failed order notification:', userError.message);
-                        }
-                    } else if (order.guestCustomer?.email) {
-                        customerEmail = order.guestCustomer.email;
-                        customerName = order.guestCustomer.name || customerName;
-                    }
-
-                    if (customerEmail) {
-                        // Check total emails sent to this customer across all failed orders (excluding current order)
-                        const customerEmailLower = customerEmail.toLowerCase();
-                        const allFailedOrders = await OrderModel.find({
-                            $or: [
-                                { userId: order.userId },
-                                { 'guestCustomer.email': { $regex: new RegExp(customerEmailLower, 'i') } }
-                            ],
-                            payment_status: 'FAILED',
-                            _id: { $ne: order._id } // Exclude current order
-                        }).select('failedOrderNotificationsSent');
-
-                        const totalEmailsSentFromOtherOrders = allFailedOrders.reduce((sum, o) => sum + (o.failedOrderNotificationsSent || 0), 0);
-                        const currentOrderEmailsSent = order.failedOrderNotificationsSent || 0;
-                        const totalEmailsSent = totalEmailsSentFromOtherOrders + currentOrderEmailsSent;
-
-                        // Only send if we haven't reached the limit of 3 emails total
-                        if (totalEmailsSent < 3) {
-                            const websiteUrl = process.env.WEBSITE_URL || process.env.CLIENT_URL || 'https://zubahouse.com';
-                            
-                            const emailHtml = FailedOrderEmailTemplate({
-                                customerName,
-                                orderId: order._id,
-                                websiteUrl
-                            });
-
-                            const emailText = `Hello ${customerName},\n\nWe wanted to let you know that your recent order attempt was unsuccessful.\n\nWe'd love to help you complete your purchase. Please visit our store: ${websiteUrl}\n\nIf you have any questions or need assistance:\n📧 Email: sales@zubahouse.com\n💬 WhatsApp: +1 437-557-7487\n\nYou can reply directly to this email or contact us using the information above. We're here to help!\n\nZuba House`;
-
-                            const emailSent = await sendEmailFun({
-                                sendTo: customerEmail,
-                                subject: 'Your Order Attempt - Zuba House',
-                                text: emailText,
-                                html: emailHtml
-                            });
-
-                            if (emailSent) {
-                                // Update order with notification sent
-                                order.failedOrderNotificationsSent = (order.failedOrderNotificationsSent || 0) + 1;
-                                if (!order.failedOrderNotificationsSentAt) {
-                                    order.failedOrderNotificationsSentAt = [];
-                                }
-                                order.failedOrderNotificationsSentAt.push(new Date());
-                                await order.save();
-
-                                console.log(`✅ Failed order notification sent automatically to ${customerEmail} for order ${order._id}`);
-                            } else {
-                                console.warn('⚠️ Failed to send failed order notification email (non-critical)');
-                            }
-                        } else {
-                            console.log(`⚠️ Skipping failed order notification - limit reached (${totalEmailsSent} emails already sent to this customer)`);
-                        }
-                    } else {
-                        console.warn('⚠️ No customer email found - skipping failed order notification');
-                    }
-                } catch (failedOrderEmailError) {
-                    console.error('❌ Error sending failed order notification (non-critical):', failedOrderEmailError.message);
                 }
-            })(); // Fire and forget - don't await
+            } else if (request.body.guestCustomer?.email) {
+                // Guest checkout
+                userEmail = request.body.guestCustomer.email;
+                userName = request.body.guestCustomer.name;
+                userInfo = {
+                    name: request.body.guestCustomer.name,
+                    email: request.body.guestCustomer.email,
+                    phone: request.body.guestCustomer.phone
+                };
+            }
+            
+            // Send customer confirmation email
+            if (userEmail) {
+                console.log('📧 Preparing to send order confirmation email to:', userEmail);
+                const recipients = [userEmail];
+                try {
+                    const emailResult = await sendEmailFun({
+                        sendTo: recipients,
+                        subject: "Order Confirmation - Zuba House",
+                        text: "",
+                        html: OrderConfirmationEmail(userName || 'Customer', order)
+                    });
+                    console.log('✅ Customer confirmation email sent successfully:', {
+                        to: userEmail,
+                        result: emailResult
+                    });
+                } catch (emailError) {
+                    console.error('❌ Failed to send customer confirmation email:', {
+                        to: userEmail,
+                        error: emailError.message,
+                        stack: emailError.stack
+                    });
+                    // Don't fail order creation if email fails
+                }
+            } else {
+                console.warn('⚠️ No user email found - skipping customer confirmation email');
+            }
+
+            // Send admin notification email
+            try {
+                const adminEmail = process.env.ADMIN_EMAIL || 'sales@zubahouse.com';
+                console.log('📧 Preparing to send admin notification email to:', adminEmail);
+                
+                // Get shipping address if available - prefer order.shippingAddress, then fetch from delivery_address
+                let shippingAddress = null;
+                if (order.shippingAddress) {
+                    // Use shipping address stored directly in order
+                    shippingAddress = order.shippingAddress;
+                } else if (order.delivery_address) {
+                    try {
+                        shippingAddress = await AddressModel.findById(order.delivery_address);
+                    } catch (addrError) {
+                        console.log('Could not fetch shipping address:', addrError.message);
+                    }
+                }
+
+                const adminEmailResult = await sendEmailFun({
+                    sendTo: [adminEmail],
+                    subject: `New Order #${order._id} - ${userName || 'Guest Customer'}`,
+                    text: "",
+                    html: AdminOrderNotificationEmail(order, userInfo, shippingAddress)
+                });
+                console.log('✅ Admin notification email sent successfully:', {
+                    to: adminEmail,
+                    result: adminEmailResult
+                });
+            } catch (adminEmailError) {
+                console.error('❌ Error sending admin notification email:', {
+                    error: adminEmailError.message,
+                    stack: adminEmailError.stack
+                });
+                // Don't fail order creation if admin email fails
+            }
         }
 
 
@@ -1262,87 +401,9 @@ export const createOrderController = async (request, response) => {
         console.error('❌ Order creation error:', {
             message: error.message,
             stack: error.stack,
-            body: request.body,
-            paymentStatus: request.body.payment_status
+            body: request.body
         });
         
-        // CRITICAL: If payment succeeded, we MUST NOT fail the order
-        // Try to create order anyway with minimal validation
-        const paymentStatus = (request.body.payment_status || '').toUpperCase();
-        if (paymentStatus === 'COMPLETED' || paymentStatus === 'SUCCEEDED') {
-            console.warn('⚠️ Payment succeeded but order creation had error. Attempting emergency order creation...');
-            
-            try {
-                // Emergency order creation - minimal validation, just save the order
-                const emergencyOrder = new OrderModel({
-                    userId: request.body.userId || null,
-                    products: request.body.products || [],
-                    paymentId: request.body.paymentId || '',
-                    payment_status: 'COMPLETED',
-                    delivery_address: request.body.delivery_address || null,
-                    totalAmt: request.body.totalAmt || 0,
-                    shippingCost: request.body.shippingCost || 0,
-                    shippingRate: request.body.shippingRate || null,
-                    shippingAddress: request.body.shippingAddress || null,
-                    phone: request.body.phone || '',
-                    customerName: request.body.customerName || '',
-                    apartmentNumber: request.body.apartmentNumber || '',
-                    deliveryNote: request.body.deliveryNote || '',
-                    date: request.body.date || new Date().toLocaleString("en-US", {
-                        month: "short",
-                        day: "2-digit",
-                        year: "numeric",
-                    }),
-                    isGuestOrder: request.body.isGuestOrder || false,
-                    guestCustomer: request.body.guestCustomer || null,
-                    discounts: request.body.discounts || null,
-                    status: 'Received',
-                    statusHistory: [{
-                        status: 'Received',
-                        timestamp: new Date(),
-                        updatedBy: request.userId || null
-                    }],
-                    emergencyCreated: true, // Flag to indicate this was emergency creation
-                    originalError: error.message
-                });
-                
-                const savedEmergencyOrder = await emergencyOrder.save();
-                console.log('✅ Emergency order created successfully:', savedEmergencyOrder._id);
-                
-                // Send emails in background (non-blocking)
-                process.nextTick(() => {
-                    runBackgroundTask(async () => {
-                        const emailData = {
-                            userId: request.body.userId || null,
-                            guestCustomer: request.body.guestCustomer || null,
-                            customerName: request.body.customerName || null
-                        };
-                        await sendOrderEmails(savedEmergencyOrder, emailData);
-                    }, 30000);
-                });
-                
-                return response.status(200).json({
-                    error: false,
-                    success: true,
-                    message: "Order Placed Successfully (Emergency Mode)",
-                    order: savedEmergencyOrder,
-                    orderId: savedEmergencyOrder._id,
-                    warning: "Order created in emergency mode due to validation error, but payment succeeded"
-                });
-            } catch (emergencyError) {
-                console.error('❌ Emergency order creation also failed:', emergencyError);
-                // Even emergency creation failed - return error but log payment ID for manual recovery
-                return response.status(500).json({
-                    error: true,
-                    success: false,
-                    message: 'Order creation failed. Payment succeeded. Please contact support with Payment ID: ' + (request.body.paymentId || 'N/A'),
-                    paymentId: request.body.paymentId,
-                    details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-                });
-            }
-        }
-        
-        // If payment didn't succeed, return normal error
         return response.status(500).json({
             error: true,
             success: false,
@@ -1383,84 +444,15 @@ export async function getOrderDetailsController(request, response) {
 
 export async function getUserOrderDetailsController(request, response) {
     try {
-        const userId = request.userId; // User ID from auth middleware
-        
-        if (!userId) {
-            return response.status(401).json({
-                message: "User authentication required",
-                error: true,
-                success: false
-            });
-        }
+        const userId = request.userId // order id
 
-        const { page = 1, limit = 5 } = request.query;
-        const pageNum = parseInt(page);
-        const limitNum = parseInt(limit);
-        const skip = (pageNum - 1) * limitNum;
+        const { page, limit } = request.query;
 
-        // Get user email to also fetch guest orders with matching email
-        let userEmail = null;
-        try {
-            const user = await UserModel.findById(userId).select('email');
-            if (user?.email) {
-                userEmail = user.email.toLowerCase();
-            }
-        } catch (userError) {
-            console.warn('Could not fetch user email for guest order matching:', userError.message);
-        }
+        const orderlist = await OrderModel.find({ userId: userId }).sort({ createdAt: -1 }).populate('delivery_address userId').skip((page - 1) * limit).limit(parseInt(limit));
 
-        // Build query: orders where userId matches (handle both ObjectId and string)
-        // Also include guest orders with matching email
-        let userIdQuery;
-        
-        // Handle both ObjectId and string formats
-        try {
-            if (mongoose.Types.ObjectId.isValid(userId)) {
-                userIdQuery = { userId: new mongoose.Types.ObjectId(userId) };
-            } else {
-                userIdQuery = { userId: userId };
-            }
-        } catch {
-            userIdQuery = { userId: userId };
-        }
-        
-        const query = {
-            $or: [
-                userIdQuery
-            ]
-        };
-        
-        // Also include guest orders with matching email if user email is available
-        if (userEmail) {
-            query.$or.push({
-                isGuestOrder: true,
-                'guestCustomer.email': { $regex: new RegExp(userEmail, 'i') }
-            });
-        }
+        const orderTotal = await OrderModel.find({ userId: userId }).sort({ createdAt: -1 }).populate('delivery_address userId');
 
-        console.log('🔍 Fetching orders for user:', {
-            userId,
-            userEmail,
-            query: JSON.stringify(query)
-        });
-
-        // Get paginated orders
-        const orderlist = await OrderModel.find(query)
-            .sort({ createdAt: -1 })
-            .populate('delivery_address userId')
-            .skip(skip)
-            .limit(limitNum)
-            .lean(); // Use lean() for better performance
-
-        // Get total count for pagination
-        const total = await OrderModel.countDocuments(query);
-
-        console.log('✅ Found orders:', {
-            count: orderlist.length,
-            total,
-            page: pageNum,
-            totalPages: Math.ceil(total / limitNum)
-        });
+        const total = await orderTotal?.length;
 
         return response.json({
             message: "order list",
@@ -1468,16 +460,15 @@ export async function getUserOrderDetailsController(request, response) {
             error: false,
             success: true,
             total: total,
-            page: pageNum,
-            totalPages: Math.ceil(total / limitNum)
-        });
+            page: parseInt(page),
+            totalPages: Math.ceil(total / limit)
+        })
     } catch (error) {
-        console.error('❌ Error fetching user orders:', error);
         return response.status(500).json({
             message: error.message || error,
             error: true,
             success: false
-        });
+        })
     }
 }
 
@@ -1721,9 +712,8 @@ export const updateOrderStatusController = async (request, response) => {
                         // Populate products for email template
                         const populatedOrder = await savedOrder.populate('products.productId');
                         
-                        // Use full order ID for consistency with order confirmation email
-                        const emailSubject = `Order Status Update - Order #${savedOrder._id.toString()}`;
-                        const emailText = `Your order #${savedOrder._id.toString()} status has been updated to ${newStatus}.`;
+                        const emailSubject = `Order Status Update - Order #${savedOrder._id.toString().slice(-8).toUpperCase()}`;
+                        const emailText = `Your order #${savedOrder._id.toString().slice(-8).toUpperCase()} status has been updated to ${newStatus}.`;
                         
                         console.log('📧 Calling sendEmail function...');
                         const emailResult = await sendEmail(

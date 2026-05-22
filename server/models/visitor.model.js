@@ -125,31 +125,11 @@ visitorSchema.index({ country: 1, createdAt: -1 });
 visitorSchema.index({ page: 1, createdAt: -1 });
 visitorSchema.index({ device: 1, createdAt: -1 });
 visitorSchema.index({ sessionId: 1, createdAt: -1 });
-visitorSchema.index({ visitorHash: 1, createdAt: -1 }); // For unique visitor tracking
-visitorSchema.index({ isBot: 1, createdAt: -1 }); // For filtering bots
-visitorSchema.index({ browser: 1, createdAt: -1 });
-visitorSchema.index({ referrerDomain: 1, createdAt: -1 });
 
-// Compound indexes for common analytics queries
+// Compound indexes for common queries
 visitorSchema.index({ 
     createdAt: -1, 
-    country: 1,
-    isBot: 1
-});
-visitorSchema.index({ 
-    createdAt: -1, 
-    device: 1,
-    isBot: 1
-});
-visitorSchema.index({ 
-    createdAt: -1, 
-    page: 1,
-    isBot: 1
-});
-visitorSchema.index({ 
-    createdAt: -1, 
-    visitorHash: 1,
-    isBot: 1
+    country: 1 
 });
 
 // ========================================

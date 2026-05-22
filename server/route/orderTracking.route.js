@@ -20,69 +20,10 @@ orderTrackingRouter.get("/track/:orderId", async (req, res) => {
       });
     }
 
-    // Normalize orderId (remove any # prefix and convert to uppercase for comparison)
-    const normalizedOrderId = orderId.replace(/^#/, '').trim();
-    const searchOrderId = normalizedOrderId.toUpperCase();
-
-    let order = null;
-
-    // Try to find by full ObjectId first (most common case - 24 character hex string)
-    if (normalizedOrderId.length === 24 && /^[0-9a-fA-F]{24}$/.test(normalizedOrderId)) {
-      try {
-        order = await OrderModel.findById(normalizedOrderId)
-          .populate("delivery_address")
-          .populate("userId");
-      } catch (err) {
-        // Invalid ObjectId format, will try shortened ID search
-        console.log('Full ObjectId lookup failed, trying shortened ID...');
-      }
-    }
-
-    // If not found and input is 8 characters (shortened ID from emails), search by last 8 characters
-    if (!order && searchOrderId.length === 8) {
-      try {
-        // Use aggregation to find order by last 8 characters of _id
-        const orders = await OrderModel.aggregate([
-          {
-            $addFields: {
-              idSuffix: {
-                $substr: [{ $toString: "$_id" }, -8, 8]
-              }
-            }
-          },
-          {
-            $match: {
-              $expr: {
-                $eq: [{ $toUpper: "$idSuffix" }, searchOrderId]
-              }
-            }
-          },
-          {
-            $limit: 1
-          }
-        ]);
-
-        if (orders.length > 0) {
-          // Populate the order manually since aggregation returns plain objects
-          order = await OrderModel.findById(orders[0]._id)
-            .populate("delivery_address")
-            .populate("userId");
-        }
-      } catch (err) {
-        console.error('Error searching by shortened ID:', err);
-      }
-    }
-
-    // If still not found, try direct findById one more time (handles edge cases)
-    if (!order) {
-      try {
-        order = await OrderModel.findById(normalizedOrderId)
-          .populate("delivery_address")
-          .populate("userId");
-      } catch (err) {
-        // Ignore and continue to error response
-      }
-    }
+    // Find order by orderId
+    const order = await OrderModel.findById(orderId)
+      .populate("delivery_address")
+      .populate("userId");
 
     if (!order) {
       return res.status(404).json({
@@ -92,23 +33,10 @@ orderTrackingRouter.get("/track/:orderId", async (req, res) => {
       });
     }
 
-    // Verify email - handle both logged-in users and guest orders
-    let emailMatches = false;
+    // Get user email to verify
+    const user = await UserModel.findById(order.userId);
     
-    if (order.userId) {
-      // Logged-in user order - verify against user email
-      const user = await UserModel.findById(order.userId);
-      if (user && user.email.toLowerCase() === email.toLowerCase()) {
-        emailMatches = true;
-      }
-    } else if (order.guestCustomer && order.guestCustomer.email) {
-      // Guest order - verify against guest customer email
-      if (order.guestCustomer.email.toLowerCase() === email.toLowerCase()) {
-        emailMatches = true;
-      }
-    }
-    
-    if (!emailMatches) {
+    if (!user || user.email.toLowerCase() !== email.toLowerCase()) {
       return res.status(404).json({
         error: true,
         success: false,
@@ -311,7 +239,7 @@ orderTrackingRouter.get("/track/:orderId", async (req, res) => {
       shippingAddress: {
         name: address?.contactInfo?.firstName 
           ? `${address.contactInfo.firstName} ${address.contactInfo.lastName || ''}`.trim()
-          : (order.customerName || order.guestCustomer?.name || "Customer"),
+          : (user?.name || "Customer"),
         street: address?.address?.addressLine1 || address?.address_line1 || "",
         city: address?.address?.city || address?.city || "",
         state: address?.address?.province || address?.state || "",

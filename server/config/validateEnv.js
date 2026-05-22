@@ -1,76 +1,49 @@
-/**
- * Environment Variable Validation
- * Validates required environment variables at startup
- */
-
-const requiredEnvVars = [
-    'PORT',
-    'SECRET_KEY_ACCESS_TOKEN',
-    'SECRET_KEY_REFRESH_TOKEN',
-    'JSON_WEB_TOKEN_SECRET_KEY',
-    'cloudinary_Config_Cloud_Name',
-    'cloudinary_Config_api_key',
-    'cloudinary_Config_api_secret',
-    // EMAIL and EMAIL_PASS are optional - we use SendGrid now
-    // 'EMAIL',
-    // 'EMAIL_PASS',
-];
-
-const optionalEnvVars = [
-    'MONGODB_URI',
-    'MONGODB_LOCAL_URI',
-    'STRIPE_SECRET_KEY',
-    'STRIPE_TARGET_ACCOUNT',
-    'STRIPE_ACCOUNT',
-    'CURRENCY',
-    'STRIPE_CURRENCY',
-    'PAYPAL_MODE',
-    'PAYPAL_CLIENT_ID_TEST',
-    'PAYPAL_SECRET_TEST',
-    'PAYPAL_CLIENT_ID_LIVE',
-    'PAYPAL_SECRET_LIVE',
-    // Email configuration - SendGrid is preferred
-    'SENDGRID_API_KEY',
-    'EMAIL_FROM',
-    'EMAIL_USER',
-    'EMAIL',
-    'EMAIL_PASS',
-    'EMAIL_SENDER_NAME',
-];
+import { env } from './env.js';
 
 export function validateEnv() {
     const missing = [];
     const warnings = [];
 
-    // Check required variables
-    for (const varName of requiredEnvVars) {
-        if (!process.env[varName]) {
-            missing.push(varName);
-        }
-    }
+    // Core required startup variables
+    if (!env.port) missing.push('PORT');
+    if (!env.jwtAccessSecret) missing.push('SECRET_KEY_ACCESS_TOKEN');
+    if (!env.jwtRefreshSecret) missing.push('SECRET_KEY_REFRESH_TOKEN');
+    if (!env.jwtLegacySecret) missing.push('JSON_WEB_TOKEN_SECRET_KEY');
+    if (!env.sendgridApiKey) missing.push('SENDGRID_API_KEY');
+    if (!env.emailFrom) missing.push('EMAIL_FROM (or EMAIL/EMAIL_USER)');
+    if (!env.cloudinaryCloudName) missing.push('cloudinary_Config_Cloud_Name');
+    if (!env.cloudinaryApiKey) missing.push('cloudinary_Config_api_key');
+    if (!env.cloudinaryApiSecret) missing.push('cloudinary_Config_api_secret');
 
-    // Check MongoDB connection (at least one is required)
-    if (!process.env.MONGODB_URI && !process.env.MONGODB_LOCAL_URI) {
+    // Database
+    if (!env.mongodbUri && !env.mongodbLocalUri) {
         missing.push('MONGODB_URI or MONGODB_LOCAL_URI');
     }
 
-    // Check email configuration - SendGrid is preferred
-    if (!process.env.SENDGRID_API_KEY) {
-        warnings.push('SENDGRID_API_KEY is not set - email sending will fail. Set SENDGRID_API_KEY for email functionality.');
-    }
-
-    // Check Stripe configuration if using Stripe
-    if (process.env.STRIPE_SECRET_KEY) {
-        if (process.env.STRIPE_SECRET_KEY.startsWith('sk_org_')) {
-            if (!process.env.STRIPE_TARGET_ACCOUNT && !process.env.STRIPE_ACCOUNT) {
+    // Stripe warnings
+    if (env.stripeSecretKey) {
+        if (env.stripeSecretKey.includes('placeholder')) {
+            warnings.push('STRIPE_SECRET_KEY appears to be a placeholder');
+        }
+        if (env.stripeSecretKey.startsWith('sk_org_') && !env.stripeTargetAccount) {
                 warnings.push('STRIPE_TARGET_ACCOUNT or STRIPE_ACCOUNT required when using organization key');
-            }
         }
     }
 
-    // Check PayPal configuration if using PayPal
-    if (process.env.PAYPAL_MODE === 'live') {
-        if (!process.env.PAYPAL_CLIENT_ID_LIVE || !process.env.PAYPAL_SECRET_LIVE) {
+    // Feature-level warnings (not startup-blocking)
+    if (!env.googleClientId || !env.googleClientSecret) {
+        warnings.push('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required for Google login');
+    }
+    if (!env.easypostApiKey) {
+        warnings.push('EASYPOST_API_KEY not set. Shipping label/rate integrations may fail');
+    }
+    if (!env.googleMapsApiKey) {
+        warnings.push('GOOGLE_MAPS_API_KEY not set. Address autocomplete falls back to limited mode');
+    }
+
+    // PayPal warnings
+    if (env.paypalMode === 'live') {
+        if (!env.paypalClientIdLive || !env.paypalSecretLive) {
             warnings.push('PAYPAL_CLIENT_ID_LIVE and PAYPAL_SECRET_LIVE required when PAYPAL_MODE=live');
         }
     }

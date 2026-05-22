@@ -24,23 +24,11 @@ const auth = async(request, response, next) => {
 
         // Get user details to include role and vendorId
         const UserModel = (await import('../models/user.model.js')).default;
-        const user = await UserModel.findById(decode.id).select('role vendorId vendor');
-        
-        if (!user) {
-            return response.status(401).json({
-                error: true,
-                success: false,
-                message: "User not found"
-            });
-        }
+        const user = await UserModel.findById(decode.id).select('role vendorId');
         
         request.userId = decode.id;
-        // Normalize role to uppercase for consistent comparison
-        request.userRole = (user?.role || 'USER').toUpperCase();
-        request.vendorId = user?.vendorId || user?.vendor || null;
-        request.user = user;
-        
-        console.log(`🔐 Auth: User ${decode.id}, Role: ${request.userRole}`);
+        request.userRole = user?.role || 'USER';
+        request.vendorId = user?.vendorId || null;
         next()
 
     } catch (error) {

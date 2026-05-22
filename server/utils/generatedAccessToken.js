@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken'
 import UserModel from '../models/user.model.js'
+import { env } from '../config/env.js';
 
 const generatedAccessToken = async (userId) => {
     // Fetch user to include role and vendorId in token
@@ -14,8 +15,8 @@ const generatedAccessToken = async (userId) => {
 
     const token = await jwt.sign(
         payload,
-        process.env.SECRET_KEY_ACCESS_TOKEN,
-        { expiresIn: '7d' } // Extended from 24h to 7 days for better user experience
+        env.jwtAccessSecret,
+        { expiresIn: env.accessTokenExpiresIn }
     )
 
     return token

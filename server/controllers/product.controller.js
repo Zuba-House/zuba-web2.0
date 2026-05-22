@@ -9,17 +9,10 @@ import fs from 'fs';
 import { request } from 'http';
 
 
-const cloudinaryCloudName =
-    process.env.cloudinary_Config_Cloud_Name || process.env.CLOUDINARY_CLOUD_NAME || '';
-const cloudinaryApiKey =
-    process.env.cloudinary_Config_api_key || process.env.CLOUDINARY_API_KEY || '';
-const cloudinaryApiSecret =
-    process.env.cloudinary_Config_api_secret || process.env.CLOUDINARY_API_SECRET || '';
-
 cloudinary.config({
-    cloud_name: cloudinaryCloudName,
-    api_key: cloudinaryApiKey,
-    api_secret: cloudinaryApiSecret,
+    cloud_name: process.env.cloudinary_Config_Cloud_Name,
+    api_key: process.env.cloudinary_Config_api_key,
+    api_secret: process.env.cloudinary_Config_api_secret,
     secure: true,
 });
 
@@ -80,14 +73,6 @@ const ensureAttributesFromVariations = (productData) => {
 var imagesArr = [];
 export async function uploadImages(request, response) {
     try {
-        if (!cloudinaryCloudName || !cloudinaryApiKey || !cloudinaryApiSecret) {
-            return response.status(500).json({
-                error: true,
-                success: false,
-                message: "Cloudinary is not configured correctly. Missing cloud name or API credentials."
-            });
-        }
-
         imagesArr = [];
 
         const image = request.files;
@@ -184,12 +169,8 @@ export async function uploadImages(request, response) {
 
     } catch (error) {
         console.error('Upload images error:', error);
-        const cloudinaryMessage = String(error?.message || '');
-        const isCloudinaryDisabled = cloudinaryMessage.toLowerCase().includes('cloud_name is disabled');
         return response.status(500).json({
-            message: isCloudinaryDisabled
-                ? "Cloudinary rejected this cloud name. Please verify your Cloudinary account is active and your cloud name is correct."
-                : (error.message || error),
+            message: error.message || error,
             error: true,
             success: false
         })
@@ -330,42 +311,23 @@ export async function createProduct(request, response) {
 
         // Handle pricing - support both new structure and legacy
         let pricingData = {};
-        const now = new Date();
-        
         if (request.body.pricing && typeof request.body.pricing === 'object') {
-            const salePrice = request.body.pricing.salePrice || null;
-            const regularPrice = request.body.pricing.regularPrice || request.body.oldPrice || request.body.price || 0;
-            const saleStartDate = request.body.pricing.saleStartDate ? new Date(request.body.pricing.saleStartDate) : null;
-            const saleEndDate = request.body.pricing.saleEndDate ? new Date(request.body.pricing.saleEndDate) : null;
-            
-            // Check if sale is currently active based on dates
-            const saleActive = salePrice && salePrice < regularPrice && 
-                (!saleStartDate || saleStartDate <= now) && 
-                (!saleEndDate || saleEndDate >= now);
-            
             pricingData = {
-                regularPrice: regularPrice,
-                salePrice: salePrice,
-                price: saleActive ? salePrice : regularPrice,
+                regularPrice: request.body.pricing.regularPrice || request.body.oldPrice || request.body.price || 0,
+                salePrice: request.body.pricing.salePrice || null,
+                price: request.body.pricing.salePrice || request.body.pricing.regularPrice || request.body.price || request.body.oldPrice || 0,
                 currency: request.body.pricing.currency || request.body.currency || 'USD',
-                onSale: saleActive,
-                saleStartDate: saleStartDate,
-                saleEndDate: saleEndDate,
+                onSale: request.body.pricing.onSale || (request.body.pricing.salePrice && request.body.pricing.salePrice < request.body.pricing.regularPrice),
                 taxStatus: request.body.pricing.taxStatus || 'taxable',
                 taxClass: request.body.pricing.taxClass || 'standard'
             };
         } else {
-            const salePrice = request.body.oldPrice && request.body.price && request.body.price < request.body.oldPrice ? request.body.price : null;
-            const regularPrice = request.body.oldPrice || request.body.price || 0;
-            
             pricingData = {
-                regularPrice: regularPrice,
-                salePrice: salePrice,
-                price: salePrice || regularPrice,
+                regularPrice: request.body.oldPrice || request.body.price || 0,
+                salePrice: request.body.oldPrice && request.body.price && request.body.price < request.body.oldPrice ? request.body.price : null,
+                price: request.body.price || request.body.oldPrice || 0,
                 currency: request.body.currency || 'USD',
-                onSale: salePrice !== null,
-                saleStartDate: null,
-                saleEndDate: null,
+                onSale: request.body.oldPrice && request.body.price && request.body.price < request.body.oldPrice,
                 taxStatus: 'taxable',
                 taxClass: 'standard'
             };
@@ -428,57 +390,6 @@ export async function createProduct(request, response) {
                 slug: request.body.slug || null
             };
         }
-        
-        // Ensure slug is unique if provided
-        if (seoData.slug) {
-            try {
-                seoData.slug = await ProductModel.generateUniqueSlug(seoData.slug);
-            } catch (error) {
-                console.error('Error generating unique slug:', error);
-                // Fallback: generate from name if slug generation fails
-                if (request.body.name) {
-                    const baseSlug = request.body.name
-                        .toLowerCase()
-                        .replace(/[^a-z0-9]+/g, '-')
-                        .replace(/(^-|-$)/g, '');
-                    seoData.slug = await ProductModel.generateUniqueSlug(baseSlug);
-                }
-            }
-        }
-
-        // Determine product ownership and approval status based on user role
-        const userRole = request.userRole || (request.user?.role || 'USER').toUpperCase();
-        // Check if user is full admin (in email list) - only full admins can auto-approve
-        const isFullAdmin = request.isFullAdmin !== undefined ? request.isFullAdmin : (userRole === 'ADMIN');
-        const isMarketingManager = request.isMarketingManager !== undefined ? request.isMarketingManager : (userRole === 'MARKETING_MANAGER');
-        const isVendor = userRole === 'VENDOR' || request.vendorId;
-        
-        // Set product ownership and approval status
-        let productOwnerType = 'PLATFORM';
-        let approvalStatus = 'APPROVED';
-        
-        if (isVendor && !isFullAdmin && !isMarketingManager) {
-            // Vendor products need approval
-            productOwnerType = 'VENDOR';
-            approvalStatus = 'PENDING_REVIEW';
-        } else if (isFullAdmin) {
-            // Full admin products are automatically approved
-            productOwnerType = 'PLATFORM';
-            approvalStatus = 'APPROVED';
-        } else if (isMarketingManager) {
-            // Marketing Manager products are platform products - no approval needed
-            // They show immediately when published (visibility doesn't check approval for platform products)
-            productOwnerType = 'PLATFORM';
-            approvalStatus = 'APPROVED'; // Set to APPROVED for consistency, but not required for visibility
-        }
-        
-        // Override if explicitly provided in request body (only full admins can override)
-        if (request.body.productOwnerType && isFullAdmin) {
-            productOwnerType = request.body.productOwnerType;
-        }
-        if (request.body.approvalStatus && isFullAdmin) {
-            approvalStatus = request.body.approvalStatus;
-        }
 
         // Build product data with backward compatibility
         let productData = {
@@ -508,9 +419,6 @@ export async function createProduct(request, response) {
             productType: request.body.productType || 'simple',
             status: request.body.status || 'draft',
             visibility: request.body.visibility || 'visible',
-            // Product ownership and approval
-            productOwnerType: productOwnerType,
-            approvalStatus: approvalStatus,
             // Images in new format
             images: imagesFormatted,
             // Pricing (new structure)
@@ -606,9 +514,7 @@ export async function createProduct(request, response) {
             seo: seoData,
             // SKU
             sku: request.body.sku || null,
-            barcode: request.body.barcode || null,
-            // Vendor information (if vendor product)
-            vendor: isVendor && !isAdmin ? request.vendorId : null
+            barcode: request.body.barcode || null
         };
 
         // NEW: Ensure attributes are populated for variable products
@@ -643,120 +549,13 @@ export async function createProduct(request, response) {
             });
         }
 
-        // Validate required fields before saving
-        if (!productData.name || !productData.name.trim()) {
-            return response.status(400).json({
-                error: true,
-                success: false,
-                message: "Product name is required"
-            });
-        }
-        
-        if (!productData.description || !productData.description.trim()) {
-            return response.status(400).json({
-                error: true,
-                success: false,
-                message: "Product description is required"
-            });
-        }
-        
-        if (!productData.category) {
-            return response.status(400).json({
-                error: true,
-                success: false,
-                message: "Product category is required"
-            });
-        }
-
-        // Validate and generate unique SKU for product-level
-        if (productData.sku && productData.sku.trim()) {
-            const isUnique = await ProductModel.isSkuUnique(productData.sku);
-            if (!isUnique) {
-                // Generate a unique SKU based on the provided one
-                productData.sku = await ProductModel.generateUniqueSku(productData.sku);
-            } else {
-                // Normalize SKU (uppercase, trim)
-                productData.sku = productData.sku.trim().toUpperCase();
-            }
-        } else if (productData.productType === 'simple') {
-            // Auto-generate SKU for simple products if not provided
-            const baseSku = productData.name
-                ? productData.name.substring(0, 10).toUpperCase().replace(/[^A-Z0-9]/g, '') || 'PROD'
-                : 'PROD';
-            productData.sku = await ProductModel.generateUniqueSku(baseSku);
-        }
-
-        // Validate and generate unique SKUs for variations
-        if (productData.variations && productData.variations.length > 0) {
-            const variationSkus = [];
-            for (let i = 0; i < productData.variations.length; i++) {
-                const variation = productData.variations[i];
-                if (variation.sku && variation.sku.trim()) {
-                    // Normalize the variation SKU
-                    let normalizedVariationSku = variation.sku.trim().toUpperCase();
-                    
-                    // Check if this variation SKU conflicts with product SKU
-                    if (productData.sku && normalizedVariationSku === productData.sku) {
-                        // Conflict with product SKU, generate new one
-                        normalizedVariationSku = await ProductModel.generateUniqueSku(variation.sku, null, [...variationSkus, productData.sku]);
-                    } 
-                    // Check if variation SKU conflicts with other variations in this product
-                    else if (variationSkus.includes(normalizedVariationSku)) {
-                        // Conflict with another variation in the same product, generate new one
-                        normalizedVariationSku = await ProductModel.generateUniqueSku(variation.sku, null, [...variationSkus, productData.sku].filter(Boolean));
-                    }
-                    // Check if variation SKU exists in database
-                    else {
-                        const isUnique = await ProductModel.isSkuUnique(normalizedVariationSku);
-                        if (!isUnique) {
-                            // SKU exists in database, generate new one
-                            normalizedVariationSku = await ProductModel.generateUniqueSku(variation.sku, null, [...variationSkus, productData.sku].filter(Boolean));
-                        }
-                    }
-                    
-                    variation.sku = normalizedVariationSku;
-                    variationSkus.push(variation.sku);
-                } else if (productData.productType === 'variable') {
-                    // Auto-generate SKU for variations if not provided
-                    const baseSku = productData.sku 
-                        ? `${productData.sku}-VAR${i + 1}`
-                        : (productData.name 
-                            ? `${productData.name.substring(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, '') || 'VAR'}-${i + 1}`
-                            : `VAR-${i + 1}`);
-                    const generatedSku = await ProductModel.generateUniqueSku(baseSku, null, [...variationSkus, productData.sku].filter(Boolean));
-                    variation.sku = generatedSku;
-                    variationSkus.push(variation.sku);
-                }
-            }
-        }
-
-        // Validate barcode uniqueness if provided
-        if (productData.barcode && productData.barcode.trim()) {
-            const existingBarcode = await ProductModel.findOne({ 
-                barcode: productData.barcode.trim() 
-            });
-            if (existingBarcode) {
-                // Barcode exists, set to null to avoid conflict (or generate unique one)
-                productData.barcode = null;
-            } else {
-                productData.barcode = productData.barcode.trim();
-            }
-        }
-
         let product = new ProductModel(productData);
         product = await product.save();
 
-        console.log('Product created:', {
-            id: product._id,
-            name: product.name,
-            images: product.images?.length || 0,
-            productOwnerType: product.productOwnerType,
-            approvalStatus: product.approvalStatus,
-            createdBy: userRole
-        });
+        console.log('Product created with images:', product.images?.length || 0, 'images');
 
         if (!product) {
-            return response.status(500).json({
+            response.status(500).json({
                 error: true,
                 success: false,
                 message: "Product Not created"
@@ -775,29 +574,6 @@ export async function createProduct(request, response) {
 
 
     } catch (error) {
-        // Handle duplicate key errors specifically
-        if (error.code === 11000 || (error.name === 'MongoServerError' && error.code === 11000)) {
-            const duplicateField = error.keyPattern ? Object.keys(error.keyPattern)[0] : 'unknown';
-            let errorMessage = 'Duplicate entry detected. ';
-            
-            if (duplicateField === 'sku') {
-                errorMessage += 'The SKU already exists. Please use a different SKU or leave it blank to auto-generate.';
-            } else if (duplicateField === 'barcode') {
-                errorMessage += 'The barcode already exists. Please use a different barcode or leave it blank.';
-            } else if (duplicateField === 'variations.sku') {
-                errorMessage += 'One or more variation SKUs already exist. Please use different SKUs or leave them blank to auto-generate.';
-            } else {
-                errorMessage += `Duplicate value for field: ${duplicateField}`;
-            }
-            
-            return response.status(409).json({
-                message: errorMessage,
-                error: true,
-                success: false,
-                duplicateField: duplicateField
-            });
-        }
-        
         return response.status(500).json({
             message: error.message || error,
             error: true,
@@ -816,61 +592,21 @@ export async function getAllProducts(request, response) {
         // Build query filters
         const query = {};
         
-        // Check if user is admin or marketing manager
-        const isAdminOrMarketingManager = request.userId && 
-            (request.user?.role?.toUpperCase() === 'ADMIN' || request.user?.role?.toUpperCase() === 'MARKETING_MANAGER');
-        
-        // Filter by status (default to published for public, allow all for admin and marketing manager)
+        // Filter by status (default to published for public, allow all for admin)
         if (status) {
             query.status = status;
-        } else if (!isAdminOrMarketingManager) {
+        } else if (!request.userId || request.user?.role !== 'ADMIN') {
             // Public users only see published products
             query.status = 'published';
-            
-            // Visibility logic: Show all published products EXCEPT unapproved vendor products
-            // IMPORTANT: Platform products (non-vendor) ALWAYS show if published, regardless of approval status
-            // Only vendor products require approval
-            query.$and = query.$and || [];
-            query.$and.push({
-                $or: [
-                    // Platform products (non-vendor) - ALWAYS visible if published (no approval needed)
-                    { productOwnerType: { $ne: 'VENDOR' } },
-                    { productOwnerType: { $exists: false } }, // Legacy products without productOwnerType
-                    // Vendor products - only show if approved
-                    { 
-                        productOwnerType: 'VENDOR',
-                        $or: [
-                            { approvalStatus: 'APPROVED' },
-                            { approvalStatus: { $exists: false } } // Legacy vendor products without approvalStatus
-                        ]
-                    }
-                ]
-            });
         }
 
-        // Debug: Log the query being used
-        console.log('🔍 getAllProducts query:', JSON.stringify(query, null, 2));
-        
         const totalProducts = await ProductModel.find(query);
         const products = await ProductModel.find(query)
-            .populate("vendor", "storeName storeSlug isVerified status")
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
             .limit(parseInt(limit));
 
         const total = await ProductModel.countDocuments(query);
-        
-        // Debug: Log results
-        console.log(`📦 getAllProducts: Found ${total} total products, returning ${products.length} products`);
-        if (products.length > 0) {
-            console.log('📦 Sample product:', {
-                id: products[0]._id,
-                name: products[0].name,
-                status: products[0].status,
-                productOwnerType: products[0].productOwnerType,
-                approvalStatus: products[0].approvalStatus
-            });
-        }
 
         return response.status(200).json({
             error: false,
@@ -935,17 +671,9 @@ export async function getAllProductsByCatId(request, response) {
                 { status: 'published' },
                 { 
                     $or: [
-                        // Platform products (non-vendor) are always visible if published
-                        { productOwnerType: { $ne: 'VENDOR' } },
-                        { productOwnerType: { $exists: false } }, // Legacy products without productOwnerType
-                        // Vendor products must be approved
-                        { 
-                            productOwnerType: 'VENDOR',
-                            $or: [
-                                { approvalStatus: 'APPROVED' },
-                                { approvalStatus: { $exists: false } } // Legacy vendor products without approvalStatus
-                            ]
-                        }
+                        { approvalStatus: 'APPROVED' },
+                        { approvalStatus: { $exists: false } },
+                        { productOwnerType: { $ne: 'VENDOR' } }
                     ]
                 }
             ]
@@ -966,7 +694,6 @@ export async function getAllProductsByCatId(request, response) {
         const products = await ProductModel.find(query)
             .populate("category")
             .populate("categories")
-            .populate("vendor", "storeName storeSlug isVerified status")
             .skip((page - 1) * perPage)
             .limit(perPage)
             .exec();
@@ -1076,9 +803,7 @@ export async function getAllProductsBySubCatId(request, response) {
             );
         }
 
-        const products = await ProductModel.find(query)
-            .populate("category")
-            .populate("vendor", "storeName storeSlug isVerified status")
+        const products = await ProductModel.find(query).populate("category")
             .skip((page - 1) * perPage)
             .limit(perPage)
             .exec();
@@ -1448,28 +1173,14 @@ export async function getAllFeaturedProducts(request, response) {
     try {
         // Only show published and approved featured products
         const products = await ProductModel.find({
-            $and: [
-                { isFeatured: true },
-                { status: 'published' },
-                { 
-                    $or: [
-                        // Platform products (non-vendor) are always visible if published
-                        { productOwnerType: { $ne: 'VENDOR' } },
-                        { productOwnerType: { $exists: false } }, // Legacy products without productOwnerType
-                        // Vendor products must be approved
-                        { 
-                            productOwnerType: 'VENDOR',
-                            $or: [
-                                { approvalStatus: 'APPROVED' },
-                                { approvalStatus: { $exists: false } } // Legacy vendor products without approvalStatus
-                            ]
-                        }
-                    ]
-                }
+            isFeatured: true,
+            status: 'published',
+            $or: [
+                { approvalStatus: 'APPROVED' },
+                { approvalStatus: { $exists: false } },
+                { productOwnerType: { $ne: 'VENDOR' } }
             ]
-        })
-            .populate("category")
-            .populate("vendor", "storeName storeSlug isVerified status");
+        }).populate("category");
 
         if (!products) {
             response.status(500).json({
@@ -1504,45 +1215,19 @@ export async function getSaleProducts(request, response) {
         const page = parseInt(request.query.page) || 1;
         const limit = parseInt(request.query.limit) || 12;
         const skip = (page - 1) * limit;
-        const now = new Date();
 
-        // First, get all published products with proper visibility filters
+        // First, get all published products
         const baseQuery = {
-            $and: [
-                { status: 'published' },
-                { 
-                    $or: [
-                        // Platform products (non-vendor) are always visible if published
-                        { productOwnerType: { $ne: 'VENDOR' } },
-                        { productOwnerType: { $exists: false } }, // Legacy products without productOwnerType
-                        // Vendor products must be approved
-                        { 
-                            productOwnerType: 'VENDOR',
-                            $or: [
-                                { approvalStatus: 'APPROVED' },
-                                { approvalStatus: { $exists: false } } // Legacy vendor products without approvalStatus
-                            ]
-                        }
-                    ]
-                }
-            ]
+            status: 'published'
         };
 
         // Fetch more products than needed to filter
         let products = await ProductModel.find(baseQuery)
             .populate("category")
             .sort({ createdAt: -1 })
-            .limit(500); // Increased limit to catch more sale products
+            .limit(100);
 
         console.log(`📦 getSaleProducts: Found ${products.length} published products to check`);
-
-        // Helper function to check if sale is active based on dates
-        const isSaleActive = (saleStartDate, saleEndDate) => {
-            if (!saleStartDate && !saleEndDate) return true; // No date restrictions
-            if (saleStartDate && saleStartDate > now) return false; // Sale hasn't started
-            if (saleEndDate && saleEndDate < now) return false; // Sale has ended
-            return true; // Sale is active
-        };
 
         // Filter products that are actually on sale and calculate discounts
         const saleProducts = products
@@ -1552,40 +1237,22 @@ export async function getSaleProducts(request, response) {
                 let regularPrice = 0;
                 let salePrice = 0;
                 let isOnSale = false;
-                let saleStartDate = null;
-                let saleEndDate = null;
 
-                // Method 1: Check pricing object (new structure) with date validation
-                if (product.pricing?.salePrice > 0 && product.pricing?.regularPrice > 0) {
-                    if (product.pricing.salePrice < product.pricing.regularPrice) {
-                        saleStartDate = product.pricing.saleStartDate;
-                        saleEndDate = product.pricing.saleEndDate;
-                        
-                        if (isSaleActive(saleStartDate, saleEndDate)) {
-                            regularPrice = product.pricing.regularPrice;
-                            salePrice = product.pricing.salePrice;
-                            isOnSale = true;
-                        }
-                    }
+                // Method 1: Check pricing object (new structure)
+                if (product.pricing?.onSale === true && product.pricing?.salePrice > 0) {
+                    regularPrice = product.pricing.regularPrice || 0;
+                    salePrice = product.pricing.salePrice || 0;
+                    isOnSale = true;
                 }
-                // Method 2: Check variable product variations with date validation
-                else if (product.productType === 'variable' && product.variations?.length > 0) {
-                    const saleVariation = product.variations.find(v => {
-                        if (v.salePrice > 0 && v.regularPrice > 0 && v.salePrice < v.regularPrice) {
-                            return isSaleActive(v.saleStartDate, v.saleEndDate);
-                        }
-                        return false;
-                    });
-                    
-                    if (saleVariation) {
-                        regularPrice = saleVariation.regularPrice;
-                        salePrice = saleVariation.salePrice;
-                        saleStartDate = saleVariation.saleStartDate;
-                        saleEndDate = saleVariation.saleEndDate;
+                // Method 2: Check pricing with regularPrice > salePrice
+                else if (product.pricing?.regularPrice > 0 && product.pricing?.salePrice > 0) {
+                    if (product.pricing.salePrice < product.pricing.regularPrice) {
+                        regularPrice = product.pricing.regularPrice;
+                        salePrice = product.pricing.salePrice;
                         isOnSale = true;
                     }
                 }
-                // Method 3: Check oldPrice and price (legacy structure) - no date check for legacy
+                // Method 3: Check oldPrice and price (legacy structure)
                 else if (product.oldPrice > 0 && product.price > 0) {
                     if (product.price < product.oldPrice) {
                         regularPrice = product.oldPrice;
@@ -1593,10 +1260,21 @@ export async function getSaleProducts(request, response) {
                         isOnSale = true;
                     }
                 }
-                // Method 4: Check discount field (legacy) - no date check for legacy
+                // Method 4: Check discount field
                 else if (product.discount && product.discount > 0) {
                     discountPercentage = product.discount;
                     isOnSale = true;
+                }
+                // Method 5: Check variable product variations
+                else if (product.productType === 'variable' && product.variations?.length > 0) {
+                    const saleVariation = product.variations.find(v => 
+                        v.salePrice > 0 && v.regularPrice > 0 && v.salePrice < v.regularPrice
+                    );
+                    if (saleVariation) {
+                        regularPrice = saleVariation.regularPrice;
+                        salePrice = saleVariation.salePrice;
+                        isOnSale = true;
+                    }
                 }
 
                 // Calculate discount percentage if not already set
@@ -1613,8 +1291,6 @@ export async function getSaleProducts(request, response) {
                     ...productObj,
                     discountPercentage,
                     isOnSale: true,
-                    saleStartDate,
-                    saleEndDate,
                     // Ensure price fields are populated for display
                     oldPrice: regularPrice || productObj.oldPrice,
                     price: salePrice || productObj.price
@@ -1622,10 +1298,7 @@ export async function getSaleProducts(request, response) {
             })
             .filter(Boolean);
 
-        console.log(`🔥 getSaleProducts: ${saleProducts.length} products are currently on sale`);
-
-        // Sort by discount percentage (highest first) for better display
-        saleProducts.sort((a, b) => (b.discountPercentage || 0) - (a.discountPercentage || 0));
+        console.log(`🔥 getSaleProducts: ${saleProducts.length} products are on sale`);
 
         // Apply pagination
         const paginatedProducts = saleProducts.slice(skip, skip + limit);
@@ -1721,24 +1394,12 @@ export async function getAllProductsBanners(request, response) {
     try {
         // Only show published and approved products for banners
         const products = await ProductModel.find({
-            $and: [
-                { isDisplayOnHomeBanner: true },
-                { status: 'published' },
-                { 
-                    $or: [
-                        // Platform products (non-vendor) are always visible if published
-                        { productOwnerType: { $ne: 'VENDOR' } },
-                        { productOwnerType: { $exists: false } }, // Legacy products without productOwnerType
-                        // Vendor products must be approved
-                        { 
-                            productOwnerType: 'VENDOR',
-                            $or: [
-                                { approvalStatus: 'APPROVED' },
-                                { approvalStatus: { $exists: false } } // Legacy vendor products without approvalStatus
-                            ]
-                        }
-                    ]
-                }
+            isDisplayOnHomeBanner: true,
+            status: 'published',
+            $or: [
+                { approvalStatus: 'APPROVED' },
+                { approvalStatus: { $exists: false } },
+                { productOwnerType: { $ne: 'VENDOR' } }
             ]
         }).populate("category");
 
@@ -1916,7 +1577,7 @@ export async function getProduct(request, response) {
         // Variations and attributes are embedded documents, so they're automatically included
         const product = await ProductModel.findById(request.params.id)
             .populate("category")
-            .populate("vendor", "storeName storeSlug isVerified");
+            .populate("vendor", "storeName storeSlug");
 
         if (!product) {
             return response.status(404).json({
@@ -1928,32 +1589,17 @@ export async function getProduct(request, response) {
 
         // Check if product is available for public viewing
         // Vendor products must be approved AND published
-        // Platform products (non-vendor) only need to be published
         const isVendorProduct = product.productOwnerType === 'VENDOR';
         const isApproved = product.approvalStatus === 'APPROVED' || !product.approvalStatus;
         const isPublished = product.status === 'published';
         
-        // Check if user is admin or marketing manager (they can see all products)
-        const isAdminOrMarketingManager = request.userId && 
-            (request.user?.role?.toUpperCase() === 'ADMIN' || request.user?.role?.toUpperCase() === 'MARKETING_MANAGER');
-        
-        // Only enforce visibility rules for non-admin users
-        if (!isAdminOrMarketingManager) {
-            if (isVendorProduct && (!isApproved || !isPublished)) {
-                // Vendor product is not available for public viewing
-                return response.status(404).json({
-                    message: "This product is not available",
-                    error: true,
-                    success: false
-                })
-            } else if (!isVendorProduct && !isPublished) {
-                // Platform product must be published
-                return response.status(404).json({
-                    message: "This product is not available",
-                    error: true,
-                    success: false
-                })
-            }
+        if (isVendorProduct && (!isApproved || !isPublished)) {
+            // Product is not available for public viewing
+            return response.status(404).json({
+                message: "This product is not available",
+                error: true,
+                success: false
+            })
         }
 
         // Convert to plain object to ensure all fields are serialized
@@ -2224,25 +1870,12 @@ export async function updateProduct(request, response) {
 
         // Update pricing structure (new format)
         if (request.body.pricing || request.body.price !== undefined || request.body.oldPrice !== undefined) {
-            const now = new Date();
-            const regularPrice = request.body.pricing?.regularPrice || request.body.oldPrice || request.body.price || existingProduct.pricing?.regularPrice || 0;
-            const salePrice = request.body.pricing?.salePrice || (request.body.oldPrice && request.body.price && request.body.price < request.body.oldPrice ? request.body.price : null);
-            const saleStartDate = request.body.pricing?.saleStartDate ? new Date(request.body.pricing.saleStartDate) : (existingProduct.pricing?.saleStartDate || null);
-            const saleEndDate = request.body.pricing?.saleEndDate ? new Date(request.body.pricing.saleEndDate) : (existingProduct.pricing?.saleEndDate || null);
-            
-            // Check if sale is currently active based on dates
-            const saleActive = salePrice && salePrice < regularPrice && 
-                (!saleStartDate || saleStartDate <= now) && 
-                (!saleEndDate || saleEndDate >= now);
-            
             updateData.pricing = {
-                regularPrice: regularPrice,
-                salePrice: salePrice,
-                price: saleActive ? salePrice : regularPrice,
+                regularPrice: request.body.pricing?.regularPrice || request.body.oldPrice || request.body.price || existingProduct.pricing?.regularPrice || 0,
+                salePrice: request.body.pricing?.salePrice || (request.body.oldPrice && request.body.price && request.body.price < request.body.oldPrice ? request.body.price : null),
+                price: request.body.pricing?.price || request.body.price || request.body.pricing?.salePrice || request.body.pricing?.regularPrice || request.body.oldPrice || 0,
                 currency: request.body.pricing?.currency || request.body.currency || existingProduct.pricing?.currency || 'USD',
-                onSale: saleActive,
-                saleStartDate: saleStartDate,
-                saleEndDate: saleEndDate,
+                onSale: request.body.pricing?.onSale !== undefined ? request.body.pricing.onSale : (request.body.pricing?.salePrice && request.body.pricing.salePrice < request.body.pricing.regularPrice),
                 taxStatus: request.body.pricing?.taxStatus || existingProduct.pricing?.taxStatus || 'taxable',
                 taxClass: request.body.pricing?.taxClass || existingProduct.pricing?.taxClass || 'standard'
             };
@@ -2279,63 +1912,12 @@ export async function updateProduct(request, response) {
 
         // Update SEO structure
         if (request.body.seo) {
-            let slugToUse = request.body.seo.slug || request.body.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || existingProduct.seo?.slug || '';
-            
-            // Ensure slug is unique (exclude current product from duplicate check)
-            if (slugToUse && slugToUse !== existingProduct.seo?.slug) {
-                try {
-                    slugToUse = await ProductModel.generateUniqueSlug(slugToUse, existingProduct._id);
-                } catch (error) {
-                    console.error('Error generating unique slug during update:', error);
-                    // Keep existing slug if generation fails
-                    slugToUse = existingProduct.seo?.slug || slugToUse;
-                }
-            }
-            
             updateData.seo = {
-                metaTitle: request.body.seo.metaTitle || existingProduct.seo?.metaTitle || '',
-                metaDescription: request.body.seo.metaDescription || existingProduct.seo?.metaDescription || '',
-                metaKeywords: request.body.seo.metaKeywords || existingProduct.seo?.metaKeywords || [],
-                slug: slugToUse
+                metaTitle: request.body.seo.metaTitle || '',
+                metaDescription: request.body.seo.metaDescription || '',
+                metaKeywords: request.body.seo.metaKeywords || [],
+                slug: request.body.seo.slug || request.body.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || existingProduct.seo?.slug || ''
             };
-        }
-
-        // Handle approval status based on user role
-        // Only full admins can auto-approve products
-        const userRole = request.userRole || (request.user?.role || 'USER').toUpperCase();
-        const isFullAdmin = request.isFullAdmin !== undefined ? request.isFullAdmin : (userRole === 'ADMIN');
-        const isMarketingManager = request.isMarketingManager !== undefined ? request.isMarketingManager : (userRole === 'MARKETING_MANAGER');
-        
-        // Handle approval status when publishing products
-        // IMPORTANT: Platform products (non-vendor) don't need approval - they show immediately when published
-        // Only vendor products need approval
-        if (request.body.status === 'published' && existingProduct.status !== 'published') {
-            const isVendorProduct = existingProduct.productOwnerType === 'VENDOR' || request.body.productOwnerType === 'VENDOR';
-            
-            if (isFullAdmin) {
-                // Full admin can explicitly set approval status
-                if (request.body.approvalStatus) {
-                    updateData.approvalStatus = request.body.approvalStatus;
-                } else {
-                    // Full admin publishing - auto-approve
-                    updateData.approvalStatus = 'APPROVED';
-                }
-            } else if (isVendorProduct) {
-                // Vendor products need approval when published by non-admin
-                updateData.approvalStatus = 'PENDING_REVIEW';
-                console.log('📋 Vendor product status changed to published by non-admin, setting approvalStatus to PENDING_REVIEW');
-            } else {
-                // Platform products (non-vendor) - no approval needed, but set to APPROVED for consistency
-                // They will show immediately because visibility query doesn't check approval for platform products
-                updateData.approvalStatus = 'APPROVED';
-                console.log('📋 Platform product published - no approval needed, setting to APPROVED for consistency');
-            }
-        } else if (request.body.approvalStatus && isFullAdmin) {
-            // Only full admins can change approval status directly
-            updateData.approvalStatus = request.body.approvalStatus;
-        } else if (request.body.status && request.body.status !== 'published' && existingProduct.approvalStatus === 'PENDING_REVIEW') {
-            // If changing from published to draft, keep approval status as is
-            // Don't override approvalStatus
         }
 
         // Handle attributes and variations for variable products
@@ -2419,19 +2001,11 @@ export async function updateProduct(request, response) {
                     
                     // Calculate current price (sale price if active, otherwise regular price)
                     let currentPrice = regularPrice;
-                    const now = new Date();
-                    
-                    // Get existing variation to preserve sale dates if not provided
-                    const existingVariation = existingProduct.variations?.find(v => 
-                        v._id?.toString() === variation._id?.toString() || 
-                        v.id?.toString() === variation._id?.toString()
-                    );
-                    
-                    const saleStart = variation.saleStartDate ? new Date(variation.saleStartDate) : (existingVariation?.saleStartDate || null);
-                    const saleEnd = variation.saleEndDate ? new Date(variation.saleEndDate) : (existingVariation?.saleEndDate || null);
-                    
                     if (salePrice && regularPrice && salePrice < regularPrice) {
                         // Check if sale is active
+                        const now = new Date();
+                        const saleStart = variation.saleStartDate ? new Date(variation.saleStartDate) : null;
+                        const saleEnd = variation.saleEndDate ? new Date(variation.saleEndDate) : null;
                         const isSaleActive = (!saleStart || saleStart <= now) && (!saleEnd || saleEnd >= now);
                         
                         if (isSaleActive) {
@@ -2445,8 +2019,6 @@ export async function updateProduct(request, response) {
                         regularPrice: regularPrice || currentPrice,
                         price: currentPrice,
                         salePrice: salePrice || null,
-                        saleStartDate: saleStart,
-                        saleEndDate: saleEnd,
                     stock: variation.endlessStock ? 999999 : (variation.stock || 0),
                     stockStatus: variation.endlessStock ? 'in_stock' : (variation.stockStatus || (variation.stock > 0 ? 'in_stock' : 'out_of_stock')),
                     manageStock: variation.manageStock !== false,
@@ -3128,27 +2700,14 @@ export async function filters(request, response) {
     }
     filters.$and.push({
         $or: [
-            // Platform products (non-vendor) are always visible if published
-            { productOwnerType: { $ne: 'VENDOR' } },
-            { productOwnerType: { $exists: false } }, // Legacy products without productOwnerType
-            // Vendor products must be approved
-            { 
-                productOwnerType: 'VENDOR',
-                $or: [
-                    { approvalStatus: 'APPROVED' },
-                    { approvalStatus: { $exists: false } } // Legacy vendor products without approvalStatus
-                ]
-            }
+            { approvalStatus: 'APPROVED' },
+            { approvalStatus: { $exists: false } },
+            { productOwnerType: { $ne: 'VENDOR' } }
         ]
     });
 
     try {
-        const products = await ProductModel.find(filters)
-            .populate("category")
-            .populate("categories")
-            .populate("vendor", "storeName storeSlug isVerified status")
-            .skip((page - 1) * limit)
-            .limit(parseInt(limit));
+        const products = await ProductModel.find(filters).populate("category").populate("categories").skip((page - 1) * limit).limit(parseInt(limit));
 
         const total = await ProductModel.countDocuments(filters);
 

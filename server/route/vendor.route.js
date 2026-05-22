@@ -8,7 +8,6 @@ import * as vendorProductController from '../controllers/vendorProduct.controlle
 import * as vendorOrderController from '../controllers/vendorOrder.controller.js';
 import * as vendorFinanceController from '../controllers/vendorFinance.controller.js';
 import * as vendorCouponController from '../controllers/vendorCoupon.controller.js';
-import * as vendorApplicationController from '../controllers/vendorApplication.controller.js';
 
 const router = Router();
 
@@ -21,9 +20,6 @@ router.post('/verify-otp', vendorController.verifyOTP);
 
 // Step 3: Complete registration (requires verified email)
 router.post('/apply', vendorController.applyToBecomeVendor);
-
-// Vendor Application (simple form submission - no account creation)
-router.post('/application', vendorApplicationController.submitVendorApplication);
 
 // Vendor Login (dedicated endpoint)
 router.post('/login', vendorController.vendorLogin);
@@ -50,9 +46,7 @@ router.get('/dashboard', vendorController.getDashboardStats);
 
 // Products
 router.get('/products', vendorProductController.list);
-router.get('/products/available', vendorProductController.browseAvailable); // Browse products available for claiming
 router.post('/products', vendorProductController.create);
-router.post('/products/:id/claim', vendorProductController.claimProduct); // Claim/add product to store
 router.get('/products/:id', vendorProductController.get);
 router.put('/products/:id', vendorProductController.update);
 router.delete('/products/:id', vendorProductController.remove);

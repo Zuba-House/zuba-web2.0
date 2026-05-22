@@ -326,6 +326,36 @@ const SEOSchema = new mongoose.Schema({
   }
 }, { _id: false });
 
+// Seller/Vendor Schema
+const SellerSchema = new mongoose.Schema({
+  sellerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  sellerName: {
+    type: String,
+    default: ''
+  },
+  sellerRating: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 5
+  },
+  commissionRate: {
+    type: Number,
+    default: 0.12,
+    min: 0,
+    max: 1
+  },
+  commissionType: {
+    type: String,
+    enum: ['percentage', 'fixed'],
+    default: 'percentage'
+  }
+}, { _id: false });
+
 // ============================================
 // MAIN PRODUCT SCHEMA
 // ============================================
@@ -399,8 +429,15 @@ const ProductSchema = new mongoose.Schema({
     trim: true
   }],
   
-  // ========== VENDOR INFORMATION ==========
+  // ========== SELLER/VENDOR INFORMATION ==========
+  seller: SellerSchema,
   vendor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vendor',
+    default: null,
+    index: true
+  },
+  vendorId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Vendor',
     default: null,
@@ -639,7 +676,7 @@ ProductSchema.index({ status: 1, visibility: 1 });
 ProductSchema.index({ category: 1, status: 1 });
 ProductSchema.index({ categories: 1, status: 1 });
 ProductSchema.index({ brand: 1, status: 1 });
-ProductSchema.index({ vendor: 1, status: 1 });
+ProductSchema.index({ 'seller.sellerId': 1, status: 1 });
 ProductSchema.index({ productType: 1 });
 ProductSchema.index({ isFeatured: 1, status: 1 });
 ProductSchema.index({ 'pricing.price': 1 });
@@ -814,210 +851,19 @@ ProductSchema.methods.calculatePriceRange = function() {
 };
 
 // ============================================
-// STATIC METHODS
-// ============================================
-
-/**
- * Generate a unique slug by checking for duplicates
- * @param {String} baseSlug - The base slug to make unique
- * @param {String} excludeId - Product ID to exclude from duplicate check (for updates)
- * @returns {Promise<String>} - A unique slug
- */
-ProductSchema.statics.generateUniqueSlug = async function(baseSlug, excludeId = null) {
-  if (!baseSlug) return null;
-  
-  // Normalize the base slug
-  let slug = baseSlug
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-  
-  if (!slug) return null;
-  
-  // Check if slug exists
-  const query = { 'seo.slug': slug };
-  if (excludeId) {
-    query._id = { $ne: excludeId };
-  }
-  
-  const existing = await this.findOne(query);
-  
-  // If slug doesn't exist, return it
-  if (!existing) {
-    return slug;
-  }
-  
-  // If slug exists, append a number and try again
-  let counter = 2;
-  let uniqueSlug = `${slug}-${counter}`;
-  
-  while (true) {
-    const checkQuery = { 'seo.slug': uniqueSlug };
-    if (excludeId) {
-      checkQuery._id = { $ne: excludeId };
-    }
-    
-    const exists = await this.findOne(checkQuery);
-    if (!exists) {
-      return uniqueSlug;
-    }
-    
-    counter++;
-    uniqueSlug = `${slug}-${counter}`;
-    
-    // Safety limit to prevent infinite loops
-    if (counter > 1000) {
-      // Fallback to timestamp-based slug
-      return `${slug}-${Date.now().toString().slice(-8)}`;
-    }
-  }
-};
-
-/**
- * Generate a unique SKU by checking for duplicates in products and variations
- * @param {String} baseSku - The base SKU to make unique (optional)
- * @param {String} excludeId - Product ID to exclude from duplicate check (for updates)
- * @param {Array} excludeVariationSkus - Array of variation SKUs to exclude (for updates)
- * @returns {Promise<String>} - A unique SKU
- */
-ProductSchema.statics.generateUniqueSku = async function(baseSku = null, excludeId = null, excludeVariationSkus = []) {
-  // If no base SKU provided, generate one from timestamp
-  let sku = baseSku;
-  if (!sku || !sku.trim()) {
-    const timestamp = Date.now().toString(36).toUpperCase();
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-    sku = `SKU-${timestamp}-${random}`;
-  } else {
-    // Normalize the SKU (uppercase, trim)
-    sku = sku.trim().toUpperCase();
-  }
-  
-  // Check if SKU exists in product-level
-  const productQuery = { sku: sku };
-  if (excludeId) {
-    productQuery._id = { $ne: excludeId };
-  }
-  
-  const existingProduct = await this.findOne(productQuery);
-  
-  // Check if SKU exists in any variation (embedded variations)
-  const variationQuery = { 'variations.sku': sku };
-  if (excludeId) {
-    variationQuery._id = { $ne: excludeId };
-  }
-  
-  const existingVariation = await this.findOne(variationQuery);
-  
-  // If SKU doesn't exist and not in exclude list, return it
-  const normalizedExcludeList = excludeVariationSkus.map(s => s ? s.trim().toUpperCase() : null).filter(Boolean);
-  if (!existingProduct && !existingVariation && !normalizedExcludeList.includes(sku)) {
-    return sku;
-  }
-  
-  // If SKU exists, append a number and try again
-  let counter = 2;
-  let baseSkuPart = baseSku ? baseSku.trim().toUpperCase() : sku.split('-').slice(0, -1).join('-') || sku;
-  let uniqueSku = `${baseSkuPart}-${counter}`;
-  
-  // If no base SKU was provided, use the generated SKU as base
-  if (!baseSku) {
-    baseSkuPart = sku;
-    uniqueSku = `${baseSkuPart}-${counter}`;
-  }
-  
-  while (true) {
-    const checkProductQuery = { sku: uniqueSku };
-    const checkVariationQuery = { 'variations.sku': uniqueSku };
-    
-    if (excludeId) {
-      checkProductQuery._id = { $ne: excludeId };
-      checkVariationQuery._id = { $ne: excludeId };
-    }
-    
-    const productExists = await this.findOne(checkProductQuery);
-    const variationExists = await this.findOne(checkVariationQuery);
-    const inExcludeList = normalizedExcludeList.includes(uniqueSku);
-    
-    if (!productExists && !variationExists && !inExcludeList) {
-      return uniqueSku;
-    }
-    
-    counter++;
-    uniqueSku = `${baseSkuPart}-${counter}`;
-    
-    // Safety limit to prevent infinite loops
-    if (counter > 10000) {
-      // Fallback to timestamp-based SKU
-      const timestamp = Date.now().toString(36).toUpperCase();
-      const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-      return `SKU-${timestamp}-${random}`;
-    }
-  }
-};
-
-/**
- * Check if a SKU is unique (not used in products or variations)
- * @param {String} sku - The SKU to check
- * @param {String} excludeId - Product ID to exclude from check (for updates)
- * @returns {Promise<Boolean>} - True if SKU is unique, false otherwise
- */
-ProductSchema.statics.isSkuUnique = async function(sku, excludeId = null) {
-  if (!sku || !sku.trim()) {
-    return true; // Empty SKU is considered unique (sparse index)
-  }
-  
-  const normalizedSku = sku.trim().toUpperCase();
-  
-  // Check product-level SKU
-  const productQuery = { sku: normalizedSku };
-  if (excludeId) {
-    productQuery._id = { $ne: excludeId };
-  }
-  const existingProduct = await this.findOne(productQuery);
-  
-  // Check variation-level SKU
-  const variationQuery = { 'variations.sku': normalizedSku };
-  if (excludeId) {
-    variationQuery._id = { $ne: excludeId };
-  }
-  const existingVariation = await this.findOne(variationQuery);
-  
-  return !existingProduct && !existingVariation;
-};
-
-// ============================================
 // MIDDLEWARE
 // ============================================
 
-ProductSchema.pre('save', async function(next) {
-  try {
-    // Generate or ensure unique slug
-    if (!this.seo) {
-      this.seo = {};
-    }
+ProductSchema.pre('save', function(next) {
+  // Generate slug if not exists
+  if (this.isModified('name') && (!this.seo || !this.seo.slug)) {
+    const baseSlug = this.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
     
-    // If slug is being set or modified, ensure it's unique
-    if (this.isModified('seo.slug') || this.isModified('name')) {
-      let slugToUse = this.seo?.slug;
-      
-      // If no slug provided, generate from name
-      if (!slugToUse && this.name) {
-        const baseSlug = this.name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/(^-|-$)/g, '');
-        slugToUse = baseSlug;
-      }
-      
-      // Ensure slug is unique
-      if (slugToUse) {
-        const excludeId = this.isNew ? null : this._id;
-        this.seo.slug = await this.constructor.generateUniqueSlug(slugToUse, excludeId);
-      }
-    }
-  } catch (error) {
-    return next(error);
+    if (!this.seo) this.seo = {};
+    this.seo.slug = `${baseSlug}-${this._id.toString().slice(-6)}`;
   }
   
   // Set featured image

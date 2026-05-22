@@ -18,7 +18,6 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 import VendorModel from '../models/vendor.model.js';
 import UserModel from '../models/user.model.js';
 import PayoutModel from '../models/payout.model.js';
-import ProductModel from '../models/product.model.js';
 
 const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
 
@@ -47,13 +46,9 @@ async function deleteAllVendors() {
       console.log(`   - ${v.storeName || 'N/A'} (ID: ${v._id})`);
     });
 
-    // Delete all products associated with vendors
-    const productDeleteResult = await ProductModel.deleteMany({ vendor: { $in: vendorIds } });
-    console.log(`\n🗑️ Deleted ${productDeleteResult.deletedCount} product(s)`);
-
     // Delete all payouts associated with vendors
     const payoutDeleteResult = await PayoutModel.deleteMany({ vendor: { $in: vendorIds } });
-    console.log(`🗑️ Deleted ${payoutDeleteResult.deletedCount} payout record(s)`);
+    console.log(`\n🗑️ Deleted ${payoutDeleteResult.deletedCount} payout records`);
 
     // Update users - remove vendor references and change role back to USER
     const userUpdateResult = await UserModel.updateMany(
@@ -72,7 +67,6 @@ async function deleteAllVendors() {
     console.log('\n✅ All vendors deleted successfully!');
     console.log('\n📊 Summary:');
     console.log(`   - Vendors deleted: ${vendorDeleteResult.deletedCount}`);
-    console.log(`   - Products deleted: ${productDeleteResult.deletedCount}`);
     console.log(`   - Users updated: ${userUpdateResult.modifiedCount}`);
     console.log(`   - Payouts deleted: ${payoutDeleteResult.deletedCount}`);
 

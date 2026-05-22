@@ -2,556 +2,293 @@ import UserModel from '../models/user.model.js'
 import bcryptjs from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import mongoose from 'mongoose'
-import sendEmailFun from '../config/sendEmail.js';
-import VerificationEmail from '../utils/verifyEmailTemplate.js';
+import crypto from 'crypto'
+import { sendOtpEmail } from '../config/emailService.js';
+import { env } from '../config/env.js';
+import { sendError, sendSuccess } from '../utils/response.js';
 import generatedAccessToken from '../utils/generatedAccessToken.js';
 import genertedRefreshToken from '../utils/generatedRefreshToken.js';
-import { isAdminEmail } from '../config/adminEmails.js';
+import { checkOtpRateLimit } from '../utils/rateLimitOtp.js';
+import CartProductModel from '../models/cartProduct.modal.js';
 
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
-import ReviewModel from '../models/reviews.model.js.js';
+import ReviewModel from '../models/reviews.model.js';
+import {
+    buildCountryBreakdown,
+    collectUserCountriesFromDb,
+} from '../utils/geoBreakdown.js';
 
 cloudinary.config({
-    cloud_name: process.env.cloudinary_Config_Cloud_Name,
-    api_key: process.env.cloudinary_Config_api_key,
-    api_secret: process.env.cloudinary_Config_api_secret,
+    cloud_name: env.cloudinaryCloudName,
+    api_key: env.cloudinaryApiKey,
+    api_secret: env.cloudinaryApiSecret,
     secure: true,
 });
+
+const OTP_EXPIRY_MINUTES = env.otpExpiryMinutes;
+const COOKIE_DOMAIN = env.cookieDomain;
+
+function normalizeEmail(email) {
+    return String(email || '').trim().toLowerCase();
+}
+
+function generateOtp() {
+    return String(crypto.randomInt(100000, 1000000));
+}
+
+function getCookieOptions() {
+    const isProduction = env.nodeEnv === 'production';
+    return {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? 'None' : 'Lax',
+        path: '/',
+        ...(COOKIE_DOMAIN ? { domain: COOKIE_DOMAIN } : {}),
+    };
+}
+
+async function issueAuthTokens(response, userId) {
+    const accessToken = await generatedAccessToken(userId);
+    const refreshToken = await genertedRefreshToken(userId);
+    const cookiesOption = getCookieOptions();
+    response.cookie('accessToken', accessToken, cookiesOption);
+    response.cookie('refreshToken', refreshToken, cookiesOption);
+    return { accessToken, refreshToken };
+}
+
+function getRefreshTokenFromRequest(request) {
+    const cookieToken = request.cookies?.refreshToken;
+    const authHeader = request?.headers?.authorization;
+    if (cookieToken) return cookieToken;
+    if (!authHeader) return null;
+    if (authHeader.startsWith('Bearer ')) return authHeader.substring(7).trim();
+    const parts = authHeader.split(' ');
+    return parts.length > 1 ? parts[1].trim() : authHeader.trim();
+}
+
+async function sendOtpEmailOrThrow({ email, name, otp, purpose }) {
+    const result = await sendOtpEmail({
+        to: email,
+        customerName: name,
+        otp,
+        purpose,
+        expiryMinutes: OTP_EXPIRY_MINUTES,
+    });
+    if (!result?.success) {
+        throw new Error(result?.error || 'Failed to deliver OTP email. Please try again.');
+    }
+}
+
+const buildTokenData = (accessToken, refreshToken, user = null) => {
+    const data = { accessToken, refreshToken };
+    if (user) data.user = user;
+    return data;
+};
+
+async function mergeGuestCartForUser(userId, guestCart = []) {
+    if (!Array.isArray(guestCart) || guestCart.length === 0) {
+        return;
+    }
+
+    for (const item of guestCart) {
+        if (!item?.productId) continue;
+
+        const query = {
+            userId: String(userId),
+            productId: item.productId,
+            variationId: item.variationId || null
+        };
+        const qtyToAdd = Math.max(1, parseInt(item.quantity) || 1);
+        const existing = await CartProductModel.findOne(query);
+
+        if (existing) {
+            existing.quantity += qtyToAdd;
+            existing.subTotal = parseFloat(existing.price) * existing.quantity;
+            await existing.save();
+            continue;
+        }
+
+        const payload = {
+            productTitle: item.productTitle || item.product?.name || 'Product',
+            image: item.image || item.product?.images?.[0] || '',
+            rating: parseFloat(item.rating || 0),
+            price: parseFloat(item.price || 0),
+            oldPrice: item.oldPrice ? parseFloat(item.oldPrice) : null,
+            quantity: qtyToAdd,
+            subTotal: parseFloat(item.price || 0) * qtyToAdd,
+            productId: item.productId,
+            countInStock: parseInt(item.countInStock) || 0,
+            userId: String(userId),
+            discount: parseFloat(item.discount || 0),
+            brand: item.brand || '',
+            productType: item.productType || 'simple',
+            variationId: item.variationId || null,
+            variation: item.variation || null,
+            size: item.size || null,
+            weight: item.weight || null,
+            ram: item.ram || null
+        };
+
+        try {
+            await CartProductModel.create(payload);
+        } catch (error) {
+            if (error?.code === 11000) {
+                const racedItem = await CartProductModel.findOne(query);
+                if (racedItem) {
+                    racedItem.quantity += qtyToAdd;
+                    racedItem.subTotal = parseFloat(racedItem.price) * racedItem.quantity;
+                    await racedItem.save();
+                }
+            } else {
+                throw error;
+            }
+        }
+    }
+}
 
 
 export async function registerUserController(request, response) {
     try {
-        let user;
-
         const { name, email, password } = request.body;
-        if (!name || !email || !password) {
-            return response.status(400).json({
-                message: "provide email, name, password",
-                error: true,
-                success: false
-            })
+        const normalizedEmail = normalizeEmail(email);
+
+        if (!name || !normalizedEmail || !password) {
+            return sendError(response, 400, "provide email, name, password");
         }
 
-        // NOTE: Admin email check removed - this endpoint is for regular user registration
-        // Admin email check is only applied to admin panel routes, not general user routes
+        if (password.length < 6) {
+            return sendError(response, 400, "Password must be at least 6 characters");
+        }
 
-        const normalizedEmail = email.toLowerCase().trim();
-        user = await UserModel.findOne({ email: normalizedEmail });
+        const rateLimit = checkOtpRateLimit(normalizedEmail);
+        if (!rateLimit.allowed) {
+            return sendError(response, 429, `Too many OTP requests. Try again in ${rateLimit.retryAfter} seconds.`);
+        }
+
+        let user = await UserModel.findOne({ email: normalizedEmail });
 
         if (user) {
-            return response.json({
-                message: "User already Registered with this email",
-                error: true,
-                success: false
-            })
+            return sendError(response, 409, "Account already exists");
         }
 
-        const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const verifyCode = generateOtp();
 
 
         const salt = await bcryptjs.genSalt(10);
         const hashPassword = await bcryptjs.hash(password, salt);
-
-        // Check if email is authorized for marketing manager role
-        const { isMarketingManagerEmail } = await import('../config/adminEmails.js');
-        let userRole = 'USER'; // Default role
-        
-        if (isMarketingManagerEmail(normalizedEmail)) {
-            userRole = 'MARKETING_MANAGER';
-            console.log('✅ Setting MARKETING_MANAGER role for:', normalizedEmail);
-        }
 
         user = new UserModel({
             email: normalizedEmail,
             password: hashPassword,
             name: name,
             otp: verifyCode,
-            otpExpires: Date.now() + 600000,
-            role: userRole
+            otpExpires: Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000,
+
         });
 
         await user.save();
 
-        // Send verification email - CRITICAL: Must send OTP for account verification
-        console.log('📧 ====== SENDING OTP EMAIL ======');
-        console.log('📧 Recipient:', normalizedEmail);
-        console.log('👤 Name:', name);
-        console.log('🔐 OTP Code:', verifyCode);
-        console.log('⏰ Expires in: 10 minutes');
-        console.log('👤 Role:', userRole);
-        
-        // Check SendGrid configuration
-        const hasSendGridKey = !!process.env.SENDGRID_API_KEY;
-        const senderEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER || process.env.EMAIL;
-        console.log(`📧 SendGrid Config: API_KEY=${hasSendGridKey ? 'SET' : 'NOT SET'}, FROM=${senderEmail || 'NOT SET'}`);
-        
-        let emailSent = false;
-        let emailError = null;
-        
         try {
-            if (!hasSendGridKey) {
-                console.error('❌ SENDGRID_API_KEY is not set - email cannot be sent');
-                emailError = 'SENDGRID_API_KEY environment variable is not configured';
-            } else {
-                // Generate email template
-                const emailHtml = VerificationEmail(name, verifyCode);
-                const emailText = `Hi ${name},\n\nYour verification code is: ${verifyCode}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, please ignore this email.\n\nBest regards,\nZuba House Team`;
-                
-                console.log('📧 Calling sendEmailFun with:', {
-                    sendTo: normalizedEmail,
-                    subject: "Verify Your Email - Zuba House",
-                    hasHtml: !!emailHtml,
-                    htmlLength: emailHtml?.length || 0,
-                    hasText: !!emailText,
-                    textLength: emailText?.length || 0
-                });
-                
-                // Validate email template before sending
-                if (!emailHtml || emailHtml.trim().length === 0) {
-                    console.error('❌ Email HTML template is empty or invalid');
-                    emailError = 'Email template generation failed';
-                } else {
-                    emailSent = await sendEmailFun({
-                        sendTo: normalizedEmail,
-                        subject: "Verify Your Email - Zuba House",
-                        text: emailText,
-                        html: emailHtml
-                    });
-                }
-
-                if (emailSent) {
-                    console.log('✅ OTP email sent successfully to:', normalizedEmail);
-                    console.log('====================================\n');
-                } else {
-                    console.error('❌ Failed to send OTP email to:', normalizedEmail);
-                    console.error('⚠️ Registration succeeded but email delivery failed');
-                    console.error('⚠️ Check server logs above for detailed SendGrid error information');
-                    emailError = 'Email delivery failed - check SendGrid configuration and server logs';
-                }
-            }
-        } catch (emailErrorCaught) {
-            console.error('❌ Error sending OTP email:', {
-                to: normalizedEmail,
-                error: emailErrorCaught.message,
-                stack: emailErrorCaught.stack
+            await sendOtpEmailOrThrow({
+                email: normalizedEmail,
+                name,
+                otp: verifyCode,
+                purpose: 'verification'
             });
-            emailError = emailErrorCaught.message;
+        } catch (emailError) {
+            await UserModel.findByIdAndDelete(user._id);
+            return sendError(response, 502, emailError.message || 'Could not send verification email');
         }
-        
-        // Log OTP in console for debugging (always)
-        console.log('🔑 OTP CODE (for verification):', verifyCode);
-        console.log('====================================\n');
 
-        // Create a JWT token for verification purposes (expires in 7 days)
+        // Create a JWT token for verification purposes
         const token = jwt.sign(
             { email: user.email, id: user._id },
-            process.env.JSON_WEB_TOKEN_SECRET_KEY,
-            { expiresIn: '7d' } // Extended expiration for email verification token
+            env.jwtLegacySecret
         );
 
-        // Determine success message and response data
-        const isLocal = !process.env.RENDER && !process.env.VERCEL;
-        const successMessage = emailSent 
-            ? "User registered successfully! Please check your email for the verification code (OTP)."
-            : `User registered successfully! ${isLocal ? 'Check server console for OTP code.' : 'Email delivery issue - OTP included in response for verification.'}`;
 
-        // Build response - include OTP if email failed (for testing/admin use)
-        const responseData = {
-            success: true,
-            error: false,
-            message: successMessage,
-            token: token,
-            data: {
-                email: normalizedEmail,
-                emailSent: emailSent,
-                // Include OTP in response when email fails (for admin/testing)
-                ...(!emailSent ? { otp: verifyCode } : {}),
-                ...(emailError ? { emailError: emailError } : {})
-            }
-        };
-
-        return response.status(200).json(responseData);
+        return sendSuccess(response, 200, "User registered successfully!", { verificationToken: token });
 
 
 
     } catch (error) {
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        })
-    }
-}
-
-// Resend OTP for email verification
-export async function resendOTPController(request, response) {
-    try {
-        const { email } = request.body;
-
-        if (!email) {
-            return response.status(400).json({
-                error: true,
-                success: false,
-                message: "Email is required"
-            });
-        }
-
-        const normalizedEmail = email.toLowerCase().trim();
-        const user = await UserModel.findOne({ email: normalizedEmail });
-        
-        if (!user) {
-            return response.status(400).json({
-                error: true,
-                success: false,
-                message: "User not found"
-            });
-        }
-
-        // Generate new OTP
-        const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
-        user.otp = verifyCode;
-        user.otpExpires = Date.now() + 600000; // 10 minutes
-        await user.save();
-
-        // Send verification email
-        console.log('📧 ====== RESENDING OTP EMAIL ======');
-        console.log('📧 Recipient:', normalizedEmail);
-        console.log('👤 Name:', user.name);
-        console.log('🔐 New OTP Code:', verifyCode);
-        console.log('⏰ Expires in: 10 minutes');
-        
-        // Check SendGrid configuration
-        const hasSendGridKey = !!process.env.SENDGRID_API_KEY;
-        const senderEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER || process.env.EMAIL;
-        console.log(`📧 SendGrid Config: API_KEY=${hasSendGridKey ? 'SET' : 'NOT SET'}, FROM=${senderEmail || 'NOT SET'}`);
-        
-        let emailSent = false;
-        let emailError = null;
-        
-        try {
-            if (!hasSendGridKey) {
-                console.error('❌ SENDGRID_API_KEY is not set - email cannot be sent');
-                emailError = 'SENDGRID_API_KEY environment variable is not configured';
-            } else {
-                // Generate email template
-                const userName = user.name || 'User';
-                const emailHtml = VerificationEmail(userName, verifyCode);
-                const emailText = `Hi ${userName},\n\nYour new verification code is: ${verifyCode}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this code, please ignore this email.\n\nBest regards,\nZuba House Team`;
-                
-                console.log('📧 Calling sendEmailFun (resend) with:', {
-                    sendTo: normalizedEmail,
-                    subject: "Verify Your Email - Zuba House (Resent)",
-                    hasHtml: !!emailHtml,
-                    htmlLength: emailHtml?.length || 0,
-                    hasText: !!emailText,
-                    textLength: emailText?.length || 0
-                });
-                
-                // Validate email template before sending
-                if (!emailHtml || emailHtml.trim().length === 0) {
-                    console.error('❌ Email HTML template is empty or invalid');
-                    emailError = 'Email template generation failed';
-                } else {
-                    emailSent = await sendEmailFun({
-                        sendTo: normalizedEmail,
-                        subject: "Verify Your Email - Zuba House (Resent)",
-                        text: emailText,
-                        html: emailHtml
-                    });
-                }
-
-                if (emailSent) {
-                    console.log('✅ OTP email resent successfully to:', normalizedEmail);
-                    console.log('====================================\n');
-                } else {
-                    console.error('❌ Failed to resend OTP email to:', normalizedEmail);
-                    console.error('⚠️ Check server logs above for detailed SendGrid error information');
-                    emailError = 'Email delivery failed - check SendGrid configuration and server logs';
-                }
-            }
-        } catch (emailErrorCaught) {
-            console.error('❌ Error resending OTP email:', {
-                to: normalizedEmail,
-                error: emailErrorCaught.message,
-                stack: emailErrorCaught.stack
-            });
-            emailError = emailErrorCaught.message;
-        }
-        
-        // Log OTP in console for debugging (always)
-        console.log('🔑 NEW OTP CODE (for verification):', verifyCode);
-        console.log('====================================\n');
-
-        const isLocal = !process.env.RENDER && !process.env.VERCEL;
-        const successMessage = emailSent 
-            ? "OTP has been resent to your email. Please check your inbox (and spam folder)."
-            : `OTP has been regenerated. ${isLocal ? 'Check server console for OTP code.' : 'Email delivery issue - OTP included in response.'}`;
-
-        return response.status(200).json({
-            success: true,
-            error: false,
-            message: successMessage,
-            data: {
-                email: normalizedEmail,
-                emailSent: emailSent,
-                // Include OTP in response when email fails (for admin/testing)
-                ...(!emailSent ? { otp: verifyCode } : {}),
-                ...(emailError ? { emailError: emailError } : {})
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ Resend OTP error:', error);
-        return response.status(500).json({
-            error: true,
-            success: false,
-            message: error.message || "Failed to resend OTP"
-        });
+        return sendError(response, 500, error.message || "Failed to register user");
     }
 }
 
 export async function verifyEmailController(request, response) {
     try {
         const { email, otp } = request.body;
+        const normalizedEmail = normalizeEmail(email);
+        const normalizedOtp = String(otp || '').trim();
 
-        if (!email || !otp) {
-            return response.status(400).json({ 
-                error: true, 
-                success: false, 
-                message: "Email and OTP are required" 
-            });
+        if (!normalizedEmail || normalizedOtp.length !== 6) {
+            return sendError(response, 400, "Provide valid email and 6-digit OTP");
         }
 
-        const user = await UserModel.findOne({ email: email.toLowerCase().trim() });
+        const user = await UserModel.findOne({ email: normalizedEmail });
         if (!user) {
-            return response.status(400).json({ 
-                error: true, 
-                success: false, 
-                message: "User not found" 
-            });
+            return sendError(response, 404, "User not found");
         }
 
-        // Check if OTP exists and is not expired
-        if (!user.otp) {
-            return response.status(400).json({
-                error: true,
-                success: false,
-                message: "No OTP found. Please request a new OTP."
-            });
+        if (!user.otp || String(user.otp) !== normalizedOtp) {
+            return sendError(response, 400, "Invalid OTP");
         }
-
-        const isCodeValid = user.otp === otp;
-        const isNotExpired = user.otpExpires && user.otpExpires > Date.now();
-
-        if (!isCodeValid) {
-            return response.status(400).json({
-                error: true,
-                success: false,
-                message: "Invalid OTP code. Please check and try again."
-            });
+        const expiresAt = user.otpExpires ? new Date(user.otpExpires).getTime() : 0;
+        if (expiresAt < Date.now()) {
+            return sendError(response, 400, "OTP expired");
         }
-
-        if (!isNotExpired) {
-            return response.status(400).json({
-                error: true,
-                success: false,
-                message: "OTP has expired. Please request a new OTP."
-            });
-        }
-
-        // If we reach here, OTP is valid and not expired
         user.verify_email = true;
         user.otp = null;
         user.otpExpires = null;
         await user.save();
-        
-        console.log('✅ Email verified successfully for:', email);
-        return response.status(200).json({ 
-            error: false, 
-            success: true, 
-            message: "Email verified successfully" 
-        });
+        return sendSuccess(response, 200, "Email verified successfully");
 
     } catch (error) {
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        })
+        return sendError(response, 500, error.message || "Failed to verify email");
     }
-}
-
-
-export async function authWithGoogle(request, response) {
-    const { name, email, password, avatar, mobile, role } = request.body;
-
-    try {
-        // NOTE: Admin email check removed - this endpoint is for regular user Google auth
-        // Admin email check is only applied to admin panel routes, not general user routes
-
-        const normalizedEmail = email ? email.toLowerCase().trim() : email;
-        const existingUser = await UserModel.findOne({ email: normalizedEmail });
-
-        if (!existingUser) {
-            const user = await UserModel.create({
-                name: name,
-                mobile: mobile,
-                email: normalizedEmail,
-                password: "null",
-                avatar: avatar,
-                role: role,
-                verify_email: true,
-                signUpWithGoogle: true
-            });
-
-            await user.save();
-
-            const accesstoken = await generatedAccessToken(user._id);
-            const refreshToken = await genertedRefreshToken(user._id);
-
-            await UserModel.findByIdAndUpdate(user?._id, {
-                last_login_date: new Date()
-            })
-
-
-            const cookiesOption = {
-                httpOnly: true,
-                secure: true,
-                sameSite: "None"
-            }
-            response.cookie('accessToken', accesstoken, cookiesOption)
-            response.cookie('refreshToken', refreshToken, cookiesOption)
-
-
-            return response.json({
-                message: "Login successfully",
-                error: false,
-                success: true,
-                data: {
-                    accesstoken,
-                    refreshToken
-                }
-            })
-
-        } else {
-            const accesstoken = await generatedAccessToken(existingUser._id);
-            const refreshToken = await genertedRefreshToken(existingUser._id);
-
-            await UserModel.findByIdAndUpdate(existingUser?._id, {
-                last_login_date: new Date()
-            })
-
-
-            const cookiesOption = {
-                httpOnly: true,
-                secure: true,
-                sameSite: "None"
-            }
-            response.cookie('accessToken', accesstoken, cookiesOption)
-            response.cookie('refreshToken', refreshToken, cookiesOption)
-
-
-            return response.json({
-                message: "Login successfully",
-                error: false,
-                success: true,
-                data: {
-                    accesstoken,
-                    refreshToken
-                }
-            })
-        }
-
-    } catch (error) {
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        })
-    }
-
-
 }
 
 
 export async function loginUserController(request, response) {
     try {
-        const { email, password } = request.body;
+        const { email, password, guestCart } = request.body;
+        const normalizedEmail = normalizeEmail(email);
 
-        // NOTE: Admin email check removed - this endpoint is for regular user login
-        // Admin email check is only applied to admin panel routes, not general user routes
-
-        const normalizedEmail = email.toLowerCase().trim();
         const user = await UserModel.findOne({ email: normalizedEmail });
 
         if (!user) {
-            return response.status(400).json({
-                message: "User not register",
-                error: true,
-                success: false
-            })
+            return sendError(response, 401, "Invalid email or password");
         }
 
         if (user.status !== "Active") {
-            return response.status(400).json({
-                message: "Contact to admin",
-                error: true,
-                success: false
-            })
+            return sendError(response, 403, "Contact to admin");
         }
 
         if (user.verify_email !== true) {
-            return response.status(400).json({
-                message: "Your Email is not verify yet please verify your email first",
-                error: true,
-                success: false
-            })
+            return sendError(response, 403, "Your Email is not verify yet please verify your email first");
         }
 
         const checkPassword = await bcryptjs.compare(password, user.password);
 
         if (!checkPassword) {
-            return response.status(400).json({
-                message: "Check your password",
-                error: true,
-                success: false
-            })
+            return sendError(response, 401, "Invalid email or password");
         }
 
 
-        const accesstoken = await generatedAccessToken(user._id);
-        const refreshToken = await genertedRefreshToken(user._id);
+        const { accessToken, refreshToken } = await issueAuthTokens(response, user._id);
 
-        const updateUser = await UserModel.findByIdAndUpdate(user?._id, {
+        await UserModel.findByIdAndUpdate(user?._id, {
             last_login_date: new Date()
         })
 
 
-        const cookiesOption = {
-            httpOnly: true,
-            secure: true,
-            sameSite: "None"
-        }
-        response.cookie('accessToken', accesstoken, cookiesOption)
-        response.cookie('refreshToken', refreshToken, cookiesOption)
+        await mergeGuestCartForUser(user._id, guestCart);
 
-
-        return response.json({
-            message: "Login successfully",
-            error: false,
-            success: true,
-            data: {
-                accesstoken,
-                refreshToken
-            }
-        })
+        return sendSuccess(response, 200, "Login successfully", buildTokenData(accessToken, refreshToken))
     } catch (error) {
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        })
+        return sendError(response, 500, error.message || "Login failed");
     }
 
 }
@@ -563,79 +300,18 @@ export async function logoutController(request, response) {
     try {
         const userid = request.userId //middleware
 
-        const cookiesOption = {
-            httpOnly: true,
-            secure: true,
-            sameSite: "None"
-        }
+        const cookiesOption = getCookieOptions();
 
         response.clearCookie("accessToken", cookiesOption)
         response.clearCookie("refreshToken", cookiesOption)
 
-        const removeRefreshToken = await UserModel.findByIdAndUpdate(userid, {
+        await UserModel.findByIdAndUpdate(userid, {
             refresh_token: ""
         })
 
-        return response.json({
-            message: "Logout successfully",
-            error: false,
-            success: true
-        })
+        return sendSuccess(response, 200, "Logout successfully")
     } catch (error) {
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        })
-    }
-}
-
-// Logout all non-admin users (Admin only endpoint)
-export async function logoutAllNonAdminUsers(request, response) {
-    try {
-        // This endpoint should only be accessible by admins
-        // The middleware will handle the check
-        
-        const { isAdminEmail } = await import('../config/adminEmails.js');
-        
-        // Get all users
-        const allUsers = await UserModel.find({}).select('email role');
-        
-        // Find non-admin users
-        const nonAdminUsers = allUsers.filter(user => {
-            const userRole = (user.role || '').toUpperCase();
-            const isAdmin = userRole === 'ADMIN' && isAdminEmail(user.email);
-            return !isAdmin;
-        });
-
-        // Clear refresh tokens for all non-admin users
-        const result = await UserModel.updateMany(
-            {
-                _id: { $in: nonAdminUsers.map(u => u._id) }
-            },
-            {
-                $set: { refresh_token: "" }
-            }
-        );
-
-        console.log(`✅ Logged out ${result.modifiedCount} non-admin users`);
-
-        return response.json({
-            message: `Successfully logged out ${result.modifiedCount} non-admin users`,
-            error: false,
-            success: true,
-            data: {
-                loggedOutCount: result.modifiedCount,
-                totalNonAdminUsers: nonAdminUsers.length
-            }
-        })
-    } catch (error) {
-        console.error('Logout all non-admin users error:', error);
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        })
+        return sendError(response, 500, error.message || "Logout failed");
     }
 }
 
@@ -746,7 +422,7 @@ export async function updateUserDetails(request, response) {
 
         const userExist = await UserModel.findById(userId);
         if (!userExist)
-            return response.status(400).send('The user cannot be Updated!');
+            return sendError(response, 400, 'The user cannot be Updated!');
 
 
         const updateUser = await UserModel.findByIdAndUpdate(
@@ -761,10 +437,7 @@ export async function updateUserDetails(request, response) {
 
 
 
-        return response.json({
-            message: "User Updated successfully",
-            error: false,
-            success: true,
+        return sendSuccess(response, 200, 'User Updated successfully', {
             user: {
                 name: updateUser?.name,
                 _id: updateUser?._id,
@@ -775,76 +448,57 @@ export async function updateUserDetails(request, response) {
         })
 
     } catch (error) {
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        })
+        return sendError(response, 500, error.message || error)
     }
 }
 
 //forgot password
 export async function forgotPasswordController(request, response) {
     try {
-        const { email } = request.body
-
-        if (!email) {
-            return response.status(400).json({
-                message: "Email is required",
-                error: true,
-                success: false
-            })
+        const normalizedEmail = normalizeEmail(request.body?.email);
+        if (!normalizedEmail) {
+            return sendError(response, 400, "Email is required");
         }
 
-        const normalizedEmail = email.toLowerCase().trim();
+        const rateLimit = checkOtpRateLimit(normalizedEmail);
+        if (!rateLimit.allowed) {
+            return sendError(response, 429, `Too many OTP requests. Try again in ${rateLimit.retryAfter} seconds.`);
+        }
+
         const user = await UserModel.findOne({ email: normalizedEmail })
 
         if (!user) {
-            return response.status(400).json({
-                message: "Email not available",
-                error: true,
-                success: false
-            })
+            return sendError(response, 404, "Email not available");
         }
 
         else {
-            let verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+            const verifyCode = generateOtp();
 
             user.otp = verifyCode;
-            user.otpExpires = Date.now() + 600000;
+            user.otpExpires = Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000;
+            user.forgotPasswordVerifiedAt = null;
 
             await user.save();
 
-            console.log('📧 Sending forgot password OTP email to:', normalizedEmail);
-            const emailSent = await sendEmailFun({
-                sendTo: normalizedEmail,
-                subject: "Password Reset OTP - Zuba House",
-                text: "",
-                html: VerificationEmail(user.name, verifyCode)
-            });
-
-            if (emailSent) {
-                console.log('✅ Forgot password OTP email sent successfully to:', normalizedEmail);
-            } else {
-                console.error('❌ Failed to send forgot password OTP email to:', normalizedEmail);
+            try {
+                await sendOtpEmailOrThrow({
+                    email: normalizedEmail,
+                    name: user.name,
+                    otp: verifyCode,
+                    purpose: 'reset'
+                });
+            } catch (emailError) {
+                return sendError(response, 502, emailError.message || "Failed to send OTP email");
             }
 
-            return response.json({
-                message: "check your email",
-                error: false,
-                success: true
-            })
+            return sendSuccess(response, 200, "check your email")
 
         }
 
 
 
     } catch (error) {
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        })
+        return sendError(response, 500, error.message || "Forgot password failed");
     }
 }
 
@@ -852,108 +506,73 @@ export async function forgotPasswordController(request, response) {
 export async function verifyForgotPasswordOtp(request, response) {
     try {
         const { email, otp } = request.body;
+        const normalizedEmail = normalizeEmail(email);
+        const normalizedOtp = String(otp || '').trim();
 
-        if (!email || !otp) {
-            return response.status(400).json({
-                message: "Email and OTP are required",
-                error: true,
-                success: false
-            })
-        }
-
-        const normalizedEmail = email.toLowerCase().trim();
         const user = await UserModel.findOne({ email: normalizedEmail })
 
         if (!user) {
-            return response.status(400).json({
-                message: "Email not available",
-                error: true,
-                success: false
-            })
+            return sendError(response, 404, "Email not available");
         }
 
-        if (otp !== user.otp) {
-            return response.status(400).json({
-                message: "Invailid OTP",
-                error: true,
-                success: false
-            })
+        if (!normalizedEmail || normalizedOtp.length !== 6) {
+            return sendError(response, 400, "Provide required field email, otp.");
         }
 
-
-        const currentTime = new Date().toISOString()
-
-        if (user.otpExpires < currentTime) {
-            return response.status(400).json({
-                message: "Otp is expired",
-                error: true,
-                success: false
-            })
+        if (!user.otp || String(user.otp) !== normalizedOtp) {
+            return sendError(response, 400, "Invalid OTP");
         }
 
+        const expiresAt = user.otpExpires ? new Date(user.otpExpires).getTime() : 0;
+        if (expiresAt < Date.now()) {
+            return sendError(response, 400, "OTP expired");
+        }
 
-        user.otp = "";
-        user.otpExpires = "";
-
+        user.forgotPasswordVerifiedAt = new Date();
+        user.otp = null;
+        user.otpExpires = null;
         await user.save();
 
-        return response.status(200).json({
-            message: "Verify OTP successfully",
-            error: false,
-            success: true
-        })
+        return sendSuccess(response, 200, "Verify OTP successfully")
     } catch (error) {
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        })
+        return sendError(response, 500, error.message || "OTP verification failed");
     }
 
 }
 
 
-//reset password
+//reset password (forgot-password flow: email + newPassword + confirmPassword; or change-password: + oldPassword)
 export async function resetpassword(request, response) {
     try {
-        const { email, oldPassword, newPassword, confirmPassword } = request.body;
-        if (!email || !newPassword || !confirmPassword) {
-            return response.status(400).json({
-                error: true,
-                success: false,
-                message: "provide required fields email, newPassword, confirmPassword"
-            })
+        const { email, newPassword, confirmPassword } = request.body;
+        const normalizedEmail = normalizeEmail(email);
+        if (!normalizedEmail || !newPassword || !confirmPassword) {
+            return sendError(response, 400, "Please provide email and both password fields");
         }
 
-        const normalizedEmail = email.toLowerCase().trim();
         const user = await UserModel.findOne({ email: normalizedEmail });
         if (!user) {
-            return response.status(400).json({
-                message: "Email is not available",
-                error: true,
-                success: false
-            })
+            return sendError(response, 404, "We could not find an account with this email");
         }
 
-
-        if (user?.signUpWithGoogle === false) {
-            const checkPassword = await bcryptjs.compare(oldPassword, user.password);
-            if (!checkPassword) {
-                return response.status(400).json({
-                    message: "your old password is wrong",
-                    error: true,
-                    success: false,
-                })
-            }
+        if (!user.forgotPasswordVerifiedAt) {
+            return sendError(response, 400, "Please confirm your reset code first");
         }
 
+        const verifiedAt = new Date(user.forgotPasswordVerifiedAt).getTime();
+        const fifteenMin = 15 * 60 * 1000;
+        if (Date.now() - verifiedAt > fifteenMin) {
+            user.forgotPasswordVerifiedAt = null;
+            await user.save();
+            return sendError(response, 400, "Your reset code has expired. Please request a new one");
+        }
 
         if (newPassword !== confirmPassword) {
-            return response.status(400).json({
-                message: "newPassword and confirmPassword must be same.",
-                error: true,
-                success: false,
-            })
+            return sendError(response, 400, "Passwords do not match");
+        }
+
+        if (String(newPassword).length < 8) {
+            return sendError(response, 400, "Password must be at least 8 characters");
         }
 
         const salt = await bcryptjs.genSalt(10);
@@ -961,21 +580,14 @@ export async function resetpassword(request, response) {
 
         user.password = hashPassword;
         user.signUpWithGoogle = false;
+        user.forgotPasswordVerifiedAt = null;
         await user.save();
 
-        return response.json({
-            message: "Password updated successfully.",
-            error: false,
-            success: true
-        })
+        return sendSuccess(response, 200, "Password updated successfully");
 
 
     } catch (error) {
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        })
+        return sendError(response, 500, "We could not reset your password right now. Please try again.");
     }
 }
 
@@ -1026,64 +638,47 @@ export async function changePasswordController(request, response) {
 
 
     } catch (error) {
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        })
+        return sendError(response, 500, error.message || "Password change failed");
     }
 }
 
 
-//refresh token controler
+//refresh token controller (with rotation: new access + new refresh, old refresh invalidated)
 export async function refreshToken(request, response) {
     try {
-        const refreshToken = request.cookies.refreshToken || request?.headers?.authorization?.split(" ")[1]  /// [ Bearer token]
+        const refreshToken = getRefreshTokenFromRequest(request);
 
         if (!refreshToken) {
-            return response.status(401).json({
-                message: "Invalid token",
-                error: true,
-                success: false
-            })
+            return sendError(response, 401, "Refresh token is required");
         }
 
-
-        const verifyToken = await jwt.verify(refreshToken, process.env.SECRET_KEY_REFRESH_TOKEN)
-        if (!verifyToken) {
-            return response.status(401).json({
-                message: "token is expired",
-                error: true,
-                success: false
-            })
+        const decoded = jwt.verify(refreshToken, env.jwtRefreshSecret);
+        const userId = decoded?.id || decoded?.userId || decoded?._id;
+        if (!userId) {
+            return sendError(response, 401, "Invalid token");
         }
 
-        const userId = verifyToken?._id;
-        const newAccessToken = await generatedAccessToken(userId)
-
-        const cookiesOption = {
-            httpOnly: true,
-            secure: true,
-            sameSite: "None"
+        const user = await UserModel.findById(userId).select('refresh_token status');
+        if (!user) {
+            return sendError(response, 401, "User not found for refresh token");
         }
 
-        response.cookie('accessToken', newAccessToken, cookiesOption)
+        if (user.status !== 'Active') {
+            return sendError(response, 403, "Account is not active");
+        }
 
-        return response.json({
-            message: "New Access token generated",
-            error: false,
-            success: true,
-            data: {
-                accessToken: newAccessToken
-            }
-        })
+        if (!user.refresh_token || user.refresh_token !== refreshToken) {
+            return sendError(response, 401, "Refresh token invalidated");
+        }
 
+        const { accessToken: newAccessToken, refreshToken: newRefreshToken } = await issueAuthTokens(response, userId);
+
+        return sendSuccess(response, 200, "Tokens refreshed", buildTokenData(newAccessToken, newRefreshToken))
     } catch (error) {
-        return response.status(500).json({
-            message: error.message || error,
-            error: true,
-            success: false
-        })
+        if (error.name === 'TokenExpiredError' || error.name === 'JsonWebTokenError') {
+            return sendError(response, 401, "Token expired or invalid");
+        }
+        return sendError(response, 500, error.message || "Token refresh failed");
     }
 }
 
@@ -1095,18 +690,9 @@ export async function userDetails(request, response) {
 
         const user = await UserModel.findById(userId).select('-password -refresh_token').populate('address_details')
 
-        return response.json({
-            message: 'user details',
-            data: user,
-            error: false,
-            success: true
-        })
+        return sendSuccess(response, 200, 'user details', user)
     } catch (error) {
-        return response.status(500).json({
-            message: "Something is wrong",
-            error: true,
-            success: false
-        })
+        return sendError(response, 500, "Something is wrong");
     }
 }
 
@@ -1185,8 +771,8 @@ export async function addReview(request, response) {
         // Send email notification to admin (non-blocking)
         try {
             const { sendEmail } = await import('../config/emailService.js');
-            const adminEmail = process.env.ADMIN_EMAIL || 'sales@zubahouse.com';
-            const adminUrl = process.env.ADMIN_URL || 'http://localhost:3001';
+            const adminEmail = env.adminEmail || 'sales@zubahouse.com';
+            const adminUrl = env.adminUrl || 'http://localhost:3001';
             
             const emailHtml = `
                 <!DOCTYPE html>
@@ -1348,26 +934,10 @@ export async function getReviews(request, response) {
 // Get reviews for specific product (admin only)
 export async function getProductReviewsAdmin(request, response) {
     try {
-        const adminId = request.userId;
-        
-        // Check if user is admin
-        const user = await UserModel.findById(adminId);
-        if (!user || user.role !== 'ADMIN') {
-            return response.status(403).json({
-                error: true,
-                success: false,
-                message: 'Admin access required'
-            });
-        }
-        
         const { productId } = request.params;
         
         if (!productId) {
-            return response.status(400).json({
-                error: true,
-                success: false,
-                message: 'Product ID is required'
-            });
+            return sendError(response, 400, 'Product ID is required');
         }
         
         const reviews = await ReviewModel.find({ productId })
@@ -1384,43 +954,17 @@ export async function getProductReviewsAdmin(request, response) {
             spam: reviews.filter(r => r.status === 'spam').length
         };
         
-        return response.status(200).json({
-            error: false,
-            success: true,
-            reviews: reviews,
-            statusCounts: statusCounts
-        });
+        return sendSuccess(response, 200, 'Product reviews', { reviews, statusCounts });
         
     } catch (error) {
         console.error('Get Product Reviews Admin Error:', error);
-        return response.status(500).json({
-            error: true,
-            success: false,
-            message: error.message || 'Failed to fetch product reviews'
-        });
+        return sendError(response, 500, error.message || 'Failed to fetch product reviews');
     }
 }
 
 //get all reviews (admin only - includes pending/rejected)
 export async function getAllReviews(request, response) {
     try {
-        const adminId = request.userId;
-        
-        // Check if user is admin (case-insensitive)
-        const user = await UserModel.findById(adminId);
-        const userRole = (user?.role || '').toUpperCase();
-        
-        console.log('🔐 Reviews admin check:', { userId: adminId, role: user?.role, isAdmin: userRole === 'ADMIN' });
-        
-        if (!user || userRole !== 'ADMIN') {
-            return response.status(403).json({
-                error: true,
-                success: false,
-                message: 'Admin access required',
-                debug: { userRole: user?.role }
-            });
-        }
-        
         const { status, page = 1, limit = 20 } = request.query;
         
         const filter = {};
@@ -1455,10 +999,8 @@ export async function getAllReviews(request, response) {
             counts[item._id] = item.count;
         });
 
-        return response.status(200).json({
-            error: false,
-            success: true,
-            reviews: reviews,
+        return sendSuccess(response, 200, 'Reviews list', {
+            reviews,
             pagination: {
                 page: parseInt(page),
                 limit: parseInt(limit),
@@ -1470,11 +1012,7 @@ export async function getAllReviews(request, response) {
         
     } catch (error) {
         console.error('Get All Reviews Error:', error);
-        return response.status(500).json({
-            message: error.message || "Something is wrong",
-            error: true,
-            success: false
-        })
+        return sendError(response, 500, error.message || "Something is wrong")
     }
 }
 
@@ -1484,23 +1022,9 @@ export async function approveReview(request, response) {
         const { reviewId } = request.params;
         const adminId = request.userId;
         
-        // Check if user is admin
-        const user = await UserModel.findById(adminId);
-        if (!user || user.role !== 'ADMIN') {
-            return response.status(403).json({
-                error: true,
-                success: false,
-                message: 'Admin access required'
-            });
-        }
-        
         const review = await ReviewModel.findById(reviewId);
         if (!review) {
-            return response.status(404).json({
-                error: true,
-                success: false,
-                message: 'Review not found'
-            });
+            return sendError(response, 404, 'Review not found');
         }
         
         review.status = 'approved';
@@ -1514,19 +1038,10 @@ export async function approveReview(request, response) {
             await review.updateProductRating();
         }
         
-        return response.status(200).json({
-            error: false,
-            success: true,
-            message: 'Review approved successfully',
-            review: review
-        });
+        return sendSuccess(response, 200, 'Review approved successfully', { review });
     } catch (error) {
         console.error('Approve Review Error:', error);
-        return response.status(500).json({
-            error: true,
-            success: false,
-            message: error.message || 'Failed to approve review'
-        });
+        return sendError(response, 500, error.message || 'Failed to approve review');
     }
 }
 
@@ -1537,23 +1052,9 @@ export async function rejectReview(request, response) {
         const { reason } = request.body;
         const adminId = request.userId;
         
-        // Check if user is admin
-        const user = await UserModel.findById(adminId);
-        if (!user || user.role !== 'ADMIN') {
-            return response.status(403).json({
-                error: true,
-                success: false,
-                message: 'Admin access required'
-            });
-        }
-        
         const review = await ReviewModel.findById(reviewId);
         if (!review) {
-            return response.status(404).json({
-                error: true,
-                success: false,
-                message: 'Review not found'
-            });
+            return sendError(response, 404, 'Review not found');
         }
         
         review.status = 'rejected';
@@ -1568,19 +1069,10 @@ export async function rejectReview(request, response) {
             await review.updateProductRating();
         }
         
-        return response.status(200).json({
-            error: false,
-            success: true,
-            message: 'Review rejected',
-            review: review
-        });
+        return sendSuccess(response, 200, 'Review rejected', { review });
     } catch (error) {
         console.error('Reject Review Error:', error);
-        return response.status(500).json({
-            error: true,
-            success: false,
-            message: error.message || 'Failed to reject review'
-        });
+        return sendError(response, 500, error.message || 'Failed to reject review');
     }
 }
 
@@ -1590,23 +1082,9 @@ export async function markReviewAsSpam(request, response) {
         const { reviewId } = request.params;
         const adminId = request.userId;
         
-        // Check if user is admin
-        const user = await UserModel.findById(adminId);
-        if (!user || user.role !== 'ADMIN') {
-            return response.status(403).json({
-                error: true,
-                success: false,
-                message: 'Admin access required'
-            });
-        }
-        
         const review = await ReviewModel.findById(reviewId);
         if (!review) {
-            return response.status(404).json({
-                error: true,
-                success: false,
-                message: 'Review not found'
-            });
+            return sendError(response, 404, 'Review not found');
         }
         
         review.status = 'spam';
@@ -1620,19 +1098,10 @@ export async function markReviewAsSpam(request, response) {
             await review.updateProductRating();
         }
         
-        return response.status(200).json({
-            error: false,
-            success: true,
-            message: 'Review marked as spam',
-            review: review
-        });
+        return sendSuccess(response, 200, 'Review marked as spam', { review });
     } catch (error) {
         console.error('Mark Spam Error:', error);
-        return response.status(500).json({
-            error: true,
-            success: false,
-            message: error.message || 'Failed to mark review as spam'
-        });
+        return sendError(response, 500, error.message || 'Failed to mark review as spam');
     }
 }
 
@@ -1649,33 +1118,78 @@ export async function getAllUsers(request, response) {
         const total = await UserModel.countDocuments(users);
 
         if(!users){
-            return response.status(400).json({
-                error: true,
-                success: false
-            })
+            return sendError(response, 400, 'Invalid request')
         }
 
-        return response.status(200).json({
-            error: false,
-            success: true,
-            users:users,
-            total: total,
+        return sendSuccess(response, 200, 'Users list', {
+            users,
+            total,
             page: parseInt(page),
             totalPages: Math.ceil(total / limit),
-            totalUsersCount:totalUsers?.length,
-            totalUsers:totalUsers
+            totalUsersCount: totalUsers?.length,
+            totalUsers
         })
         
     } catch (error) {
-        return response.status(500).json({
-            message: "Something is wrong",
-            error: true,
-            success: false
-        })
+        return sendError(response, 500, "Something is wrong")
     }
 }
 
+/** Country breakdown for admin analytics (saved addresses + order shipping). */
+export async function getGeoBreakdown(request, response) {
+    try {
+        if (request.userRole !== 'ADMIN') {
+            return sendError(response, 403, 'Unauthorized');
+        }
 
+        const userCountryMap = await collectUserCountriesFromDb(mongoose);
+        const { countries, total } = buildCountryBreakdown(userCountryMap);
+
+        return sendSuccess(response, 200, 'Geo breakdown', { countries, total });
+    } catch (error) {
+        console.error('Geo breakdown error:', error);
+        return sendError(response, 500, error.message || 'Failed to load geo breakdown');
+    }
+}
+
+/** Self-service account deletion for the authenticated user (mobile app). */
+export async function deleteOwnAccount(request, response) {
+    try {
+        const userId = request.userId;
+        if (!userId) {
+            return sendError(response, 401, 'Authentication required');
+        }
+
+        const user = await UserModel.findById(userId);
+        if (!user) {
+            return sendError(response, 404, 'User not found');
+        }
+
+        const cleanup = [
+            CartProductModel.deleteMany({ userId }),
+        ];
+
+        try {
+            const PushToken = (await import('../models/pushToken.model.js')).default;
+            cleanup.push(PushToken.deleteMany({ userId }));
+        } catch (pushErr) {
+            console.warn('[Account] PushToken cleanup skipped:', pushErr?.message);
+        }
+
+        await Promise.allSettled(cleanup);
+
+        const deletedUser = await UserModel.findByIdAndDelete(userId);
+        if (!deletedUser) {
+            return sendError(response, 500, 'Could not delete account');
+        }
+
+        console.log(`[Account] Deleted user: ${userId}`);
+
+        return sendSuccess(response, 200, 'Account deleted successfully');
+    } catch (error) {
+        return sendError(response, 500, error?.message || 'Something went wrong');
+    }
+}
 
 export async function deleteUser(request, response) {
     const user = await UserModel.findById(request.params.id);

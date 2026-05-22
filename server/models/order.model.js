@@ -328,43 +328,6 @@ const orderSchema = new mongoose.Schema({
             type: Number,
             default: 0
         }
-    },
-    // Review request settings
-    reviewRequestEnabled: {
-        type: Boolean,
-        default: true  // Enable review requests by default for delivered orders
-    },
-    reviewRequestsSent: {
-        type: Boolean,
-        default: false
-    },
-    reviewRequestsSentAt: {
-        type: Date,
-        default: null
-    },
-    // Failed order notification settings
-    failedOrderNotificationEnabled: {
-        type: Boolean,
-        default: true  // Enable failed order notifications by default
-    },
-    failedOrderNotificationsSent: {
-        type: Number,
-        default: 0,
-        min: 0,
-        max: 3  // Maximum 3 emails per customer
-    },
-    failedOrderNotificationsSentAt: [{
-        type: Date,
-        default: null
-    }],
-    // Emergency order creation flag (for orders created when payment succeeded but validation had issues)
-    emergencyCreated: {
-        type: Boolean,
-        default: false
-    },
-    originalError: {
-        type: String,
-        default: null
     }
 }, {
     timestamps: true

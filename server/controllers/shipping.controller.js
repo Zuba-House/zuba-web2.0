@@ -24,17 +24,13 @@ export const getShippingRates = async (req, res) => {
       });
     }
 
-    // Prepare items for shipping service with full product info for classification
+    // Prepare items for shipping service
     const items = cartItems.map(item => ({
       id: item.productId || item._id,
-      name: item.product?.name || item.name || item.productTitle || 'Product',
-      productTitle: item.productTitle || item.product?.name || item.name || 'Product',
+      name: item.product?.name || item.name || 'Product',
       quantity: item.quantity || 1,
       weight: item.product?.shipping?.weight || item.product?.inventory?.weight || 0.5,
-      product: item.product || {},
-      // Include category info for product-type classification
-      categoryName: item.product?.category?.name || item.product?.catName || item.categoryName || '',
-      category: item.product?.category || null
+      product: item.product || {}
     }));
 
     // Prepare destination address
@@ -148,17 +144,13 @@ export const calculateShippingRates = async (req, res) => {
       });
     }
 
-    // Prepare items for shipping service with full product info for classification
+    // Prepare items for shipping service
     const items = cartItems.map(item => ({
       id: item.productId || item._id,
-      name: item.product?.name || item.name || item.productTitle || 'Product',
-      productTitle: item.productTitle || item.product?.name || item.name || 'Product',
+      name: item.product?.name || item.name || 'Product',
       quantity: item.quantity || 1,
       weight: item.product?.shipping?.weight || item.product?.inventory?.weight || 0.5,
-      product: item.product || {},
-      // Include category info for product-type classification
-      categoryName: item.product?.category?.name || item.product?.catName || item.categoryName || '',
-      category: item.product?.category || null
+      product: item.product || {}
     }));
 
     // Prepare destination address

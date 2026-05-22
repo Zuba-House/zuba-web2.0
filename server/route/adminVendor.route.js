@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import auth from '../middlewares/auth.js';
-import requireAdminEmail from '../middlewares/adminEmailCheck.js';
 import * as adminVendorController from '../controllers/adminVendor.controller.js';
 import * as adminPayoutController from '../controllers/adminPayout.controller.js';
 
@@ -9,8 +8,34 @@ const router = Router();
 // All routes require authentication
 router.use(auth);
 
-// Check if user is admin AND has admin email
-router.use(requireAdminEmail);
+// Check if user is admin
+const requireAdmin = (req, res, next) => {
+  // Normalize role comparison (case-insensitive)
+  const userRole = (req.userRole || '').toUpperCase();
+  
+  console.log('🔐 Admin check:', {
+    userId: req.userId,
+    userRole: req.userRole,
+    normalizedRole: userRole,
+    isAdmin: userRole === 'ADMIN'
+  });
+  
+  if (userRole !== 'ADMIN') {
+    console.log('❌ Admin access denied for role:', req.userRole);
+    return res.status(403).json({
+      error: true,
+      success: false,
+      message: 'Admin access only',
+      debug: {
+        userRole: req.userRole,
+        required: 'ADMIN'
+      }
+    });
+  }
+  next();
+};
+
+router.use(requireAdmin);
 
 // ========================================
 // SPECIFIC ROUTES MUST COME BEFORE /:id
@@ -36,11 +61,7 @@ router.post('/payouts/:payoutId/mark-paid', adminPayoutController.markPayoutAsPa
 
 // Vendor management routes
 router.get('/', adminVendorController.getAllVendors);
-router.post('/', adminVendorController.createVendor); // Admin can create vendors
-router.post('/fix-indexes', adminVendorController.fixVendorIndexes); // Fix database indexes (must come before /:id)
-router.delete('/all', adminVendorController.deleteAllVendors); // Delete ALL vendors (must come before /:id)
 router.get('/:id', adminVendorController.getVendorById);
-router.post('/:id/impersonate', adminVendorController.impersonateVendor); // Admin can impersonate vendor
 router.put('/:id', adminVendorController.updateVendor);
 router.put('/:id/status', adminVendorController.updateVendorStatus);
 router.put('/:id/withdrawal-access', adminVendorController.updateWithdrawalAccess);
