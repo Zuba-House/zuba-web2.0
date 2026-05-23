@@ -587,7 +587,9 @@ export async function createProduct(request, response) {
 //get all products
 export async function getAllProducts(request, response) {
     try {
-        const { page = 1, limit = 50, status } = request.query;
+        const page = Math.max(parseInt(request.query.page, 10) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(request.query.limit, 10) || 50, 1), 100);
+        const { status } = request.query;
         
         // Build query filters
         const query = {};
@@ -604,7 +606,7 @@ export async function getAllProducts(request, response) {
         const products = await ProductModel.find(query)
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
-            .limit(parseInt(limit));
+            .limit(limit);
 
         const total = await ProductModel.countDocuments(query);
 
@@ -613,8 +615,8 @@ export async function getAllProducts(request, response) {
             success: true,
             products: products,
             total: total,
-            page: parseInt(page),
-            totalPages: Math.ceil(total / limit),
+            page,
+            totalPages: Math.ceil(total / limit) || 1,
             totalCount: totalProducts?.length,
             totalProducts: totalProducts
         });
@@ -659,24 +661,33 @@ export async function getAllProductsByCatId(request, response) {
 
         // Build query - support both single category and multiple categories
         // Only show published and approved products to public users
+        const categoryMatch = {
+            $or: [
+                { catId: categoryId },
+                { category: categoryId },
+                { categories: categoryId },
+                { categories: { $in: [categoryId] } },
+            ],
+        };
+
         const query = {
             $and: [
+                categoryMatch,
                 {
                     $or: [
-                        { catId: categoryId },
-                        { category: categoryId },
-                        { categories: { $in: [categoryId] } } // Use $in for array field
-                    ]
+                        { status: 'published' },
+                        { status: { $exists: false } },
+                    ],
                 },
-                { status: 'published' },
-                { 
+                {
                     $or: [
                         { approvalStatus: 'APPROVED' },
                         { approvalStatus: { $exists: false } },
-                        { productOwnerType: { $ne: 'VENDOR' } }
-                    ]
-                }
-            ]
+                        { productOwnerType: { $ne: 'VENDOR' } },
+                        { productOwnerType: { $exists: false } },
+                    ],
+                },
+            ],
         };
 
         const totalPosts = await ProductModel.countDocuments(query);

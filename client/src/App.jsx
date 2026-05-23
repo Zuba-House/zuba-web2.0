@@ -436,10 +436,13 @@ function App() {
 
   useEffect(() => {
     fetchDataFromApi("/api/category").then((res) => {
-      if (res?.error === false) {
-        setCatData(res?.data);
+      if (res && res.success !== false && res.error !== true) {
+        const cats = Array.isArray(res?.data) ? res.data : [];
+        setCatData(cats);
       }
-    })
+    }).catch((err) => {
+      console.error('Failed to load categories:', err);
+    });
 
     const handleResize = () => {
       setWindowWidth(window.innerWidth);

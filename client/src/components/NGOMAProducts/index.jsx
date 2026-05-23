@@ -36,7 +36,7 @@ const NGOMAProducts = () => {
         limit: isMobile ? 12 : 24 // Show more on desktop
       });
 
-      if (response?.error === false && response?.products) {
+      if (response && response.success !== false && response.error !== true && response?.products) {
         setNgomaProducts(response.products);
         setTotalPages(response.totalPages || 1);
         setTotalProducts(response.total || 0);

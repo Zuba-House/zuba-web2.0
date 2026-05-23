@@ -26,6 +26,7 @@ import BlogItem from "../../components/BlogItem";
 import HomeBannerV2 from "../../components/HomeSliderV2";
 import BannerBoxV2 from "../../components/bannerBoxV2";
 import { fetchDataFromApi } from "../../utils/api";
+import { apiOk, getProductsFromResponse } from "../../utils/unwrapApiResponse";
 import { MyContext } from "../../App";
 import ProductLoading from "../../components/ProductLoading";
 import { Button } from "@mui/material";
@@ -38,6 +39,7 @@ const Home = () => {
   const [value, setValue] = useState(0);
   // const [homeSlidesData, setHomeSlidesData] = useState([]); // Unused - kept for future use
   const [popularProductsData, setPopularProductsData] = useState([]);
+  const [popularProductsLoading, setPopularProductsLoading] = useState(true);
   const [productsData, setAllProductsData] = useState([]);
   const [productsBanners, setProductsBanners] = useState([]);
   const [featuredProducts, setFeaturedProducts] = useState([]);
@@ -61,8 +63,14 @@ const Home = () => {
       fetchDataFromApi("/api/product/getAllProductsBanners"),
       fetchDataFromApi("/api/bannerV1")
     ]).then(([productsRes, bannersRes, bannerV1Res]) => {
-      if (productsRes?.products) setAllProductsData(productsRes.products);
-      if (bannersRes?.products) setProductsBanners(bannersRes.products);
+      const products = getProductsFromResponse(productsRes);
+      if (products.length) {
+        setAllProductsData(products);
+        setPopularProductsData(products);
+        setPopularProductsLoading(false);
+      }
+      const bannerProducts = getProductsFromResponse(bannersRes);
+      if (bannerProducts.length) setProductsBanners(bannerProducts);
       const bannerV1List = Array.isArray(bannerV1Res?.data)
         ? bannerV1Res.data
         : Array.isArray(bannerV1Res?.data?.data)
@@ -71,6 +79,7 @@ const Home = () => {
       if (bannerV1List.length) setBannerV1Data(bannerV1List);
     }).catch(error => {
       console.error('Error loading critical content:', error);
+      setPopularProductsLoading(false);
     });
 
     // Priority 2: Load below-the-fold content after a short delay
@@ -80,7 +89,8 @@ const Home = () => {
         fetchDataFromApi("/api/bannerList2"),
         fetchDataFromApi("/api/blog")
       ]).then(([featuredRes, bannerList2Res, blogRes]) => {
-        if (featuredRes?.products) setFeaturedProducts(featuredRes.products);
+        const featured = getProductsFromResponse(featuredRes);
+        if (featured.length) setFeaturedProducts(featured);
         if (bannerList2Res?.data) setBannerList2Data(bannerList2Res.data);
         if (blogRes?.blogs) setBlogData(blogRes.blogs);
       }).catch(error => {
@@ -93,15 +103,19 @@ const Home = () => {
 
   useEffect(() => {
     if (context?.catData?.length !== 0 && context?.catData[0]?._id) {
-
+      setPopularProductsLoading(true);
       fetchDataFromApi(`/api/product/getAllProductsByCatId/${context?.catData[0]?._id}`).then((res) => {
-        if (res?.error === false) {
-          setPopularProductsData(res?.products)
+        const products = getProductsFromResponse(res);
+        if (apiOk(res) && products.length) {
+          setPopularProductsData(products);
         }
-
+        setPopularProductsLoading(false);
       }).catch((error) => {
         console.error('Error fetching products by category:', error);
-      })
+        setPopularProductsLoading(false);
+      });
+    } else if (context?.catData?.length === 0) {
+      setPopularProductsLoading(false);
     }
 
     const numbers = new Set();
@@ -130,10 +144,11 @@ const Home = () => {
       // Only fetch if catId is valid
       if (catId && catId !== 'undefined' && catId !== 'null') {
         fetchDataFromApi(`/api/product/getAllProductsByCatId/${catId}`).then((res) => {
-          if (res?.error === false && res?.products) {
+          const products = getProductsFromResponse(res);
+          if (apiOk(res) && products.length) {
             filterData.push({
               catName: catArr[arr[i]]?.name,
-              data: res?.products
+              data: products
             });
 
             setRandomCatProducts([...filterData]);
@@ -167,15 +182,18 @@ const Home = () => {
       console.error('Invalid category ID:', id);
       return;
     }
-    setPopularProductsData([])
+    setPopularProductsLoading(true);
+    setPopularProductsData([]);
     fetchDataFromApi(`/api/product/getAllProductsByCatId/${id}`).then((res) => {
-      if (res?.error === false) {
-        setPopularProductsData(res?.products || [])
+      const products = getProductsFromResponse(res);
+      if (apiOk(res) && products.length) {
+        setPopularProductsData(products);
       }
-
+      setPopularProductsLoading(false);
     }).catch((error) => {
       console.error('Error fetching products by category ID:', error);
-    })
+      setPopularProductsLoading(false);
+    });
   }
 
 
@@ -254,12 +272,15 @@ const Home = () => {
 
 
           <div className="min-h-max lg:min-h-[60vh]">
-            {
-              popularProductsData?.length === 0 && <ProductLoading />
-            }
-            {
-              popularProductsData?.length !== 0 && <ProductsSlider items={6} data={popularProductsData} />
-            }
+            {popularProductsLoading && popularProductsData?.length === 0 && (
+              <ProductLoading />
+            )}
+            {!popularProductsLoading && popularProductsData?.length === 0 && (
+              <p className="text-center text-gray-500 py-8">No products available right now. Please check back soon.</p>
+            )}
+            {popularProductsData?.length > 0 && (
+              <ProductsSlider items={6} data={popularProductsData} />
+            )}
           </div>
 
         </div>

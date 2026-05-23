@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getApiBaseUrl } from "./apiBaseUrl.js";
+import { unwrapApiResponse } from "./unwrapApiResponse.js";
 
 const apiUrl = getApiBaseUrl();
 
@@ -48,10 +49,10 @@ export const postData = async (url, formData) => {
         }
 
         if (response.ok) {
-            return data;
+            return unwrapApiResponse(data);
         } else {
             // Handle non-OK responses
-            const errorData = handleAuthError(response.status, data);
+            const errorData = handleAuthError(response.status, unwrapApiResponse(data));
             // Ensure error flag is set for non-OK responses
             return {
                 ...errorData,
@@ -87,7 +88,7 @@ export const fetchDataFromApi = async (url) => {
         } 
 
         const { data } = await axios.get(apiUrl + url, params);
-        return data;
+        return unwrapApiResponse(data);
     } catch (error) {
         console.log('API Error:', error?.response?.status, error?.response?.data?.message || error.message);
         
