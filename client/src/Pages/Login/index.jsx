@@ -8,6 +8,7 @@ import { FcGoogle } from "react-icons/fc";
 import { MyContext } from "../../App";
 import CircularProgress from '@mui/material/CircularProgress';
 import { postData } from "../../utils/api";
+import { apiOk, storeAuthTokens, isFirebaseConfigured } from "../../utils/unwrapApiResponse";
 
 import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { firebaseApp } from "../../firebase";
@@ -62,7 +63,7 @@ const Login = () => {
             postData("/api/user/forgot-password", {
               email: formFields.email,
             }).then((res) => {
-              if (res?.error === false) {
+              if (apiOk(res)) {
                 context.alertBox("success", res?.message);
                 history("/verify")
               } else {
@@ -111,18 +112,20 @@ const Login = () => {
       localStorage.removeItem("refreshToken");
   
       postData("/api/user/login", formFields, { withCredentials: true }).then(async (res) => {
-        console.log(res)
-  
-        if (res?.error !== true) {
+        if (apiOk(res)) {
+          const tokens = storeAuthTokens(res);
+          if (!tokens.accessToken) {
+            context.alertBox("error", "Login succeeded but no session token was returned. Please try again.");
+            setIsLoading(false);
+            return;
+          }
+
           setIsLoading(false);
-          context.alertBox("success", res?.message);
+          context.alertBox("success", res?.message || "Login successful");
           setFormsFields({
             email: "",
             password: ""
           })
-
-          localStorage.setItem("accessToken", res?.data?.accesstoken);
-          localStorage.setItem("refreshToken", res?.data?.refreshToken);
 
           context.setIsLogin(true);
           
@@ -161,7 +164,11 @@ const Login = () => {
 
 
       const authWithGoogle = () => {
-        // Clear any existing corrupted tokens before attempting Google login
+        if (!isFirebaseConfigured()) {
+          context.alertBox("error", "Google sign-in is not configured. Please use email and password.");
+          return;
+        }
+
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         
@@ -185,23 +192,27 @@ const Login = () => {
             };
     
     
-            postData("/api/user/authWithGoogle", fields).then((res) => {
+            postData("/api/user/authWithGoogle", fields, { withCredentials: true }).then(async (res) => {
     
-              if (res?.error !== true) {
+              if (apiOk(res)) {
+                const tokens = storeAuthTokens(res);
+                if (!tokens.accessToken) {
+                  context.alertBox("error", "Google sign-in failed to create a session. Please try again.");
+                  setIsLoading(false);
+                  return;
+                }
+
                 setIsLoading(false);
-                context.alertBox("success", res?.message);
+                context.alertBox("success", res?.message || "Login successful");
                 localStorage.setItem("userEmail", fields.email)
-                localStorage.setItem("accessToken", res?.data?.accesstoken);
-                localStorage.setItem("refreshToken", res?.data?.refreshToken);
-    
+
                 context.setIsLogin(true);
                 
                 // Trigger user data fetch
                 if (context?.getUserDetails) {
-                  context.getUserDetails();
+                  await context.getUserDetails();
                 }
                 
-                // Merge guest cart with server cart
                 if (context?.mergeGuestCartWithServer) {
                   context.mergeGuestCartWithServer();
                 }

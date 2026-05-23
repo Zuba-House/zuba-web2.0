@@ -47,6 +47,8 @@ import ScrollToTop from "./components/ScrollToTop";
 
 import toast, { Toaster } from 'react-hot-toast';
 import { fetchDataFromApi, postData } from "./utils/api";
+import { getUserProfile, clearAuthTokens, apiFailed, apiOk } from "./utils/unwrapApiResponse";
+import { refreshAccessToken } from "./utils/api";
 import { trackPageView } from "./utils/analytics";
 import {
   CURRENCY_MANUAL_KEY,
@@ -309,10 +311,12 @@ function App() {
     localStorage.removeItem("userEmail");
     const token = localStorage.getItem('accessToken');
 
-    if (token !== undefined && token !== null && token !== "") {
-      // Token exists, validate it by fetching user details
+    if (token && token !== 'undefined' && token !== 'null') {
       validateAndSetUser();
     } else {
+      if (token === 'undefined' || token === 'null') {
+        clearAuthTokens();
+      }
       setIsLogin(false);
       setUserData(null);
       // Load guest cart when not logged in
@@ -324,36 +328,28 @@ function App() {
   // Function to validate token and set user state
   const validateAndSetUser = async () => {
     try {
+      const token = localStorage.getItem('accessToken');
+      if (!token || token === 'undefined' || token === 'null') {
+        setIsLogin(false);
+        setUserData(null);
+        return;
+      }
+
       const res = await fetchDataFromApi(`/api/user/user-details`);
-      
-      // Check for various error conditions
-      if (res?.error === true || 
-          res?.response?.data?.error === true || 
-          res?.response?.status === 401 ||
-          res?.response?.status === 403 ||
-          res?.message === "Authentication token required" ||
-          res?.message === "Invalid token" ||
-          res?.message === "Token expired" ||
-          res?.response?.data?.message === "You have not login" ||
-          res?.response?.data?.message === "Authentication token required" ||
-          res?.response?.data?.message === "Invalid token" ||
-          res?.response?.data?.message === "Token expired") {
-        
-        // Token is invalid - clear everything and reset state
+      const profile = getUserProfile(res);
+
+      if (apiFailed(res) || res?.isAuthError || !profile) {
         console.log('🔐 Token invalid or expired, clearing session...');
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
+        clearAuthTokens();
         setIsLogin(false);
         setUserData(null);
         setCartData([]);
         setMyListData([]);
         return;
       }
-      
-      // Token is valid - set user data and load cart/wishlist
-      if (res?.data) {
-        setUserData(res.data);
-        setIsLogin(true);
+
+      setUserData(profile);
+      setIsLogin(true);
         
         // Check if there's a guest cart to merge
         const guestCart = getGuestCart();
@@ -364,22 +360,9 @@ function App() {
           getCartItems();
         }
         getMyListData();
-      } else {
-        // No user data returned - something is wrong
-        console.log('🔐 No user data returned, clearing session...');
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        setIsLogin(false);
-        setUserData(null);
-        // Load guest cart
-        const guestCart = getGuestCart();
-        setCartData(guestCart);
-      }
     } catch (error) {
       console.error('🔐 Error validating token:', error);
-      // On any error, clear the session to prevent stuck state
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
+      clearAuthTokens();
       setIsLogin(false);
       setUserData(null);
       setCartData([]);
@@ -388,44 +371,47 @@ function App() {
   };
 
 
-  const getUserDetails = async () => {
+  const getUserDetails = async (retried = false) => {
     try {
-      const res = await fetchDataFromApi(`/api/user/user-details`);
-      
-      // Check for authentication errors
-      if (res?.error === true || 
-          res?.response?.data?.error === true || 
-          res?.response?.status === 401 ||
-          res?.response?.status === 403 ||
-          res?.message === "Authentication token required" ||
-          res?.message === "Invalid token" ||
-          res?.message === "Token expired" ||
-          res?.response?.data?.message === "You have not login" ||
-          res?.response?.data?.message === "Authentication token required" ||
-          res?.response?.data?.message === "Invalid token" ||
-          res?.response?.data?.message === "Token expired") {
-        
+      let res = await fetchDataFromApi(`/api/user/user-details`);
+
+      if ((res?.isAuthError || apiFailed(res)) && !retried) {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (refreshToken && refreshToken !== 'undefined' && refreshToken !== 'null') {
+          try {
+            await refreshAccessToken();
+            return getUserDetails(true);
+          } catch (refreshErr) {
+            console.warn('🔐 Token refresh failed:', refreshErr?.message);
+          }
+        }
+      }
+
+      const profile = getUserProfile(res);
+
+      if (apiFailed(res) || res?.isAuthError || !profile) {
         console.log('🔐 Session invalid, clearing...');
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        alertBox("error", "Your session has expired. Please login again.");
+        clearAuthTokens();
+        const onAuthPage =
+          window.location.pathname.includes('/login') ||
+          window.location.pathname.includes('/register') ||
+          window.location.pathname.includes('/verify');
+        if (!onAuthPage) {
+          alertBox("error", "Your session has expired. Please login again.");
+        }
         setIsLogin(false);
         setUserData(null);
         setCartData([]);
         setMyListData([]);
         return null;
       }
-      
-      if (res?.data) {
-        setUserData(res.data);
-        return res.data;
-      }
-      return null;
+
+      setUserData(profile);
+      setIsLogin(true);
+      return profile;
     } catch (error) {
       console.error('🔐 Error getting user details:', error);
-      // Clear session on error to prevent stuck state
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
+      clearAuthTokens();
       setIsLogin(false);
       setUserData(null);
       return null;
@@ -852,8 +838,7 @@ function App() {
   // Function to clear session (can be called when auth errors occur)
   const clearSession = () => {
     console.log('🔐 Clearing session...');
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
+    clearAuthTokens();
     localStorage.removeItem("userEmail");
     setIsLogin(false);
     setUserData(null);
@@ -871,8 +856,9 @@ function App() {
     
     // If logged in, get cart from server
     fetchDataFromApi(`/api/cart/get`).then((res) => {
-      if (res?.error === false) {
-        setCartData(res?.data);
+      if (apiOk(res)) {
+        const items = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+        setCartData(items);
       } else if (res?.isAuthError) {
         // Auth error - clear session and load guest cart
         clearSession();
@@ -886,8 +872,9 @@ function App() {
 
   const getMyListData = () => {
     fetchDataFromApi("/api/myList").then((res) => {
-      if (res?.error === false) {
-        setMyListData(res?.data)
+      if (apiOk(res)) {
+        const items = Array.isArray(res?.data) ? res.data : [];
+        setMyListData(items);
       } else if (res?.isAuthError) {
         // Auth error - clear session
         clearSession();

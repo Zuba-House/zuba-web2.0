@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState } from "react";
 import OtpBox from "../../components/OtpBox";
 import Button from "@mui/material/Button";
 import { postData } from "../../utils/api";
+import { apiOk } from "../../utils/unwrapApiResponse";
 import { useNavigate } from "react-router-dom";
 import { MyContext } from "../../App";
 
@@ -25,7 +26,7 @@ const Verify = () => {
         email: localStorage.getItem("userEmail"),
         otp: otp
       }).then((res) => {
-        if (res?.error === false) {
+        if (apiOk(res)) {
           context.alertBox("success", res?.message);
           localStorage.removeItem("userEmail")
           history("/login")
@@ -40,7 +41,7 @@ const Verify = () => {
         email: localStorage.getItem("userEmail"),
         otp: otp
       }).then((res) => {
-        if (res?.error === false) {
+        if (apiOk(res)) {
           context.alertBox("success", res?.message);
           history("/forgot-password")
         } else {

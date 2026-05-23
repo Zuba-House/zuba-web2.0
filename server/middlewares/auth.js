@@ -1,10 +1,24 @@
 import jwt from 'jsonwebtoken'
+import { env } from '../config/env.js';
+
+function extractBearerToken(request) {
+    const cookieToken = request.cookies?.accessToken;
+    if (cookieToken) return cookieToken;
+
+    const authHeader = request.headers?.authorization;
+    if (!authHeader) return null;
+    if (authHeader.startsWith('Bearer ')) {
+        return authHeader.substring(7).trim();
+    }
+    const parts = authHeader.split(' ');
+    return parts.length > 1 ? parts[1].trim() : authHeader.trim();
+}
 
 const auth = async(request, response, next) => {
     try {
-        const token = request.cookies.accessToken || request?.headers?.authorization?.split(" ")[1];
+        const token = extractBearerToken(request);
 
-        if(!token){
+        if(!token || token === 'undefined' || token === 'null'){
             return response.status(401).json({
                 error: true,
                 success: false,
@@ -12,7 +26,7 @@ const auth = async(request, response, next) => {
             })
         }
 
-        const decode = await jwt.verify(token, process.env.SECRET_KEY_ACCESS_TOKEN);
+        const decode = await jwt.verify(token, env.jwtAccessSecret);
 
         if(!decode){
             return response.status(401).json({
@@ -78,7 +92,7 @@ export const optionalAuth = async (request, response, next) => {
 
         if (token) {
             try {
-                const decode = await jwt.verify(token, process.env.SECRET_KEY_ACCESS_TOKEN);
+                const decode = await jwt.verify(token, env.jwtAccessSecret);
                 if (decode && decode.id) {
                     request.userId = decode.id;
                     request.userRole = decode.role || 'USER';

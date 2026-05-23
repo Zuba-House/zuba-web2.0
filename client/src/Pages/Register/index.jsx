@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { FcGoogle } from "react-icons/fc";
 import { MyContext } from "../../App";
 import { postData } from "../../utils/api";
+import { apiOk, storeAuthTokens, isFirebaseConfigured } from "../../utils/unwrapApiResponse";
 import CircularProgress from '@mui/material/CircularProgress';
 import { useNavigate } from "react-router-dom";
 
@@ -75,7 +76,7 @@ const Register = () => {
 
     postData("/api/user/register", formFields).then((res) => {
 
-      if (res?.error !== true) {
+      if (apiOk(res)) {
         setIsLoading(false);
         context.alertBox("success", res?.message);
         localStorage.setItem("userEmail", formFields.email)
@@ -99,7 +100,11 @@ const Register = () => {
 
 
   const authWithGoogle = () => {
-    // Clear any existing corrupted tokens before attempting Google signup
+    if (!isFirebaseConfigured()) {
+      context.alertBox("error", "Google sign-in is not configured. Please use email and password.");
+      return;
+    }
+
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     
@@ -123,23 +128,26 @@ const Register = () => {
         };
 
 
-        postData("/api/user/authWithGoogle", fields).then((res) => {
+        postData("/api/user/authWithGoogle", fields, { withCredentials: true }).then(async (res) => {
 
-          if (res?.error !== true) {
+          if (apiOk(res)) {
+            const tokens = storeAuthTokens(res);
+            if (!tokens.accessToken) {
+              context.alertBox("error", "Google sign-up failed to create a session. Please try again.");
+              setIsLoading(false);
+              return;
+            }
+
             setIsLoading(false);
-            context.alertBox("success", res?.message);
+            context.alertBox("success", res?.message || "Account created");
             localStorage.setItem("userEmail", fields.email)
-            localStorage.setItem("accessToken", res?.data?.accesstoken);
-            localStorage.setItem("refreshToken", res?.data?.refreshToken);
 
             context.setIsLogin(true);
             
-            // Trigger user data fetch
             if (context?.getUserDetails) {
-              context.getUserDetails();
+              await context.getUserDetails();
             }
             
-            // Merge guest cart with server cart
             if (context?.mergeGuestCartWithServer) {
               context.mergeGuestCartWithServer();
             }

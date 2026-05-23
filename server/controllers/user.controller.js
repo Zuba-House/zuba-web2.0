@@ -81,7 +81,7 @@ async function sendOtpEmailOrThrow({ email, name, otp, purpose }) {
 }
 
 const buildTokenData = (accessToken, refreshToken, user = null) => {
-    const data = { accessToken, refreshToken };
+    const data = { accessToken, refreshToken, accesstoken: accessToken };
     if (user) data.user = user;
     return data;
 };
@@ -290,9 +290,7 @@ export async function authWithGoogle(request, response) {
         const { accessToken, refreshToken } = await issueAuthTokens(response, user._id);
         await UserModel.findByIdAndUpdate(user._id, { last_login_date: new Date() });
 
-        const tokenData = buildTokenData(accessToken, refreshToken);
-        tokenData.accesstoken = accessToken;
-        return sendSuccess(response, 200, 'Login successfully', tokenData);
+        return sendSuccess(response, 200, 'Login successfully', buildTokenData(accessToken, refreshToken));
     } catch (error) {
         return sendError(response, 500, error.message || 'Google sign-in failed');
     }
@@ -715,7 +713,8 @@ export async function refreshToken(request, response) {
             return sendError(response, 401, "User not found for refresh token");
         }
 
-        if (user.status !== 'Active') {
+        const status = String(user.status || 'Active').trim().toLowerCase();
+        if (status !== 'active') {
             return sendError(response, 403, "Account is not active");
         }
 
