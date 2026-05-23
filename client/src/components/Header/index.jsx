@@ -50,7 +50,7 @@ const Header = () => {
   const open = Boolean(anchorEl);
 
   const [isOpenCatPanel, setIsOpenCatPanel] = useState(false);
-  const [logoUrl, setLogoUrl] = useState('/logo.jpg'); // Start with local logo for instant load
+  const [logoUrl, setLogoUrl] = useState('/logo.png');
 
   const context = useContext(MyContext);
 
@@ -80,9 +80,8 @@ const Header = () => {
 
   useEffect(() => {
     // Preload local logo immediately
-    preloadImage('/logo.jpg').catch(() => {
-      // Logo preload failed, will use error handler fallback
-      console.log('Logo preload failed, using error handler');
+    preloadImage('/logo.png').catch(() => {
+      /* fallback chain on img onError */
     });
 
     // Fetch Cloudinary logo in background and update if available

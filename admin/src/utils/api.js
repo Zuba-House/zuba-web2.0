@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getApiBaseUrl } from "./apiBaseUrl.js";
+import { unwrapApiResponse } from "./unwrapApiResponse.js";
 
 const apiUrl = getApiBaseUrl();
 
@@ -156,15 +157,14 @@ export const postData = async (url, formData) => {
 
         if (response.ok) {
             const data = await response.json();
-            //console.log(data)
-            return data;
-        } else {
-            const errorData = await response.json();
-            return errorData;
+            return unwrapApiResponse(data);
         }
+        const errorData = await response.json();
+        return unwrapApiResponse({ ...errorData, error: true, success: false });
 
     } catch (error) {
         console.error('Error:', error);
+        return { error: true, success: false, message: error.message || 'Request failed' };
     }
 
 }
@@ -205,7 +205,7 @@ export const fetchDataFromApi = async (url) => {
         };
 
         const { data } = await axios.get(apiUrl + url, params);
-        return data;
+        return unwrapApiResponse(data);
     } catch (error) {
         // Handle axios errors properly
         if (error.response) {
@@ -330,7 +330,7 @@ export const editData = async (url, updatedData ) => {
     
     } 
     const res = await axios.put(apiUrl + url, updatedData, params);
-    return res.data;
+    return unwrapApiResponse(res.data);
    
 }
 
@@ -352,7 +352,7 @@ export const deleteImages = async (url,image ) => {
     
     } 
     const res = await axios.delete(apiUrl + url, params);
-    return res.data;
+    return unwrapApiResponse(res.data);
 }
 
 
@@ -365,7 +365,7 @@ export const deleteData = async (url ) => {
     
     } 
     const res = await axios.delete(apiUrl + url, params);
-    return res.data;
+    return unwrapApiResponse(res.data);
 }
 
 export const deleteMultipleData = async (url,data ) => {
@@ -378,5 +378,5 @@ export const deleteMultipleData = async (url,data ) => {
     } 
     // Axios delete with payload: put data under `data` in config
     const res = await axios.delete(apiUrl + url, { data, ...params });
-    return res.data;
+    return unwrapApiResponse(res.data);
 }

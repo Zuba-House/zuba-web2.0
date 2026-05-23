@@ -63,7 +63,12 @@ const Home = () => {
     ]).then(([productsRes, bannersRes, bannerV1Res]) => {
       if (productsRes?.products) setAllProductsData(productsRes.products);
       if (bannersRes?.products) setProductsBanners(bannersRes.products);
-      if (bannerV1Res?.data) setBannerV1Data(bannerV1Res.data);
+      const bannerV1List = Array.isArray(bannerV1Res?.data)
+        ? bannerV1Res.data
+        : Array.isArray(bannerV1Res?.data?.data)
+          ? bannerV1Res.data.data
+          : [];
+      if (bannerV1List.length) setBannerV1Data(bannerV1List);
     }).catch(error => {
       console.error('Error loading critical content:', error);
     });

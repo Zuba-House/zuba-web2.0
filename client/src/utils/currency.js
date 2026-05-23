@@ -4,6 +4,9 @@
 
 export const DISPLAY_CURRENCY_CODES = ['USD', 'CAD', 'EUR'];
 
+/** Fallback when /api/currency/rates is unavailable */
+export const DEFAULT_FX_RATES = { CAD: 1.38, EUR: 0.93 };
+
 export const CURRENCY_STORAGE_KEY = 'zuba_display_currency';
 export const CURRENCY_MANUAL_KEY = 'zuba_currency_manual';
 

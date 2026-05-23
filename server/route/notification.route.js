@@ -9,9 +9,16 @@ import {
   getNotificationHistory,
   getUnreadCount,
   getRegisteredDevices,
+  listInAppNotifications,
+  markInAppNotificationRead,
+  markAllInAppNotificationsRead,
 } from '../controllers/notification.controller.js';
 
 const router = Router();
+
+router.get('/', auth, listInAppNotifications);
+router.put('/read-all', auth, markAllInAppNotificationsRead);
+router.put('/:id/read', auth, markInAppNotificationRead);
 
 router.post('/register-token', auth, registerPushToken);
 router.delete('/unregister-token', auth, unregisterPushToken);

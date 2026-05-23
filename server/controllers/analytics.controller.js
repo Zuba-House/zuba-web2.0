@@ -1,16 +1,23 @@
 import AnalyticsEventModel from '../models/analyticsEvent.model.js';
 import UserModel from '../models/user.model.js';
+import { trackPageView } from '../middlewares/analytics.js';
 import { sendError, sendSuccess } from '../utils/response.js';
 
 export const ACTIVE_SESSION_WINDOW_MS = 30 * 60 * 1000;
 
 export async function trackEventController(request, response) {
+  const { page } = request.body || {};
+
+  if (page) {
+    return trackPageView(request, response);
+  }
+
   try {
     const { event, properties, userId: bodyUserId, timestamp } = request.body || {};
     const eventName = String(event || '').trim();
 
     if (!eventName) {
-      return sendError(response, 400, 'event is required');
+      return sendError(response, 400, 'page or event is required');
     }
 
     const userId = request.userId || bodyUserId || null;

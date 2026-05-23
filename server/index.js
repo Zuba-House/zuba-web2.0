@@ -37,6 +37,7 @@ import notificationRoutes from './route/notification.route.js';
 import orderTrackingRoutes from './route/orderTracking.route.js';
 import logoRoutes from './route/logo.route.js';
 import searchRoutes from './route/search.route.js';
+import currencyRoutes from './route/currency.route.js';
 
 const app = express();
 const PORT = env.port;
@@ -143,6 +144,8 @@ app.use('/api/seo', seoRoutes);
 app.use('/api/stripe', stripeRoutes);
 app.use('/api/banners', bannerRoutes);
 app.use('/api/bannersV1', bannerV1Routes);
+app.use('/api/bannerV1', bannerV1Routes);
+app.use('/api/currency', currencyRoutes);
 app.use('/api/bannerList2', bannerList2Routes);
 app.use('/api/homeSlides', homeSlidesRoutes);
 app.use('/api/blog', blogRoutes);

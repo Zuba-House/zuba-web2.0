@@ -39,9 +39,16 @@ export const trackPageView = async (page, pageTitle = '') => {
         });
         
         if (response.ok) {
-            const data = await response.json();
-            if (data.sessionId) {
-                sessionStorage.setItem('zuba_session', data.sessionId);
+            try {
+                const data = await response.json();
+                const session =
+                    data?.sessionId ||
+                    data?.data?.sessionId;
+                if (session) {
+                    sessionStorage.setItem('zuba_session', session);
+                }
+            } catch {
+                /* non-json */
             }
         }
     } catch (error) {

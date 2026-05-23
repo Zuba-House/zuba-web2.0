@@ -51,10 +51,12 @@ import { trackPageView } from "./utils/analytics";
 import {
   CURRENCY_MANUAL_KEY,
   CURRENCY_STORAGE_KEY,
+  DEFAULT_FX_RATES,
   DISPLAY_CURRENCY_CODES,
   convertUsdToDisplay,
   formatMoney
 } from "./utils/currency";
+import { getApiBaseUrl } from "./utils/apiBaseUrl";
 import Address from "./Pages/MyAccount/address";
 import { OrderSuccess } from "./Pages/Orders/success";
 import { OrderFailed } from "./Pages/Orders/failed";
@@ -136,59 +138,49 @@ function App() {
     let cancelled = false;
     (async () => {
       try {
-        const api = import.meta.env.VITE_API_URL;
-        let ratesJson = {};
-        let detectJson = {};
+        const api = getApiBaseUrl();
+        let ratesPayload = {};
+        let detectPayload = {};
 
-        if (api) {
+        try {
+          const [ratesRes, detectRes] = await Promise.all([
+            fetch(`${api}/api/currency/rates`),
+            fetch(`${api}/api/currency/detect`),
+          ]);
           try {
-            const [ratesRes, detectRes] = await Promise.all([
-              fetch(`${api}/api/currency/rates`),
-              fetch(`${api}/api/currency/detect`)
-            ]);
-            try {
-              ratesJson = await ratesRes.json();
-            } catch {
-              ratesJson = {};
-            }
-            try {
-              detectJson = await detectRes.json();
-            } catch {
-              detectJson = {};
-            }
+            ratesPayload = await ratesRes.json();
           } catch {
-            ratesJson = {};
-            detectJson = {};
+            ratesPayload = {};
           }
+          try {
+            detectPayload = await detectRes.json();
+          } catch {
+            detectPayload = {};
+          }
+        } catch {
+          ratesPayload = {};
+          detectPayload = {};
         }
 
         if (cancelled) return;
 
+        const rates =
+          ratesPayload?.rates ||
+          ratesPayload?.data?.rates ||
+          null;
+
         if (
-          ratesJson?.rates?.CAD != null &&
-          ratesJson?.rates?.EUR != null &&
-          !Number.isNaN(Number(ratesJson.rates.CAD)) &&
-          !Number.isNaN(Number(ratesJson.rates.EUR))
+          rates?.CAD != null &&
+          rates?.EUR != null &&
+          !Number.isNaN(Number(rates.CAD)) &&
+          !Number.isNaN(Number(rates.EUR))
         ) {
           setCurrencyRates({
-            CAD: Number(ratesJson.rates.CAD),
-            EUR: Number(ratesJson.rates.EUR)
+            CAD: Number(rates.CAD),
+            EUR: Number(rates.EUR),
           });
         } else {
-          try {
-            const fb = await fetch(
-              "https://api.frankfurter.app/latest?from=USD&to=CAD,EUR"
-            );
-            const fj = await fb.json();
-            if (fj?.rates?.CAD && fj?.rates?.EUR) {
-              setCurrencyRates({
-                CAD: Number(fj.rates.CAD),
-                EUR: Number(fj.rates.EUR)
-              });
-            }
-          } catch {
-            /* keep null; formatPrice falls back to USD */
-          }
+          setCurrencyRates({ ...DEFAULT_FX_RATES });
         }
 
         let manual = false;
@@ -214,10 +206,14 @@ function App() {
           return null;
         };
 
+        const detectedCurrency =
+          detectPayload?.displayCurrency ||
+          detectPayload?.data?.displayCurrency ||
+          null;
         const serverDetected =
-          detectJson?.displayCurrency &&
-          DISPLAY_CURRENCY_CODES.includes(detectJson.displayCurrency)
-            ? detectJson.displayCurrency
+          detectedCurrency &&
+          DISPLAY_CURRENCY_CODES.includes(detectedCurrency)
+            ? detectedCurrency
             : null;
         const detected = serverDetected || guessCurrencyFromNavigator();
 

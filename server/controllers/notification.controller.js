@@ -1,5 +1,6 @@
 import { sendError, sendSuccess } from '../utils/response.js';
 import NotificationLog from '../models/notificationLog.model.js';
+import NotificationModel from '../models/notification.model.js';
 import {
   upsertPushToken,
   deactivatePushToken,
@@ -226,5 +227,85 @@ export const getRegisteredDevices = async (req, res) => {
     return sendSuccess(res, 200, 'Registered devices', stats);
   } catch (e) {
     return sendError(res, 500, e.message || 'Failed to load devices');
+  }
+};
+
+/** In-app notifications for admin header bell (legacy GET /api/notifications). */
+export const listInAppNotifications = async (req, res) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return sendError(res, 401, 'Authentication required');
+    }
+
+    const notifications = await NotificationModel.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+
+    const unreadCount = await NotificationModel.countDocuments({
+      userId,
+      isRead: false,
+    });
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      notifications,
+      unreadCount,
+    });
+  } catch (e) {
+    console.error('[Notifications] list error:', e);
+    return sendError(res, 500, e.message || 'Failed to load notifications');
+  }
+};
+
+export const markInAppNotificationRead = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { id } = req.params;
+    if (!userId) {
+      return sendError(res, 401, 'Authentication required');
+    }
+
+    const updated = await NotificationModel.findOneAndUpdate(
+      { _id: id, userId },
+      { isRead: true, readAt: new Date() },
+      { new: true }
+    );
+
+    if (!updated) {
+      return sendError(res, 404, 'Notification not found');
+    }
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message: 'Notification marked as read',
+    });
+  } catch (e) {
+    return sendError(res, 500, e.message || 'Failed to update notification');
+  }
+};
+
+export const markAllInAppNotificationsRead = async (req, res) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return sendError(res, 401, 'Authentication required');
+    }
+
+    await NotificationModel.updateMany(
+      { userId, isRead: false },
+      { isRead: true, readAt: new Date() }
+    );
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message: 'All notifications marked as read',
+    });
+  } catch (e) {
+    return sendError(res, 500, e.message || 'Failed to update notifications');
   }
 };
