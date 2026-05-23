@@ -2,7 +2,7 @@
 // CLIENT-SIDE ANALYTICS TRACKING
 // ========================================
 
-const VITE_API_URL = import.meta.env.VITE_API_URL || '';
+import { getApiBaseUrl } from './apiBaseUrl.js';
 
 // Session ID management
 const getSessionId = () => {
@@ -23,7 +23,7 @@ export const trackPageView = async (page, pageTitle = '') => {
         const sessionId = getSessionId();
         const referrer = document.referrer || 'direct';
         
-        const response = await fetch(`${VITE_API_URL}/api/analytics/track`, {
+        const response = await fetch(`${getApiBaseUrl()}/api/analytics/track`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

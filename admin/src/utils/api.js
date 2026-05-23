@@ -1,5 +1,9 @@
 import axios from "axios";
-const apiUrl = import.meta.env.VITE_API_URL;
+import { getApiBaseUrl } from "./apiBaseUrl.js";
+
+const apiUrl = getApiBaseUrl();
+
+export { getApiBaseUrl };
 
 // Flag to prevent multiple simultaneous refresh attempts
 let isRefreshing = false;

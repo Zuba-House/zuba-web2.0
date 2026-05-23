@@ -1,5 +1,9 @@
 import axios from "axios";
-const apiUrl = import.meta.env.VITE_API_URL;
+import { getApiBaseUrl } from "./apiBaseUrl.js";
+
+const apiUrl = getApiBaseUrl();
+
+export { getApiBaseUrl };
 
 // Helper function to check if token error and clear session
 const handleAuthError = (status, data) => {
