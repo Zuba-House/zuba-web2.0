@@ -429,9 +429,9 @@ const Checkout = () => {
 
       let res = await createOrderRequest();
 
-      // Stale tokens can cause auth errors even for guest orders — retry without auth
-      if (res?.isAuthError && isGuestOrder) {
-        console.warn('⚠️ Guest order hit auth error, retrying without token...');
+      // Stale tokens can block order creation after payment — retry without auth for everyone
+      if (res?.isAuthError) {
+        console.warn('⚠️ Order hit auth error, retrying without token...');
         res = await postPublicData('/api/order/create', payLoad);
       }
       
@@ -468,23 +468,6 @@ const Checkout = () => {
         }
       }
       
-      // Auth errors after payment — for guests retry already happened; treat as success if payment went through
-      if (res?.isAuthError) {
-        console.error('❌ Order creation failed with auth error:', res);
-        if (isGuestOrder) {
-          context.alertBox("warning", "Payment succeeded but order confirmation had issues. Please contact support with Payment ID: " + (paymentIntent?.id || 'N/A'));
-          setIsProcessingOrder(false);
-          window.location.href = "/order/success?paymentId=" + (paymentIntent?.id || '');
-          return;
-        }
-        context.alertBox("error", res?.message || "Authentication required. Please login and try again.");
-        setIsProcessingOrder(false);
-        setTimeout(() => {
-          window.location.href = "/order/failed";
-        }, 2000);
-        return;
-      }
-      
       const buildSuccessUrl = (orderId) => {
         const params = new URLSearchParams();
         if (orderId) params.set('orderId', orderId);
@@ -493,6 +476,15 @@ const Checkout = () => {
         const query = params.toString();
         return query ? `/order/success?${query}` : '/order/success';
       };
+
+      // Auth errors after payment — retry already happened; payment still succeeded
+      if (res?.isAuthError) {
+        console.error('❌ Order creation failed with auth error after retry:', res);
+        context.alertBox("warning", "Payment succeeded but order confirmation had issues. Please contact support with Payment ID: " + (paymentIntent?.id || 'N/A'));
+        setIsProcessingOrder(false);
+        window.location.href = buildSuccessUrl(null);
+        return;
+      }
       
       if (isSuccess || hasOrderId) {
         console.log('✅ Order created successfully!');

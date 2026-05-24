@@ -14,7 +14,7 @@ const HomeCatSlider = (props) => {
   const context = useContext(MyContext);
 
   return (
-    <div className="homeCatSlider pt-0 lg:pt-4 py-4 lg:py-8">
+    <div className="homeCatSlider pt-0 lg:pt-3 py-4 lg:py-5">
       <div className="container">
         <Swiper
           slidesPerView={8}
@@ -55,11 +55,11 @@ const HomeCatSlider = (props) => {
               return (
                 <SwiperSlide key={index}>
                   <Link to={`/products?catId=${cat?._id}`}>
-                    <div className="item py-3 lg:py-7 px-2 lg:px-3 bg-white rounded-sm text-center flex items-center justify-center flex-col hover:bg-gray-50 transition-all min-h-[80px] lg:min-h-[120px]">
+                    <div className="item py-3 lg:py-5 px-2 lg:px-3 bg-white rounded-sm text-center flex items-center justify-center flex-col hover:bg-gray-50 transition-all min-h-[80px] lg:min-h-[100px]">
                       <div className="flex items-center justify-center mb-1 lg:mb-2">
                         <img
                           src={getOptimizedImageUrl(cat?.images?.[0], { width: 80, height: 80, quality: 'auto', format: 'auto' })}
-                          className="w-[35px] h-[35px] sm:w-[40px] sm:h-[40px] lg:w-[60px] lg:h-[60px] object-contain transition-all"
+                          className="w-[35px] h-[35px] sm:w-[40px] sm:h-[40px] lg:w-[48px] lg:h-[48px] object-contain transition-all"
                           alt={cat?.name}
                           loading="lazy"
                           onError={(e) => {
@@ -67,7 +67,7 @@ const HomeCatSlider = (props) => {
                           }}
                         />
                       </div>
-                      <h3 className="text-[10px] sm:text-[11px] lg:text-[15px] font-[600] mt-1 lg:mt-2 text-gray-800 line-clamp-2">{cat?.name}</h3>
+                      <h3 className="text-[10px] sm:text-[11px] lg:text-[13px] font-[600] mt-1 lg:mt-2 text-gray-800 line-clamp-2">{cat?.name}</h3>
                     </div>
                   </Link>
                 </SwiperSlide>

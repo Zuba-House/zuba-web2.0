@@ -37,7 +37,7 @@ h1, h2, h3, h4, h5, h6{font-weight: 600;}
 
 .overflow-x-auto::-webkit-scrollbar-thumb{background: #ccc;}
 
-.container{width: 95%; margin: auto;}
+.container{width: 95%; max-width: 1280px; margin: auto;}
 
 .btn-org{background: #eeb190 !important; color: #fff !important; font-weight: 500; font-size: 16px; padding: 7px 20px !important; border:1px solid transparent !important; }
 .btn-org:hover{background: #171717 !important;}
@@ -259,4 +259,39 @@ table td{padding: 8px 17px !important; font-size: 13px !important;}
 
 .animate-spin {
   animation: spin 1s linear infinite;
+}
+
+/* Desktop web — tighter scale at 100% zoom (992px+) */
+@media (min-width: 992px) {
+  html {
+    font-size: 14px;
+  }
+
+  p {
+    font-size: 13px;
+    line-height: 22px;
+  }
+
+  .btn-org,
+  .btn-org.btn-border {
+    font-size: 14px !important;
+    padding: 6px 16px !important;
+  }
+
+  .btn-lg {
+    font-size: 16px !important;
+    padding: 8px 18px !important;
+  }
+
+  .swiper-button-prev,
+  .swiper-button-next {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+  }
+
+  .swiper-button-prev:after,
+  .swiper-button-next:after {
+    font-size: 18px !important;
+  }
 }

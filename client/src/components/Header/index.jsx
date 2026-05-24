@@ -192,7 +192,7 @@ const Header = () => {
           </div>
         </div>
 
-        <div className="header py-2 lg:py-4 border-b-[1px] border-[rgba(229,226,219,0.2)]">
+        <div className="header py-2 lg:py-2 border-b-[1px] border-[rgba(229,226,219,0.2)]">
           <div className="container flex items-center justify-between">
             {
               context?.windowWidth < 992 &&
@@ -205,7 +205,7 @@ const Header = () => {
               <Link to={"/"} className="flex items-center">
                 <img 
                   src={logoUrl} 
-                  className="max-w-[140px] lg:max-w-[200px] max-h-[60px] lg:max-h-[80px] object-contain" 
+                  className="max-w-[140px] lg:max-w-[160px] max-h-[60px] lg:max-h-[56px] object-contain" 
                   alt="Zuba House Logo"
                   fetchPriority="high"
                   loading="eager"
@@ -245,14 +245,14 @@ const Header = () => {
                   <li className="list-none">
                     <Link
                       to="/login"
-                      className="link transition text-[15px] font-[500] text-[#e5e2db] hover:text-[#efb291]"
+                      className="link transition text-[13px] font-[500] text-[#e5e2db] hover:text-[#efb291]"
                     >
                       Login
                     </Link>{" "}
                     <span className="text-[#e5e2db]">|</span> &nbsp;
                     <Link
                       to="/register"
-                      className="link transition text-[15px] font-[500] text-[#e5e2db] hover:text-[#efb291]"
+                      className="link transition text-[13px] font-[500] text-[#e5e2db] hover:text-[#efb291]"
                     >
                       Register
                     </Link>
@@ -420,7 +420,7 @@ const Header = () => {
                           invisible={cartCount === 0}
                           color="secondary"
                         >
-                        <MdOutlineShoppingCart className="text-[#e5e2db] text-[20px] lg:text-[24px]" />
+                        <MdOutlineShoppingCart className="text-[#e5e2db] text-[20px] lg:text-[20px]" />
                       </StyledBadge>
                     </IconButton>
                   </Tooltip>

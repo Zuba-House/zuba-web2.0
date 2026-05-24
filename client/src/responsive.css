@@ -1471,12 +1471,12 @@
 @media only screen and (min-width:768px){
     /* Product Items - Desktop */
     .productItem .imgWrapper {
-        height: 280px !important;
+        height: 220px !important;
     }
     
     .productItem .info {
-        padding: 15px !important;
-        min-height: 190px !important;
+        padding: 12px !important;
+        min-height: 155px !important;
         height: auto !important;
     }
     
@@ -1530,11 +1530,12 @@
     
     /* Hero Banner - Desktop */
     .homeSlider .sliderHome {
-        height: 400px !important;
+        height: 320px !important;
     }
     
     .homeSlider img {
-        height: 400px !important;
+        height: 320px !important;
+        max-height: 320px !important;
     }
 }
 
@@ -1654,5 +1655,46 @@ img {
         min-height: 46px !important;
         font-size: 14px !important;
         padding: 10px 12px !important;
+    }
+}
+
+/* ========================================
+   DESKTOP WEB — compact layout at 100% zoom
+   ======================================== */
+@media (min-width: 992px) {
+    .searchBox {
+        height: 42px !important;
+    }
+
+    .searchBox input {
+        font-size: 14px !important;
+        height: 32px !important;
+    }
+
+    nav.navigation .MuiButton-root.link {
+        padding-top: 8px !important;
+        padding-bottom: 8px !important;
+        min-height: auto !important;
+        font-size: 13px !important;
+    }
+
+    .product-image-container {
+        padding-bottom: 100% !important;
+    }
+
+    .productItem .actions button {
+        width: 36px !important;
+        height: 36px !important;
+        min-width: 36px !important;
+        min-height: 36px !important;
+    }
+
+    .productItem .actions button svg {
+        font-size: 16px !important;
+    }
+
+    .MuiTab-root {
+        font-size: 13px !important;
+        min-height: 40px !important;
     }
 }

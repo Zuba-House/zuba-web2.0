@@ -239,11 +239,11 @@ const Home = () => {
         <FlashDeals />
       </section>
 
-      <section className="bg-white py-3 lg:py-8">
+      <section className="bg-white py-3 lg:py-5">
         <div className="container">
           <div className="flex items-center justify-between flex-col lg:flex-row">
             <div className="leftSec w-full lg:w-[40%]">
-              <h2 className="text-[14px] sm:text-[14px] md:text-[16px] lg:text-[20px] font-[600]">Popular Products</h2>
+              <h2 className="text-[14px] sm:text-[14px] md:text-[16px] lg:text-[17px] font-[600]">Popular Products</h2>
               <p className="text-[12px] sm:text-[14px] md:text-[13px] lg:text-[14px] font-[400] mt-0 mb-0">
                 Do not miss the current offers until the end of March.
               </p>
@@ -271,7 +271,7 @@ const Home = () => {
           </div>
 
 
-          <div className="min-h-max lg:min-h-[60vh]">
+          <div className="min-h-max lg:min-h-[42vh]">
             {popularProductsLoading && popularProductsData?.length === 0 && (
               <ProductLoading />
             )}
@@ -312,12 +312,12 @@ const Home = () => {
 
 
 
-      <section className="py-0 lg:py-4 pt-0 lg:pt-8 pb-0 bg-white">
+      <section className="py-0 lg:py-3 pt-0 lg:pt-5 pb-0 bg-white">
         <div className="container">
-          <div className="freeShipping w-full md:w-[80%] m-auto py-4 p-4  border-2 border-[#eeb190] flex items-center justify-center lg:justify-between flex-col lg:flex-row rounded-md mb-7">
+          <div className="freeShipping w-full md:w-[80%] m-auto py-3 p-3 border-2 border-[#eeb190] flex items-center justify-center lg:justify-between flex-col lg:flex-row rounded-md mb-5">
             <div className="col1 flex items-center gap-4">
-              <LiaShippingFastSolid className="text-[30px] lg:text-[50px]" />
-              <span className="text-[16px] lg:text-[20px] font-[600] uppercase">
+              <LiaShippingFastSolid className="text-[30px] lg:text-[36px]" />
+              <span className="text-[16px] lg:text-[16px] font-[600] uppercase">
                 Free Shipping{" "}
               </span>
             </div>
@@ -328,7 +328,7 @@ const Home = () => {
               </p>
             </div>
 
-            <p className="font-bold text-[20px] lg:text-[25px]">- Only $200*</p>
+            <p className="font-bold text-[18px] lg:text-[20px]">- Only $200*</p>
           </div>
 
           {
@@ -342,7 +342,7 @@ const Home = () => {
       <section className="py-3 lg:py-2 pt-0 bg-white">
         <div className="container">
           <div className="flex items-center justify-between">
-            <h2 className="text-[20px] font-[600]">Latest Products</h2>
+            <h2 className="text-[17px] lg:text-[18px] font-[600]">Latest Products</h2>
             <Link to="/products">
               <Button className="!bg-gray-100 hover:!bg-gray-200 !text-gray-800 !capitalize !px-3 !border !border-[rgba(0,0,0,0.4)]" size="small" >View All <MdArrowRightAlt size={25} /></Button>
             </Link>
@@ -368,7 +368,7 @@ const Home = () => {
 
       <section className="py-2 lg:py-0 pt-0 bg-white">
         <div className="container">
-          <h2 className="text-[20px] font-[600]">Featured Products</h2>
+          <h2 className="text-[17px] lg:text-[18px] font-[600]">Featured Products</h2>
 
           {
             featuredProducts?.length === 0 && <ProductLoading />
@@ -402,7 +402,7 @@ const Home = () => {
               <section className="py-5 pt-0 bg-white" key={index}>
                 <div className="container">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-[20px] font-[600]">{productRow?.catName}</h2>
+                    <h2 className="text-[17px] lg:text-[18px] font-[600]">{productRow?.catName}</h2>
                     {
                       productRow?.data?.length > 6 &&
                       <Link to={`/products?catId=${productRow?.data[0]?.catId || productRow?.data[0]?.category?._id || productRow?.data[0]?.category}`}>
@@ -436,7 +436,7 @@ const Home = () => {
         blogData?.length !== 0 &&
         <section className="py-5 pb-8 pt-0 bg-white blogSection">
           <div className="container">
-            <h2 className="text-[20px] font-[600] mb-4">From The Blog</h2>
+            <h2 className="text-[17px] lg:text-[18px] font-[600] mb-4">From The Blog</h2>
             <Swiper
               slidesPerView={4}
               spaceBetween={30}

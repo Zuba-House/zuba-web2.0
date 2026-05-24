@@ -68,13 +68,13 @@ const HomeBannerV2 = (props) => {
                     </h4>
                     {
                       context?.windowWidth < 992 &&
-                      <h2 className="text-[15px] lg:text-[30px] font-[700] w-full relative -right-[100%] opacity-0">
+                      <h2 className="text-[15px] lg:text-[22px] font-[700] w-full relative -right-[100%] opacity-0">
                         {item?.name?.length > 30 ? item?.name?.substr(0, 30) + '...' : item?.name}
                       </h2>
                     }
                     {
                       context?.windowWidth > 992 &&
-                      <h2 className="text-[16px] sm:text-[20px] md:text-[25px] lg:text-[30px] font-[700] w-full relative -right-[100%] opacity-0">
+                      <h2 className="text-[16px] sm:text-[20px] md:text-[25px] lg:text-[22px] font-[700] w-full relative -right-[100%] opacity-0">
                         {item?.name?.length > 70 ? item?.name?.substr(0, 70) + '...' : item?.name}
                       </h2>
                     }
@@ -82,7 +82,7 @@ const HomeBannerV2 = (props) => {
                     <h3 className="flex items-center gap-0 lg:gap-3 text-[12px] lg:text-[18px] font-[500] w-full text-left mt-3 mb-0 lg:mb-3 relative -right-[100%] opacity-0 flex-col lg:flex-row">
                      <span className="w-full lg:w-max hidden lg:block">Starting At Only </span>{" "}
                       <span
-                        className="text-primary text-[16px] lg:text-[30px] 
+                        className="text-primary text-[16px] lg:text-[22px] 
                         font-[700] block lg:inline w-full lg:w-max"
                       >
                         {(() => {

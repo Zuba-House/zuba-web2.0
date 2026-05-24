@@ -55,7 +55,7 @@ const Navigation = (props) => {
               {/* ZeroX Intelligence: Updated Home link colors */}
               <li className="list-none shrink-0">
                 <Link to="/" className="link transition text-[14px] font-[500]">
-                  <Button className="link transition !font-[500] !text-[#e5e2db] hover:!text-[#efb291] !py-4">
+                  <Button className="link transition !font-[500] !text-[#e5e2db] hover:!text-[#efb291] !py-2">
                     Home
                   </Button>
                 </Link>
@@ -66,7 +66,7 @@ const Navigation = (props) => {
                     <li className="list-none relative shrink-0" key={index}>
                       {/* ZeroX Intelligence: Updated category link colors */}
                       <Link to={`/products?catId=${cat?._id}`} className="link transition text-[14px] font-[500]">
-                        <Button className="link transition !font-[500] !text-[#e5e2db] hover:!text-[#efb291] !py-4">
+                        <Button className="link transition !font-[500] !text-[#e5e2db] hover:!text-[#efb291] !py-2">
                           {cat?.name}
                         </Button>
                       </Link>
