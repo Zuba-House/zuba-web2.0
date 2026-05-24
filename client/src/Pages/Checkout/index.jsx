@@ -4,7 +4,7 @@ import React, { useContext, useEffect, useState } from "react";
 import { Button } from "@mui/material";
 import { MyContext } from '../../App';
 import { Link } from "react-router-dom";
-import { fetchDataFromApi, postData, deleteData } from "../../utils/api";
+import { fetchDataFromApi, postData, postPublicData, deleteData } from "../../utils/api";
 import axios from 'axios';
 import { useNavigate, useLocation } from "react-router-dom";
 import CircularProgress from '@mui/material/CircularProgress';
@@ -27,6 +27,7 @@ const Checkout = () => {
   const [phoneError, setPhoneError] = useState('');
   // New customer info fields
   const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
   const [apartmentNumber, setApartmentNumber] = useState('');
   const [deliveryNote, setDeliveryNote] = useState('');
   const [discounts, setDiscounts] = useState(null);
@@ -74,6 +75,11 @@ const Checkout = () => {
     // Get new customer info fields from location state
     if (location.state?.customerName) {
       setCustomerName(location.state.customerName);
+    }
+    if (location.state?.customerEmail) {
+      setCustomerEmail(location.state.customerEmail);
+    } else if (context?.userData?.email) {
+      setCustomerEmail(context.userData.email);
     }
     if (location.state?.apartmentNumber) {
       setApartmentNumber(location.state.apartmentNumber);
@@ -344,11 +350,25 @@ const Checkout = () => {
 
     // Prepare guest customer data if user is not logged in
     const isGuestOrder = !user?._id;
+    const resolvedEmail = (
+      customerEmail ||
+      location.state?.customerEmail ||
+      user?.email ||
+      context?.userData?.email ||
+      ''
+    ).trim();
+
+    if (isGuestOrder && !resolvedEmail) {
+      context.alertBox("error", "Email is required for guest checkout. Please go back to cart and enter your email.");
+      setIsProcessingOrder(false);
+      history("/cart");
+      return;
+    }
+
     const guestCustomer = isGuestOrder ? {
       name: customerName,
       phone: phone,
-      // Email is required for guest orders - use phone-based email if not provided
-      email: userData?.email || (phone ? `guest-${phone.replace(/\D/g, '')}@zubahouse.com` : `guest-${Date.now()}@zubahouse.com`)
+      email: resolvedEmail
     } : null;
 
     const payLoad = {
@@ -403,7 +423,17 @@ const Checkout = () => {
         }))
       });
       
-      const res = await postData(`/api/order/create`, payLoad);
+      const createOrderRequest = isGuestOrder
+        ? () => postPublicData('/api/order/create', payLoad)
+        : () => postData('/api/order/create', payLoad);
+
+      let res = await createOrderRequest();
+
+      // Stale tokens can cause auth errors even for guest orders — retry without auth
+      if (res?.isAuthError && isGuestOrder) {
+        console.warn('⚠️ Guest order hit auth error, retrying without token...');
+        res = await postPublicData('/api/order/create', payLoad);
+      }
       
       console.log('📦 Order creation response:', res);
       console.log('📦 Response error field:', res?.error);
@@ -438,9 +468,15 @@ const Checkout = () => {
         }
       }
       
-      // Auth errors are different - user needs to login
+      // Auth errors after payment — for guests retry already happened; treat as success if payment went through
       if (res?.isAuthError) {
         console.error('❌ Order creation failed with auth error:', res);
+        if (isGuestOrder) {
+          context.alertBox("warning", "Payment succeeded but order confirmation had issues. Please contact support with Payment ID: " + (paymentIntent?.id || 'N/A'));
+          setIsProcessingOrder(false);
+          window.location.href = "/order/success?paymentId=" + (paymentIntent?.id || '');
+          return;
+        }
         context.alertBox("error", res?.message || "Authentication required. Please login and try again.");
         setIsProcessingOrder(false);
         setTimeout(() => {
@@ -448,6 +484,15 @@ const Checkout = () => {
         }, 2000);
         return;
       }
+      
+      const buildSuccessUrl = (orderId) => {
+        const params = new URLSearchParams();
+        if (orderId) params.set('orderId', orderId);
+        if (resolvedEmail) params.set('email', resolvedEmail);
+        if (paymentIntent?.id) params.set('paymentId', paymentIntent.id);
+        const query = params.toString();
+        return query ? `/order/success?${query}` : '/order/success';
+      };
       
       if (isSuccess || hasOrderId) {
         console.log('✅ Order created successfully!');
@@ -486,14 +531,15 @@ const Checkout = () => {
         // IMMEDIATE redirect - don't wait for alertBox or other UI updates
         console.log('✅ Order created! Redirecting immediately to success page...');
         
-        // Redirect immediately - don't wait for alertBox
-        window.location.href = "/order/success";
+        const orderId = res?.orderId || res?.order?._id || res?._id;
+        window.location.href = buildSuccessUrl(orderId);
         
         // If redirect somehow doesn't work, force it after 100ms
         setTimeout(() => {
           if (window.location.pathname !== '/order/success') {
             console.warn('⚠️ Redirect did not happen, forcing redirect...');
-            window.location.replace("/order/success");
+            const orderId = res?.orderId || res?.order?._id || res?._id;
+            window.location.replace(buildSuccessUrl(orderId));
           }
         }, 100);
       } else {
@@ -594,10 +640,17 @@ const Checkout = () => {
     }
 
     const isGuestOrder = !user?._id;
+    const failedOrderEmail = (
+      customerEmail ||
+      location.state?.customerEmail ||
+      user?.email ||
+      context?.userData?.email ||
+      ''
+    ).trim();
     const guestCustomer = isGuestOrder ? {
       name: customerName || 'Guest Customer',
       phone: phone || '',
-      email: userData?.email || (phone ? `guest-${phone.replace(/\D/g, '')}@zubahouse.com` : `guest-${Date.now()}@zubahouse.com`)
+      email: failedOrderEmail || (phone ? `guest-${phone.replace(/\D/g, '')}@zubahouse.com` : `guest-${Date.now()}@zubahouse.com`)
     } : null;
     
     const payLoad = {

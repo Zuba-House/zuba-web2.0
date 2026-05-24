@@ -343,7 +343,7 @@ function App() {
         clearAuthTokens();
         setIsLogin(false);
         setUserData(null);
-        setCartData([]);
+        setCartData(getGuestCart());
         setMyListData([]);
         return;
       }
@@ -365,7 +365,7 @@ function App() {
       clearAuthTokens();
       setIsLogin(false);
       setUserData(null);
-      setCartData([]);
+      setCartData(getGuestCart());
       setMyListData([]);
     }
   };
@@ -474,6 +474,17 @@ function App() {
 
   const clearGuestCart = () => {
     localStorage.removeItem('guestCart');
+  };
+
+  const hasValidAuth = () => {
+    const token = localStorage.getItem('accessToken');
+    return Boolean(
+      isLogin &&
+      userData?._id &&
+      token &&
+      token !== 'undefined' &&
+      token !== 'null'
+    );
   };
 
   // Add to guest cart (localStorage)
@@ -741,8 +752,8 @@ function App() {
   };
 
   const addToCart = (product, userId, quantity) => {
-    // If user is not logged in, use guest cart
-    if (userId === undefined || !isLogin) {
+    // Use guest cart unless the user has a valid authenticated session
+    if (!hasValidAuth()) {
       return addToGuestCart(product, quantity);
     }
 
@@ -822,13 +833,21 @@ function App() {
       if (res?.error === false) {
         alertBox("success", res?.message || "Product added to cart successfully");
         getCartItems();
+      } else if (res?.isAuthError) {
+        clearSession();
+        addToGuestCart(product, quantity);
       } else {
         console.error('❌ Cart add failed:', res);
         alertBox("error", res?.message || "Failed to add product to cart");
       }
     }).catch((error) => {
       console.error('❌ Cart add error:', error);
-      alertBox("error", error?.message || "Failed to add product to cart. Please try again.");
+      if (error?.isAuthError) {
+        clearSession();
+        addToGuestCart(product, quantity);
+      } else {
+        alertBox("error", error?.message || "Failed to add product to cart. Please try again.");
+      }
     })
 
   }
@@ -842,7 +861,7 @@ function App() {
     localStorage.removeItem("userEmail");
     setIsLogin(false);
     setUserData(null);
-    setCartData([]);
+    setCartData(getGuestCart());
     setMyListData([]);
   };
 

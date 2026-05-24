@@ -10,3 +10,37 @@
 
 .nav li .submenu li .submenu button{color: rgba(0,0,0,0.80) !important;}
 .nav li .submenu li .submenu button:hover{color: #eeb190 !important;}
+
+/* Horizontal scroll — keeps category labels on one line */
+.nav.nav-links-scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.nav.nav-links-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.nav.nav-links-scroll > li {
+  flex-shrink: 0;
+}
+
+.navigation .nav li a,
+.navigation .nav li button,
+.navigation .nav li .MuiButton-root {
+  white-space: nowrap !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  max-width: none !important;
+}
+
+@media (min-width: 993px) {
+  .navigation .col_2 {
+    min-width: 0;
+    overflow: hidden;
+  }
+}

@@ -33,10 +33,17 @@ orderTrackingRouter.get("/track/:orderId", async (req, res) => {
       });
     }
 
-    // Get user email to verify
-    const user = await UserModel.findById(order.userId);
+    // Verify email matches order owner (registered user or guest)
+    let emailMatches = false;
+
+    if (order.guestCustomer?.email) {
+      emailMatches = order.guestCustomer.email.toLowerCase() === email.toLowerCase();
+    } else if (order.userId) {
+      const user = await UserModel.findById(order.userId);
+      emailMatches = user && user.email.toLowerCase() === email.toLowerCase();
+    }
     
-    if (!user || user.email.toLowerCase() !== email.toLowerCase()) {
+    if (!emailMatches) {
       return res.status(404).json({
         error: true,
         success: false,
@@ -215,8 +222,9 @@ orderTrackingRouter.get("/track/:orderId", async (req, res) => {
       }
     }
 
-    // Get address details
+    // Get address details (guest orders use shippingAddress on the order document)
     const address = order.delivery_address || {};
+    const guestShip = order.shippingAddress || {};
 
     // Prepare response data
     const responseData = {
@@ -239,12 +247,12 @@ orderTrackingRouter.get("/track/:orderId", async (req, res) => {
       shippingAddress: {
         name: address?.contactInfo?.firstName 
           ? `${address.contactInfo.firstName} ${address.contactInfo.lastName || ''}`.trim()
-          : (user?.name || "Customer"),
-        street: address?.address?.addressLine1 || address?.address_line1 || "",
-        city: address?.address?.city || address?.city || "",
-        state: address?.address?.province || address?.state || "",
-        zipCode: address?.address?.postalCode || address?.pincode || "",
-        country: address?.address?.country || address?.country || ""
+          : (order.customerName || order.guestCustomer?.name || order.userId?.name || "Customer"),
+        street: address?.address?.addressLine1 || address?.address_line1 || guestShip.addressLine1 || "",
+        city: address?.address?.city || address?.city || guestShip.city || "",
+        state: address?.address?.province || address?.state || guestShip.province || guestShip.provinceCode || "",
+        zipCode: address?.address?.postalCode || address?.pincode || guestShip.postalCode || guestShip.postal_code || "",
+        country: address?.address?.country || address?.country || guestShip.country || ""
       },
       items: order.products.map((item) => ({
         name: item.productTitle || "Product",

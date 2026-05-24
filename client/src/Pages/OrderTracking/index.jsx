@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   FaSearch,
   FaTruck,
@@ -24,12 +24,14 @@ import { fetchDataFromApi } from "../../utils/api";
 import { getOptimizedImageUrl } from "../../utils/imageOptimizer";
 
 const OrderTracking = () => {
+  const [searchParams] = useSearchParams();
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  const [orderId, setOrderId] = useState("");
-  const [email, setEmail] = useState("");
+  const [orderId, setOrderId] = useState(searchParams.get('orderId') || "");
+  const [email, setEmail] = useState(searchParams.get('email') || "");
   const [orderData, setOrderData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -55,7 +57,9 @@ const OrderTracking = () => {
   };
 
   const handleTrackOrder = async (e) => {
-    e.preventDefault();
+    if (e?.preventDefault) e.preventDefault();
+    if (!orderId || !email) return;
+
     setLoading(true);
     setError("");
     setOrderData(null);
@@ -63,7 +67,7 @@ const OrderTracking = () => {
 
     try {
       const response = await fetchDataFromApi(
-        `/api/orders/track/${orderId}?email=${encodeURIComponent(email)}`
+        `/api/orders/tracking/track/${orderId}?email=${encodeURIComponent(email)}`
       );
 
       if (response?.error === false && response?.success) {
@@ -83,6 +87,14 @@ const OrderTracking = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const paramOrderId = searchParams.get('orderId');
+    const paramEmail = searchParams.get('email');
+    if (paramOrderId && paramEmail) {
+      handleTrackOrder({ preventDefault: () => {} });
+    }
+  }, []);
 
   const getStatusIcon = (status) => {
     switch (status) {

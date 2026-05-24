@@ -20,7 +20,7 @@ export const OrderFailed = () => {
                     Your order failed due to some reason. Please try again or contact support if the problem persists.
                 </p>
                 <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center'>
-                    <Link to="/checkout" className='w-full sm:w-auto'>
+                    <Link to="/cart" className='w-full sm:w-auto'>
                         <Button 
                             className="btn-org w-full sm:w-auto min-h-[44px] px-6 py-2 text-[14px] sm:text-[16px]"
                         >

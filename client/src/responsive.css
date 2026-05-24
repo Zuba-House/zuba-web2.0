@@ -578,9 +578,30 @@
         text-overflow: ellipsis !important;
     }
     
-    .navigation ul{white-space: nowrap; overflow-x: scroll; overflow-y: hidden; display: block !important; text-align: center;}
+    .navigation ul{
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        white-space: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        max-width: 100%;
+    }
     .navigation ul::-webkit-scrollbar{display: none !important;}
-    .navigation ul li{display: inline-block !important; vertical-align: top !important;}
+    .navigation ul li{
+        display: flex !important;
+        flex-shrink: 0 !important;
+        vertical-align: top !important;
+    }
+    .navigation ul li a,
+    .navigation ul li button,
+    .navigation ul li .MuiButton-root {
+        white-space: nowrap !important;
+        word-break: normal !important;
+        overflow-wrap: normal !important;
+        max-width: none !important;
+    }
 
     /* Container */
     .container{width: 95% !important; max-width: 95% !important; padding: 0 10px;}
@@ -1313,12 +1334,20 @@
         white-space: nowrap !important;
     }
     
-    /* Navigation menu items */
+    /* Navigation menu items — scroll horizontally, never wrap labels */
+    .navigation,
+    .navigation a,
+    .navigation button,
+    .navigation span {
+        word-break: normal !important;
+        overflow-wrap: normal !important;
+    }
     .navigation ul li a,
-    .navigation ul li button {
-        max-width: 100% !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
+    .navigation ul li button,
+    .navigation ul li .MuiButton-root {
+        max-width: none !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
         white-space: nowrap !important;
     }
     

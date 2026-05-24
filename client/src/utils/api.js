@@ -230,6 +230,48 @@ export const fetchDataFromApi = async (url) => {
   }
 };
 
+/** POST without auth headers — for guest checkout when stale tokens would cause 401s */
+export const postPublicData = async (url, formData) => {
+  try {
+    const response = await fetch(apiUrl + url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+    });
+
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      return {
+        error: true,
+        success: false,
+        message: `Server error (${response.status}): ${response.statusText}`,
+      };
+    }
+
+    const unwrapped = unwrapApiResponse(data);
+
+    if (response.ok) {
+      return unwrapped;
+    }
+
+    return {
+      ...unwrapped,
+      error: true,
+      success: false,
+      status: response.status,
+    };
+  } catch (error) {
+    console.error('Network/Request Error:', error);
+    return {
+      error: true,
+      success: false,
+      message: error.message || 'Network error occurred. Please check your connection and try again.',
+    };
+  }
+};
+
 export const uploadImage = async (url, updatedData) => {
   try {
     const token = localStorage.getItem('accessToken');

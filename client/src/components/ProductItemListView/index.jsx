@@ -115,6 +115,11 @@ const ProductItem = (props) => {
     }, [context?.cartData]);
   
   
+    const isGuestCartItem = () => {
+      const cartId = cartItem[0]?._id?.toString();
+      return cartId?.startsWith('guest_') || !context?.isLogin;
+    };
+
     const minusQty = () => {
       if (quantity !== 1 && quantity > 1) {
         setQuantity(quantity - 1)
@@ -124,18 +129,53 @@ const ProductItem = (props) => {
   
   
       if (quantity === 1) {
-        deleteData(`/api/cart/delete-cart-item/${cartItem[0]?._id}`).then((res) => {
+        if (isGuestCartItem()) {
+          context?.removeFromGuestCart?.(cartItem[0]?._id);
           setIsAdded(false);
-          context.alertBox("success", "Item Removed ");
-          context?.getCartItems();
           setIsShowTabs(false);
           setActiveTab(null);
-        })
+        } else {
+          deleteData(`/api/cart/delete-cart-item/${cartItem[0]?._id}`).then((res) => {
+            setIsAdded(false);
+            context.alertBox("success", "Item Removed ");
+            context?.getCartItems();
+            setIsShowTabs(false);
+            setActiveTab(null);
+          })
+        }
+      } else {
+        const newQty = quantity - 1;
+
+        if (isGuestCartItem()) {
+          context?.updateGuestCartQty?.(cartItem[0]?._id, newQty);
+        } else {
+          const obj = {
+            _id: cartItem[0]?._id,
+            qty: newQty,
+            subTotal: props?.item?.price * newQty
+          }
+  
+          editData(`/api/cart/update-qty`, obj).then((res) => {
+            context.alertBox("success", res?.data?.message);
+            context?.getCartItems();
+          })
+        }
+      }
+  
+    }
+  
+  
+    const addQty = () => {
+      const newQty = quantity + 1;
+      setQuantity(newQty);
+  
+      if (isGuestCartItem()) {
+        context?.updateGuestCartQty?.(cartItem[0]?._id, newQty);
       } else {
         const obj = {
           _id: cartItem[0]?._id,
-          qty: quantity - 1,
-          subTotal: props?.item?.price * (quantity - 1)
+          qty: newQty,
+          subTotal: props?.item?.price * newQty
         }
   
         editData(`/api/cart/update-qty`, obj).then((res) => {
@@ -143,26 +183,6 @@ const ProductItem = (props) => {
           context?.getCartItems();
         })
       }
-  
-    }
-  
-  
-    const addQty = () => {
-  
-      setQuantity(quantity + 1);
-  
-      const obj = {
-        _id: cartItem[0]?._id,
-        qty: quantity + 1,
-        subTotal: props?.item?.price * (quantity + 1)
-      }
-  
-      editData(`/api/cart/update-qty`, obj).then((res) => {
-        context.alertBox("success", res?.data?.message);
-        context?.getCartItems();
-      })
-  
-  
   
     }
   

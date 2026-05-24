@@ -21,7 +21,9 @@ const ShippingAddressInput = ({
   initialPhone = '',
   initialCustomerName = '',
   initialApartmentNumber = '',
-  initialDeliveryNote = ''
+  initialDeliveryNote = '',
+  initialEmail = '',
+  requireEmail = false
 }) => {
   const [address, setAddress] = React.useState({
     postal_code: initialAddress?.postal_code || initialAddress?.postalCode || initialAddress?.address?.postalCode || '',
@@ -38,6 +40,8 @@ const ShippingAddressInput = ({
   
   // New customer info fields
   const [customerName, setCustomerName] = React.useState(initialCustomerName || '');
+  const [customerEmail, setCustomerEmail] = React.useState(initialEmail || '');
+  const [emailError, setEmailError] = React.useState('');
   const [apartmentNumber, setApartmentNumber] = React.useState(initialApartmentNumber || '');
   const [deliveryNote, setDeliveryNote] = React.useState(initialDeliveryNote || '');
 
@@ -151,6 +155,10 @@ const ShippingAddressInput = ({
     if (field === 'customerName') {
       setCustomerName(value);
       updates.customerName = value;
+    } else if (field === 'customerEmail') {
+      setCustomerEmail(value);
+      setEmailError('');
+      updates.customerEmail = value;
     } else if (field === 'apartmentNumber') {
       setApartmentNumber(value);
       updates.apartmentNumber = value;
@@ -162,9 +170,31 @@ const ShippingAddressInput = ({
     // Notify parent of all customer info
     onCustomerInfoChange && onCustomerInfoChange({
       customerName: field === 'customerName' ? value : customerName,
+      customerEmail: field === 'customerEmail' ? value : customerEmail,
       apartmentNumber: field === 'apartmentNumber' ? value : apartmentNumber,
       deliveryNote: field === 'deliveryNote' ? value : deliveryNote
     });
+  };
+
+  const validateEmail = (emailValue) => {
+    if (!requireEmail && (!emailValue || emailValue.trim() === '')) {
+      setEmailError('');
+      return true;
+    }
+
+    if (!emailValue || emailValue.trim() === '') {
+      setEmailError('Email is required for order confirmation');
+      return false;
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(emailValue.trim())) {
+      setEmailError('Please enter a valid email address');
+      return false;
+    }
+
+    setEmailError('');
+    return true;
   };
 
   // Validate phone number
@@ -530,6 +560,29 @@ const ShippingAddressInput = ({
           />
           <small className="text-gray-600 text-[12px] mt-1 block">
             Required for delivery. Please enter your full name as it should appear on the package.
+          </small>
+        </div>
+
+        {/* Email for order confirmation */}
+        <div className="mt-3">
+          <label htmlFor="customerEmail" className="block text-[13px] font-[600] mb-2">
+            Email {requireEmail ? <span className="text-red-500">*</span> : <span className="text-gray-400 text-[11px]">(Optional)</span>}
+          </label>
+          <input
+            type="email"
+            id="customerEmail"
+            value={customerEmail}
+            onChange={(e) => handleCustomerInfoChange('customerEmail', e.target.value)}
+            onBlur={() => validateEmail(customerEmail)}
+            placeholder="Enter your email for order confirmation"
+            className="w-full px-3 py-2 border border-gray-300 rounded text-[14px]"
+            required={requireEmail}
+          />
+          {emailError && (
+            <span className="text-red-500 text-[12px] mt-1 block">{emailError}</span>
+          )}
+          <small className="text-gray-600 text-[12px] mt-1 block">
+            Used for order confirmation and tracking updates.
           </small>
         </div>
 

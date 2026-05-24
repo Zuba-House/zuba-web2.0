@@ -50,24 +50,20 @@ const Navigation = (props) => {
           }
 
 
-          <div className="col_2 w-full lg:w-[60%]">
-            <ul className="flex items-center gap-3 nav">
+          <div className="col_2 w-full min-w-0 overflow-hidden lg:w-[60%]">
+            <ul className="nav nav-links-scroll flex flex-nowrap items-center gap-2 overflow-x-auto sm:gap-3">
               {/* ZeroX Intelligence: Updated Home link colors */}
-              <li className="list-none">
+              <li className="list-none shrink-0">
                 <Link to="/" className="link transition text-[14px] font-[500]">
                   <Button className="link transition !font-[500] !text-[#e5e2db] hover:!text-[#efb291] !py-4">
                     Home
                   </Button>
                 </Link>
               </li>
-              <li className="list-none">
-               
-              </li>
-
               {
                 catData?.length !== 0 && catData?.map((cat, index) => {
                   return (
-                    <li className="list-none relative" key={index}>
+                    <li className="list-none relative shrink-0" key={index}>
                       {/* ZeroX Intelligence: Updated category link colors */}
                       <Link to={`/products?catId=${cat?._id}`} className="link transition text-[14px] font-[500]">
                         <Button className="link transition !font-[500] !text-[#e5e2db] hover:!text-[#efb291] !py-4">

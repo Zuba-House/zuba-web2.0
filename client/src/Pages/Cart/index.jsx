@@ -34,6 +34,7 @@ const CartPage = () => {
 
   // New customer info fields
   const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
   const [apartmentNumber, setApartmentNumber] = useState('');
   const [deliveryNote, setDeliveryNote] = useState('');
 
@@ -64,6 +65,9 @@ const CartPage = () => {
     // Pre-fill customer name from user data if not set from address
     if (context?.userData?.name && !customerName) {
       setCustomerName(context.userData.name);
+    }
+    if (context?.userData?.email && !customerEmail) {
+      setCustomerEmail(context.userData.email);
     }
   }, [context?.userData]);
 
@@ -192,8 +196,12 @@ const CartPage = () => {
     }
   };
 
-  // Save address to user account
+  // Save address to user account (logged-in users only)
   const saveAddress = async (silent = false) => {
+    if (!context?.isLogin || !context?.userData?._id) {
+      return true;
+    }
+
     if (!shippingAddress.city || !shippingAddress.countryCode) {
       context?.alertBox("error", "Please enter a complete address (city and country required)");
       return;
@@ -360,14 +368,17 @@ const CartPage = () => {
                 }}
                 onCustomerInfoChange={(info) => {
                   if (info.customerName !== undefined) setCustomerName(info.customerName);
+                  if (info.customerEmail !== undefined) setCustomerEmail(info.customerEmail);
                   if (info.apartmentNumber !== undefined) setApartmentNumber(info.apartmentNumber);
                   if (info.deliveryNote !== undefined) setDeliveryNote(info.deliveryNote);
                 }}
                 initialAddress={shippingAddress}
                 initialPhone={phone}
                 initialCustomerName={customerName}
+                initialEmail={customerEmail}
                 initialApartmentNumber={apartmentNumber}
                 initialDeliveryNote={deliveryNote}
+                requireEmail={!(context?.isLogin && context?.userData?.email)}
               />
             </div>
 
@@ -566,9 +577,23 @@ const CartPage = () => {
                 Number(shippingValue) >= 0;
               
               const handleCheckoutClick = async () => {
+                const isLoggedIn = context?.isLogin && context?.userData;
+                const orderEmail = (customerEmail || context?.userData?.email || '').trim();
+
                 // Validate customer name - REQUIRED
                 if (!customerName || customerName.trim() === '') {
                   context?.alertBox("error", "Please enter your full name for delivery");
+                  return;
+                }
+
+                // Validate email for guests (or logged-in users without account email)
+                if (!orderEmail) {
+                  context?.alertBox("error", "Please enter your email for order confirmation");
+                  return;
+                }
+                const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailPattern.test(orderEmail)) {
+                  context?.alertBox("error", "Please enter a valid email address");
                   return;
                 }
                 
@@ -607,9 +632,9 @@ const CartPage = () => {
                 }
                 
                 // All validations passed - proceed
-                // Save address silently before proceeding
-                if (shippingAddress?.city && phone && !savingAddress) {
-                  await saveAddress(true); // Save silently
+                // Save address silently before proceeding (logged-in users only)
+                if (isLoggedIn && shippingAddress?.city && phone && !savingAddress) {
+                  await saveAddress(true);
                 }
                 // Navigate to checkout with all customer info
                 history("/checkout", { 
@@ -618,6 +643,7 @@ const CartPage = () => {
                     shippingAddress,
                     phone: phone,
                     customerName: customerName.trim(),
+                    customerEmail: orderEmail,
                     apartmentNumber: apartmentNumber.trim(),
                     deliveryNote: deliveryNote.trim(),
                     discounts: discounts // Pass discount information
@@ -630,9 +656,12 @@ const CartPage = () => {
               
               // Check if customer name is provided
               const hasCustomerName = customerName && customerName.trim() !== '';
+              const hasCustomerEmail = Boolean(
+                (customerEmail && customerEmail.trim() !== '') || context?.userData?.email
+              );
               
               // Disable checkout if required fields are missing
-              if (!hasCustomerName || !hasValidAddress || !hasPhone) {
+              if (!hasCustomerName || !hasCustomerEmail || !hasValidAddress || !hasPhone) {
                 return (
                   <Button 
                     className="btn-org btn-lg w-full flex gap-2" 
@@ -641,7 +670,7 @@ const CartPage = () => {
                     style={{ opacity: 0.6, cursor: 'not-allowed' }}
                   >
                     <BsFillBagCheckFill className="text-[20px]" /> 
-                    {!hasCustomerName ? "⚠️ Full Name Required" : !hasValidAddress ? "⚠️ Complete Shipping Address Required" : !hasPhone ? "⚠️ Phone Number Required" : "⚠️ Complete Required Fields"}
+                    {!hasCustomerName ? "⚠️ Full Name Required" : !hasCustomerEmail ? "⚠️ Email Required" : !hasValidAddress ? "⚠️ Complete Shipping Address Required" : !hasPhone ? "⚠️ Phone Number Required" : "⚠️ Complete Required Fields"}
                   </Button>
                 );
               }
