@@ -58,6 +58,7 @@ const allowedOrigins = [
   'https://zubahouse.com',
   'https://www.zubahouse.com',
   'https://admin.zubahouse.com',
+  'https://mobileapp.zubahouse.com',
   'https://vendor.zubahouse.com',
   'https://api.zubahouse.com',
   env.frontendUrl,
