@@ -1,174 +1,30 @@
-import Stripe from "stripe";
-import dotenv from "dotenv";
-import { sendError, sendSuccess } from "../utils/response.js";
-import { env } from "../config/env.js";
-dotenv.config();
+import OrderModel from '../models/order.model.js';
+import { env } from '../config/env.js';
+import { sendError, sendSuccess } from '../utils/response.js';
+import { markOrderPaid } from '../services/orderPayment.service.js';
+import {
+  getStripe,
+  getStripeCurrency,
+  isStripeConfigured,
+  mapStripeError,
+  stripeCall,
+} from '../services/stripeClient.js';
 
-// Initialize Stripe with validation
-let stripe = null;
-if (process.env.STRIPE_SECRET_KEY) {
-    try {
-        stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-        console.log('[Stripe] Initialized with key:', process.env.STRIPE_SECRET_KEY.substring(0, 7) + '...');
-    } catch (error) {
-        console.error('[Stripe] Failed to initialize:', error.message);
-        stripe = null;
-    }
-} else {
-    console.warn('[Stripe] STRIPE_SECRET_KEY not set in environment variables');
-}
-
-// Helper: detect if an Org API key is being used
-const isOrgKey = (key) => typeof key === 'string' && key.startsWith('sk_org_');
-
-export const createPaymentIntent = async (req, res) => {
+async function assertStripeReady(res) {
+  if (!isStripeConfigured()) {
+    return sendError(res, 500, 'Stripe API key is missing. Set STRIPE_SECRET_KEY on Render.', {
+      code: 'STRIPE_NOT_CONFIGURED',
+    });
+  }
   try {
-    // Check if Stripe is initialized
-    if (!stripe) {
-      console.error('[Stripe] Cannot create payment intent: Stripe not initialized');
-      return res.status(500).json({ 
-        error: 'Payment processing unavailable',
-        message: 'Stripe API key is missing or invalid. Please contact support.',
-        code: 'STRIPE_NOT_CONFIGURED'
-      });
-    }
-
-    // Validate Stripe key is still valid
-    try {
-      await stripe.balance.retrieve();
-    } catch (keyError) {
-      console.error('[Stripe] API key validation failed:', keyError.message);
-      return res.status(500).json({
-        error: 'Payment processing unavailable',
-        message: 'Stripe API key is invalid or expired. Please contact support to update payment configuration.',
-        code: 'STRIPE_KEY_INVALID',
-        detail: keyError.message
-      });
-    }
-
-    const { amount } = req.body;
-
-    // Validate amount
-    if (!amount || isNaN(amount) || Number(amount) <= 0) {
-      return res.status(400).json({ error: "Invalid amount. Amount must be a positive number." });
-    }
-
-    const currency = (process.env.CURRENCY || process.env.STRIPE_CURRENCY || 'USD').toLowerCase();
-    const piParams = {
-      amount: Math.round(Number(amount) * 100),
-      currency,
-      automatic_payment_methods: { enabled: true },
-    };
-
-    const options = {};
-    if (isOrgKey(process.env.STRIPE_SECRET_KEY)) {
-      const targetAccount = process.env.STRIPE_TARGET_ACCOUNT || process.env.STRIPE_ACCOUNT;
-      if (targetAccount) {
-        options.stripeAccount = targetAccount; // sets Stripe-Account header
-      } else {
-        return res.status(500).json({ error: 'Organization API key detected. Please set STRIPE_TARGET_ACCOUNT (acct_...) or use a standard account secret key.' });
-      }
-    }
-
-    // Logging context
-    try {
-      console.log("[Stripe] Creating PI:", piParams.amount / 100, currency.toUpperCase(), "| testMode:", !(process.env.STRIPE_SECRET_KEY || "").startsWith("sk_live_"));
-    } catch {}
-
-    // Create PaymentIntent
-    const paymentIntent = options.stripeAccount
-      ? await stripe.paymentIntents.create(piParams, { stripeAccount: options.stripeAccount })
-      : await stripe.paymentIntents.create(piParams);
-
-    console.log("[Stripe] PaymentIntent created:", paymentIntent.id, "status:", paymentIntent.status);
-    return res.status(200).json({ clientSecret: paymentIntent.client_secret, id: paymentIntent.id });
+    await stripeCall((s, opts) =>
+      opts.stripeAccount ? s.balance.retrieve({}, opts) : s.balance.retrieve()
+    );
+    return true;
   } catch (err) {
-    console.error("[Stripe] Error creating payment intent:", {
-      message: err?.message,
-      type: err?.type,
-      code: err?.code,
-      statusCode: err?.statusCode,
-      raw: err?.raw
-    });
-    
-    // Handle specific Stripe errors
-    let errorMessage = 'Payment processing failed';
-    let statusCode = 500;
-    
-    if (err?.type === 'StripeAuthenticationError') {
-      errorMessage = 'Stripe API key is invalid or expired. Please contact support.';
-      statusCode = 500;
-    } else if (err?.type === 'StripeAPIError') {
-      errorMessage = 'Stripe API error. Please try again or contact support.';
-      statusCode = 502;
-    } else if (err?.type === 'StripeConnectionError') {
-      errorMessage = 'Unable to connect to Stripe. Please try again.';
-      statusCode = 503;
-    }
-    
-    return res.status(statusCode).json({
-      error: errorMessage,
-      detail: err?.message || String(err),
-      code: err?.code || 'STRIPE_ERROR',
-      timestamp: new Date().toISOString()
-    });
+    const mapped = mapStripeError(err);
+    return res.status(mapped.status).json(mapped.body);
   }
-};
-
-// GET /api/stripe/account-info
-export const getStripeAccountInfo = async (req, res) => {
-  try {
-    if (!stripe) {
-      return res.status(500).json({ 
-        error: 'Stripe not configured',
-        message: 'STRIPE_SECRET_KEY is not set or invalid'
-      });
-    }
-    
-    // retrieve account info associated with the secret key
-    const acct = await stripe.accounts.retrieve();
-    // mask sensitive values
-    const maskedAccount = {
-      id: acct.id,
-      email: acct.email || null,
-      business_type: acct.business_type || null,
-      country: acct.country || null,
-    };
-
-    // also return key prefix so frontend can compare
-    const secretKey = process.env.STRIPE_SECRET_KEY || '';
-    const keyPrefix = secretKey.substring(0, 7);
-
-    res.status(200).json({ account: maskedAccount, keyPrefix, configured: true });
-  } catch (err) {
-    console.error('Error retrieving Stripe account info:', err && err.message ? err.message : err);
-    
-    // Check if it's an authentication error (invalid key)
-    if (err?.type === 'StripeAuthenticationError') {
-      return res.status(500).json({ 
-        error: 'Stripe API key is invalid or expired',
-        message: 'Please update STRIPE_SECRET_KEY in environment variables',
-        configured: false
-      });
-    }
-    
-    res.status(500).json({ 
-      error: 'Failed to retrieve Stripe account info', 
-      detail: err && err.message ? err.message : String(err),
-      configured: false
-    });
-  }
-};
-
-function stripeRequestOptions() {
-  const options = {};
-  if (isOrgKey(process.env.STRIPE_SECRET_KEY)) {
-    const targetAccount = process.env.STRIPE_TARGET_ACCOUNT || process.env.STRIPE_ACCOUNT;
-    if (targetAccount) {
-      options.stripeAccount = targetAccount;
-    }
-  }
-  return options;
 }
 
 function defaultCheckoutUrls(orderId) {
@@ -179,140 +35,251 @@ function defaultCheckoutUrls(orderId) {
   };
 }
 
-// POST /api/stripe/create-checkout-session
+export const createPaymentIntent = async (req, res) => {
+  try {
+    const ready = await assertStripeReady(res);
+    if (ready !== true) return;
+
+    const { amount } = req.body;
+    if (!amount || isNaN(amount) || Number(amount) <= 0) {
+      return sendError(res, 400, 'Invalid amount. Amount must be a positive number.');
+    }
+
+    const currency = getStripeCurrency();
+    const paymentIntent = await stripeCall((s, opts) => {
+      const piParams = {
+        amount: Math.round(Number(amount) * 100),
+        currency,
+        automatic_payment_methods: { enabled: true },
+        metadata: { source: 'zuba_mobile' },
+      };
+      return opts.stripeAccount
+        ? s.paymentIntents.create(piParams, opts)
+        : s.paymentIntents.create(piParams);
+    });
+
+    return res.status(200).json({
+      success: true,
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      id: paymentIntent.id,
+    });
+  } catch (err) {
+    console.error('[Stripe] createPaymentIntent:', err?.message || err);
+    const mapped = mapStripeError(err);
+    return res.status(mapped.status).json(mapped.body);
+  }
+};
+
+/** POST /api/stripe/create-checkout-session */
 export const createCheckoutSession = async (req, res) => {
   try {
-    if (!stripe) {
-      return sendError(res, 500, 'Payment processing unavailable', { code: 'STRIPE_NOT_CONFIGURED' });
-    }
+    const ready = await assertStripeReady(res);
+    if (ready !== true) return;
 
     const { amount, orderId, successUrl, cancelUrl, metadata = {} } = req.body || {};
     const numericAmount = Number(amount);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      return sendError(res, 400, 'Invalid amount. Amount must be a positive number.');
-    }
+
     if (!orderId) {
       return sendError(res, 400, 'orderId is required');
     }
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return sendError(res, 400, 'Invalid amount. Amount must be a positive number.');
+    }
+
+    const order = await OrderModel.findById(orderId);
+    if (!order) {
+      return sendError(res, 404, 'Order not found');
+    }
 
     const defaults = defaultCheckoutUrls(orderId);
-    const currency = (process.env.CURRENCY || process.env.STRIPE_CURRENCY || 'USD').toLowerCase();
-    const stripeOptions = stripeRequestOptions();
+    const currency = getStripeCurrency();
+    const amountCents = Math.round(numericAmount * 100);
 
-    const sessionParams = {
-      mode: 'payment',
-      line_items: [
-        {
-          price_data: {
-            currency,
-            product_data: {
-              name: `Zuba House Order ${String(orderId).slice(-8).toUpperCase()}`,
+    const resolvedSuccessUrl =
+      successUrl ||
+      `zuba://payment-success?orderId=${encodeURIComponent(orderId)}&session_id={CHECKOUT_SESSION_ID}`;
+    const resolvedCancelUrl =
+      cancelUrl || `zuba://payment-cancel?orderId=${encodeURIComponent(orderId)}`;
+
+    const session = await stripeCall((s, opts) => {
+      const params = {
+        mode: 'payment',
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency,
+              unit_amount: amountCents,
+              product_data: {
+                name: `Zuba House Order #${String(orderId).slice(-8).toUpperCase()}`,
+                description: 'Secure checkout — Zuba House',
+              },
             },
-            unit_amount: Math.round(numericAmount * 100),
+            quantity: 1,
           },
-          quantity: 1,
+        ],
+        client_reference_id: String(orderId),
+        success_url: resolvedSuccessUrl.includes('://') ? resolvedSuccessUrl : defaults.success,
+        cancel_url: resolvedCancelUrl.includes('://') ? resolvedCancelUrl : defaults.cancel,
+        metadata: {
+          orderId: String(orderId),
+          source: metadata.source || 'zuba_mobile_app',
+          ...Object.fromEntries(
+            Object.entries(metadata).map(([k, v]) => [k, String(v ?? '')])
+          ),
         },
-      ],
-      success_url: successUrl || defaults.success,
-      cancel_url: cancelUrl || defaults.cancel,
-      metadata: {
-        orderId: String(orderId),
-        ...Object.fromEntries(
-          Object.entries(metadata).map(([k, v]) => [k, String(v ?? '')])
-        ),
-      },
-    };
+      };
+      return opts.stripeAccount
+        ? s.checkout.sessions.create(params, opts)
+        : s.checkout.sessions.create(params);
+    });
 
-    const session = stripeOptions.stripeAccount
-      ? await stripe.checkout.sessions.create(sessionParams, stripeOptions)
-      : await stripe.checkout.sessions.create(sessionParams);
+    await OrderModel.findByIdAndUpdate(orderId, { paymentId: session.id }).catch(() => undefined);
+
+    console.log('[Stripe] Checkout session:', session.id, 'order:', orderId, 'amount:', numericAmount);
 
     return sendSuccess(res, 200, 'Checkout session created', {
       url: session.url,
       sessionId: session.id,
-      paymentIntentId: typeof session.payment_intent === 'string'
-        ? session.payment_intent
-        : session.payment_intent?.id || null,
+      paymentIntentId:
+        typeof session.payment_intent === 'string'
+          ? session.payment_intent
+          : session.payment_intent?.id || null,
     });
   } catch (err) {
-    console.error('[Stripe] createCheckoutSession error:', err?.message || err);
+    console.error('[Stripe] createCheckoutSession:', err?.message || err);
     return sendError(res, 500, err?.message || 'Failed to create checkout session', {
       code: err?.code || 'STRIPE_ERROR',
     });
   }
 };
 
-// GET /api/stripe/checkout-status/:sessionId
+/** GET /api/stripe/checkout-status/:sessionId */
 export const getCheckoutStatus = async (req, res) => {
   try {
-    if (!stripe) {
-      return sendError(res, 500, 'Payment processing unavailable', { code: 'STRIPE_NOT_CONFIGURED' });
-    }
+    const ready = await assertStripeReady(res);
+    if (ready !== true) return;
 
-    const sessionId = req.params.sessionId;
+    const { sessionId } = req.params;
     if (!sessionId) {
       return sendError(res, 400, 'sessionId is required');
     }
 
-    const stripeOptions = stripeRequestOptions();
-    const session = stripeOptions.stripeAccount
-      ? await stripe.checkout.sessions.retrieve(sessionId, stripeOptions)
-      : await stripe.checkout.sessions.retrieve(sessionId);
+    const session = await stripeCall((s, opts) =>
+      opts.stripeAccount
+        ? s.checkout.sessions.retrieve(sessionId, opts)
+        : s.checkout.sessions.retrieve(sessionId)
+    );
 
     return sendSuccess(res, 200, 'Checkout session status', {
       status: session.status,
       paymentStatus: session.payment_status,
       amountTotal: (session.amount_total || 0) / 100,
-      currency: session.currency,
+      currency: (session.currency || getStripeCurrency()).toUpperCase(),
+      orderId: session.metadata?.orderId || session.client_reference_id || null,
     });
   } catch (err) {
-    console.error('[Stripe] getCheckoutStatus error:', err?.message || err);
+    console.error('[Stripe] getCheckoutStatus:', err?.message || err);
     return sendError(res, 500, err?.message || 'Failed to retrieve checkout status', {
       code: err?.code || 'STRIPE_ERROR',
     });
   }
 };
 
-// Optional health endpoint to help diagnose key/account context
+/** POST /api/stripe/webhook — register with express.raw() before express.json() */
+export const handleStripeWebhook = async (req, res) => {
+  const stripe = getStripe();
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!stripe || !webhookSecret) {
+    return res.status(503).json({ error: 'Webhook not configured' });
+  }
+
+  const signature = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, signature, webhookSecret);
+  } catch (err) {
+    console.error('[Stripe Webhook] Signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const orderId = session.metadata?.orderId || session.client_reference_id;
+      await markOrderPaid(orderId, session.id, 'stripe');
+      console.log('[Stripe Webhook] Order paid:', orderId);
+    }
+    if (event.type === 'payment_intent.succeeded') {
+      const pi = event.data.object;
+      const orderId = pi.metadata?.orderId;
+      if (orderId) {
+        await markOrderPaid(orderId, pi.id, 'stripe');
+      }
+    }
+  } catch (err) {
+    console.error('[Stripe Webhook] Handler error:', err);
+    return res.status(500).json({ error: 'Webhook handler failed' });
+  }
+
+  return res.json({ received: true });
+};
+
+export const getStripeAccountInfo = async (req, res) => {
+  try {
+    const ready = await assertStripeReady(res);
+    if (ready !== true) return;
+
+    const acct = await stripeCall((s, opts) =>
+      opts.stripeAccount ? s.accounts.retrieve({}, opts) : s.accounts.retrieve()
+    );
+
+    const secretKey = process.env.STRIPE_SECRET_KEY || '';
+    return res.status(200).json({
+      success: true,
+      account: {
+        id: acct.id,
+        email: acct.email || null,
+        business_type: acct.business_type || null,
+        country: acct.country || null,
+      },
+      keyPrefix: secretKey.substring(0, 7),
+      livemode: secretKey.startsWith('sk_live_'),
+      configured: true,
+    });
+  } catch (err) {
+    console.error('[Stripe] account-info:', err?.message || err);
+    const mapped = mapStripeError(err);
+    return res.status(mapped.status).json({ ...mapped.body, configured: false });
+  }
+};
+
 export const stripeHealth = async (req, res) => {
   try {
-    if (!stripe) {
-      return res.status(500).json({ 
-        ok: false, 
-        error: 'Stripe not configured',
-        message: 'STRIPE_SECRET_KEY is not set in environment variables',
-        configured: false
-      });
-    }
-    
-    const balance = await stripe.balance.retrieve();
-    const currency = (process.env.CURRENCY || process.env.STRIPE_CURRENCY || 'USD').toUpperCase();
-    res.json({ 
-      ok: true, 
+    const ready = await assertStripeReady(res);
+    if (ready !== true) return;
+
+    const balance = await stripeCall((s, opts) =>
+      opts.stripeAccount ? s.balance.retrieve({}, opts) : s.balance.retrieve()
+    );
+    const currency = getStripeCurrency().toUpperCase();
+    const secretKey = process.env.STRIPE_SECRET_KEY || '';
+
+    return res.json({
+      ok: true,
       configured: true,
-      livemode: balance.livemode, 
-      currency, 
-      available: balance.available, 
-      pending: balance.pending 
+      livemode: secretKey.startsWith('sk_live_'),
+      stripeLivemode: balance.livemode,
+      currency,
+      available: balance.available,
+      pending: balance.pending,
     });
-  } catch (e) {
-    console.error('[Stripe Health] Error:', e?.message || String(e));
-    
-    // Check if it's an authentication error
-    if (e?.type === 'StripeAuthenticationError') {
-      return res.status(500).json({ 
-        ok: false, 
-        configured: true,
-        error: 'Stripe API key is invalid or expired',
-        message: 'Please update STRIPE_SECRET_KEY in environment variables',
-        detail: e?.message
-      });
-    }
-    
-    res.status(500).json({ 
-      ok: false, 
-      configured: stripe !== null,
-      error: e?.message || String(e) 
-    });
+  } catch (err) {
+    console.error('[Stripe Health]', err?.message || err);
+    const mapped = mapStripeError(err);
+    return res.status(mapped.status).json({ ok: false, ...mapped.body });
   }
 };
