@@ -41,9 +41,16 @@ export const createPaymentIntent = async (req, res) => {
     const ready = await assertStripeReady(res);
     if (ready !== true) return;
 
-    const { amount } = req.body;
+    const { amount, orderId } = req.body || {};
     if (!amount || isNaN(amount) || Number(amount) <= 0) {
       return sendError(res, 400, 'Invalid amount. Amount must be a positive number.');
+    }
+
+    if (orderId) {
+      const order = await OrderModel.findById(orderId);
+      if (!order) {
+        return sendError(res, 404, 'Order not found');
+      }
     }
 
     const currency = getStripeCurrency();
@@ -51,8 +58,11 @@ export const createPaymentIntent = async (req, res) => {
       const piParams = {
         amount: Math.round(Number(amount) * 100),
         currency,
-        automatic_payment_methods: { enabled: true },
-        metadata: { source: 'zuba_mobile' },
+        payment_method_types: ['card'],
+        metadata: {
+          source: 'zuba_mobile',
+          ...(orderId ? { orderId: String(orderId) } : {}),
+        },
       };
       return opts.stripeAccount
         ? s.paymentIntents.create(piParams, opts)
