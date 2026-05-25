@@ -31,8 +31,27 @@ export function isStripeConfigured() {
   return stripe !== null;
 }
 
+/** Charge currency for Stripe Checkout / PaymentIntents (must match Stripe settlement). */
 export function getStripeCurrency() {
-  return (process.env.CURRENCY || process.env.STRIPE_CURRENCY || 'USD').toLowerCase();
+  const fromEnv = normalize(process.env.STRIPE_CURRENCY || process.env.CURRENCY);
+  if (fromEnv) {
+    return fromEnv.toLowerCase();
+  }
+  console.warn(
+    '[Stripe] STRIPE_CURRENCY (or CURRENCY) is not set — using CAD. Set STRIPE_CURRENCY=CAD on Render.'
+  );
+  return 'cad';
+}
+
+function normalize(value) {
+  if (value == null) return '';
+  return String(value).trim();
+}
+
+export function getStripeCurrencySource() {
+  if (normalize(process.env.STRIPE_CURRENCY)) return 'STRIPE_CURRENCY';
+  if (normalize(process.env.CURRENCY)) return 'CURRENCY';
+  return 'default_cad';
 }
 
 export function getStripeRequestOptions() {

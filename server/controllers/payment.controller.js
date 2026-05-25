@@ -5,6 +5,7 @@ import { markOrderPaid } from '../services/orderPayment.service.js';
 import {
   getStripe,
   getStripeCurrency,
+  getStripeCurrencySource,
   isStripeConfigured,
   mapStripeError,
   stripeCall,
@@ -274,6 +275,7 @@ export const stripeHealth = async (req, res) => {
       livemode: secretKey.startsWith('sk_live_'),
       stripeLivemode: balance.livemode,
       currency,
+      currencySource: getStripeCurrencySource(),
       available: balance.available,
       pending: balance.pending,
     });

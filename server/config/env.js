@@ -70,10 +70,10 @@ export const env = {
 
   stripeSecretKey: normalize(process.env.STRIPE_SECRET_KEY),
   stripeTargetAccount: normalize(process.env.STRIPE_TARGET_ACCOUNT || process.env.STRIPE_ACCOUNT),
-  stripeCurrency: normalize(process.env.STRIPE_CURRENCY || process.env.CURRENCY) || 'USD',
+  stripeCurrency: normalize(process.env.STRIPE_CURRENCY || process.env.CURRENCY) || 'CAD',
   stripeWebhookSecret: normalize(process.env.STRIPE_WEBHOOK_SECRET),
 
-  paypalMode: normalize(process.env.PAYPAL_MODE) || 'test',
+  paypalMode: normalize(process.env.PAYPAL_MODE) || 'live',
   paypalClientIdLive: normalize(process.env.PAYPAL_CLIENT_ID_LIVE),
   paypalSecretLive: normalize(process.env.PAYPAL_SECRET_LIVE),
 
