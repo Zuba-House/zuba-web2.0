@@ -1,8 +1,53 @@
+import mongoose from 'mongoose';
 import OrderModel from "../models/order.model.js";
 import ProductModel from '../models/product.model.js';
 import UserModel from '../models/user.model.js';
 import AddressModel from "../models/address.model.js";
 import VendorModel from '../models/vendor.model.js';
+import { sendError, sendSuccess } from '../utils/response.js';
+
+function resolveImageString(image) {
+    if (image == null) return '';
+    if (typeof image === 'string') return image.trim();
+    if (typeof image === 'object' && image.url) return String(image.url).trim();
+    return '';
+}
+
+function normalizeOrderProducts(products = []) {
+    if (!Array.isArray(products)) return [];
+    return products
+        .map((item) => {
+            const productId = String(item?.productId || item?._id || '').trim();
+            const quantity = Math.max(1, Number(item?.quantity) || 1);
+            const price = Number(item?.price) || 0;
+            const subTotal = Number(item?.subTotal ?? item?.subtotal ?? price * quantity) || 0;
+            const row = {
+                productId,
+                productTitle: String(item?.productTitle || item?.name || 'Product').trim() || 'Product',
+                quantity,
+                price,
+                subTotal,
+                image: resolveImageString(item?.image),
+                productType: item?.productType === 'variable' ? 'variable' : 'simple',
+                variationId: item?.variationId ? String(item.variationId) : null,
+            };
+            if (item?.variation && typeof item.variation === 'object') {
+                row.variation = {
+                    attributes: Array.isArray(item.variation.attributes) ? item.variation.attributes : [],
+                    sku: item.variation.sku ? String(item.variation.sku) : '',
+                    image: resolveImageString(item.variation.image),
+                };
+            }
+            if (item?.size) row.size = String(item.size);
+            if (item?.weight) row.weight = String(item.weight);
+            if (item?.ram) row.ram = String(item.ram);
+            if (item?.vendor) row.vendor = item.vendor;
+            if (item?.vendorId) row.vendorId = item.vendorId;
+            if (item?.vendorShopName) row.vendorShopName = String(item.vendorShopName);
+            return row;
+        })
+        .filter((row) => row.productId);
+}
 // PayPal removed - using Stripe for payments
 // import paypal from "@paypal/checkout-server-sdk";
 import OrderConfirmationEmail from "../utils/orderEmailTemplate.js";
@@ -14,16 +59,19 @@ import { sendVendorNewOrder } from "../utils/vendorEmails.js";
 
 export const createOrderController = async (request, response) => {
     try {
+        const userId = request.body.userId || request.userId || null;
+        const normalizedProducts = normalizeOrderProducts(request.body.products);
+
         console.log('📦 Order creation request received:', {
-            hasUserId: !!request.body.userId,
+            hasUserId: !!userId,
             isGuestOrder: !!request.body.guestCustomer,
-            productsCount: request.body.products?.length || 0,
+            productsCount: normalizedProducts.length,
             paymentId: request.body.paymentId || 'N/A',
             payment_status: request.body.payment_status || 'N/A'
         });
 
         // Validate required fields
-        if (!request.body.products || !Array.isArray(request.body.products) || request.body.products.length === 0) {
+        if (!normalizedProducts.length) {
             console.error('❌ Order creation failed: No products provided');
             return response.status(400).json({
                 error: true,
@@ -32,8 +80,10 @@ export const createOrderController = async (request, response) => {
             });
         }
 
-        // Handle guest checkout
-        const isGuestOrder = request.body.isGuestOrder || (!request.body.userId && request.body.guestCustomer);
+        // Authenticated users from JWT must not be treated as guests
+        const isGuestOrder = userId
+            ? false
+            : Boolean(request.body.isGuestOrder ?? request.body.guestCustomer);
         
         // Validate guest customer data if it's a guest order
         if (isGuestOrder && !request.body.guestCustomer) {
@@ -47,9 +97,12 @@ export const createOrderController = async (request, response) => {
         
         // Calculate total amount including shipping
         const shippingCost = request.body.shippingCost || 0;
-        const productsTotal = request.body.products?.reduce((sum, item) => {
-            return sum + (parseFloat(item.price || item.subTotal || 0) * (item.quantity || 1));
-        }, 0) || 0;
+        const productsTotal = normalizedProducts.reduce((sum, item) => {
+            const lineTotal =
+                Number(item.subTotal) ||
+                Number(item.price || 0) * Number(item.quantity || 1);
+            return sum + lineTotal;
+        }, 0);
         const calculatedTotal = productsTotal + shippingCost;
         // Use provided totalAmt if it exists and is valid, otherwise calculate it
         const finalTotal = (request.body.totalAmt && request.body.totalAmt > 0) 
@@ -101,12 +154,17 @@ export const createOrderController = async (request, response) => {
             };
         }
 
+        let deliveryAddressId = request.body.delivery_address;
+        if (deliveryAddressId && !mongoose.Types.ObjectId.isValid(String(deliveryAddressId))) {
+            deliveryAddressId = null;
+        }
+
         let order = new OrderModel({
-            userId: request.body.userId || null,
-            products: request.body.products,
+            userId: userId || null,
+            products: normalizedProducts,
             paymentId: request.body.paymentId,
             payment_status: request.body.payment_status,
-            delivery_address: request.body.delivery_address,
+            delivery_address: deliveryAddressId,
             totalAmt: finalTotal, // Ensure shipping is included
             shippingCost: shippingCost,
             shippingRate: request.body.shippingRate || null,
@@ -118,8 +176,8 @@ export const createOrderController = async (request, response) => {
             deliveryNote: request.body.deliveryNote || '',
             date: request.body.date,
             // Guest checkout fields
-            isGuestOrder: isGuestOrder,
-            guestCustomer: request.body.guestCustomer || null,
+            isGuestOrder,
+            guestCustomer: isGuestOrder ? (request.body.guestCustomer || null) : null,
             // Discount information
             discounts: request.body.discounts || null,
             // Status tracking
@@ -140,7 +198,7 @@ export const createOrderController = async (request, response) => {
             return response.status(500).json({
                 error: true,
                 success: false,
-                message: 'Failed to save order to database',
+                message: saveError.message || 'Failed to save order to database',
                 details: process.env.NODE_ENV === 'development' ? saveError.message : undefined
             });
         }
@@ -413,6 +471,74 @@ export const createOrderController = async (request, response) => {
     }
 }
 
+
+export async function getOrderByIdController(request, response) {
+    try {
+        const orderId = request.params.orderId || request.params.id;
+        if (!orderId || !mongoose.Types.ObjectId.isValid(String(orderId))) {
+            return sendError(response, 400, 'Invalid order id');
+        }
+
+        const order = await OrderModel.findById(orderId)
+            .populate('delivery_address userId')
+            .lean();
+
+        if (!order) {
+            return sendError(response, 404, 'Order not found');
+        }
+
+        const requestUserId = request.userId ? String(request.userId) : null;
+        const orderUserId = order.userId?._id
+            ? String(order.userId._id)
+            : order.userId
+              ? String(order.userId)
+              : null;
+
+        if (requestUserId && orderUserId && requestUserId !== orderUserId) {
+            return sendError(response, 403, 'You do not have access to this order');
+        }
+
+        return sendSuccess(response, 200, 'Order details', order);
+    } catch (error) {
+        return sendError(response, 500, error.message || 'Failed to fetch order');
+    }
+}
+
+export async function confirmOrderPaymentController(request, response) {
+    try {
+        const orderId = request.params.orderId || request.params.id;
+        if (!orderId || !mongoose.Types.ObjectId.isValid(String(orderId))) {
+            return sendError(response, 400, 'Invalid order id');
+        }
+
+        const order = await OrderModel.findById(orderId);
+        if (!order) {
+            return sendError(response, 404, 'Order not found');
+        }
+
+        const requestUserId = request.userId ? String(request.userId) : null;
+        const orderUserId = order.userId ? String(order.userId) : null;
+        if (requestUserId && orderUserId && requestUserId !== orderUserId) {
+            return sendError(response, 403, 'You do not have access to this order');
+        }
+
+        const { sessionId, paymentIntentId } = request.body || {};
+        const paymentRef = sessionId || paymentIntentId || order.paymentId;
+
+        order.payment_status = 'paid';
+        if (paymentRef) order.paymentId = paymentRef;
+
+        await order.save();
+
+        return sendSuccess(response, 200, 'Payment confirmed', {
+            orderId: String(order._id),
+            payment_status: order.payment_status,
+            paymentId: order.paymentId,
+        });
+    } catch (error) {
+        return sendError(response, 500, error.message || 'Failed to confirm payment');
+    }
+}
 
 export async function getOrderDetailsController(request, response) {
     try {

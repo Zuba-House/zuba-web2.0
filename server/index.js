@@ -58,7 +58,9 @@ const allowedOrigins = [
   'https://zubahouse.com',
   'https://www.zubahouse.com',
   'https://admin.zubahouse.com',
+  'https://www.admin.zubahouse.com',
   'https://mobileapp.zubahouse.com',
+  'https://appadmin-rho.vercel.app',
   'https://vendor.zubahouse.com',
   'https://api.zubahouse.com',
   env.frontendUrl,
@@ -73,6 +75,15 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
+    // Allow any zubahouse.com subdomain (custom domains, admin mirrors, etc.)
+    try {
+      const { hostname, protocol } = new URL(origin);
+      if (protocol === 'https:' && (hostname === 'zubahouse.com' || hostname.endsWith('.zubahouse.com'))) {
+        return callback(null, true);
+      }
+    } catch {
+      // ignore malformed origin
+    }
     // Allow any Vercel deployment
     if (origin.includes('.vercel.app')) {
       return callback(null, true);
@@ -81,13 +92,20 @@ app.use(cors({
     if (origin.includes('.onrender.com')) {
       return callback(null, true);
     }
-    // Log rejected origin for debugging
+    // Log rejected origin (null,false avoids 500 on preflight)
     console.log('CORS blocked origin:', origin);
-    return callback(new Error('Not allowed by CORS'), false);
+    return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'X-Device-Session-Id',
+  ],
+  optionsSuccessStatus: 204,
 }));
 
 // Security & Middleware

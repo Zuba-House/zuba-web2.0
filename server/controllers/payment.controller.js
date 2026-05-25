@@ -1,5 +1,7 @@
 import Stripe from "stripe";
 import dotenv from "dotenv";
+import { sendError, sendSuccess } from "../utils/response.js";
+import { env } from "../config/env.js";
 dotenv.config();
 
 // Initialize Stripe with validation
@@ -154,6 +156,119 @@ export const getStripeAccountInfo = async (req, res) => {
       error: 'Failed to retrieve Stripe account info', 
       detail: err && err.message ? err.message : String(err),
       configured: false
+    });
+  }
+};
+
+function stripeRequestOptions() {
+  const options = {};
+  if (isOrgKey(process.env.STRIPE_SECRET_KEY)) {
+    const targetAccount = process.env.STRIPE_TARGET_ACCOUNT || process.env.STRIPE_ACCOUNT;
+    if (targetAccount) {
+      options.stripeAccount = targetAccount;
+    }
+  }
+  return options;
+}
+
+function defaultCheckoutUrls(orderId) {
+  const base = env.apiUrl || env.backendUrl || 'https://zuba-api.onrender.com';
+  return {
+    success: `${base}/payment-success?orderId=${encodeURIComponent(orderId || '')}&session_id={CHECKOUT_SESSION_ID}`,
+    cancel: `${base}/payment-cancel?orderId=${encodeURIComponent(orderId || '')}`,
+  };
+}
+
+// POST /api/stripe/create-checkout-session
+export const createCheckoutSession = async (req, res) => {
+  try {
+    if (!stripe) {
+      return sendError(res, 500, 'Payment processing unavailable', { code: 'STRIPE_NOT_CONFIGURED' });
+    }
+
+    const { amount, orderId, successUrl, cancelUrl, metadata = {} } = req.body || {};
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return sendError(res, 400, 'Invalid amount. Amount must be a positive number.');
+    }
+    if (!orderId) {
+      return sendError(res, 400, 'orderId is required');
+    }
+
+    const defaults = defaultCheckoutUrls(orderId);
+    const currency = (process.env.CURRENCY || process.env.STRIPE_CURRENCY || 'USD').toLowerCase();
+    const stripeOptions = stripeRequestOptions();
+
+    const sessionParams = {
+      mode: 'payment',
+      line_items: [
+        {
+          price_data: {
+            currency,
+            product_data: {
+              name: `Zuba House Order ${String(orderId).slice(-8).toUpperCase()}`,
+            },
+            unit_amount: Math.round(numericAmount * 100),
+          },
+          quantity: 1,
+        },
+      ],
+      success_url: successUrl || defaults.success,
+      cancel_url: cancelUrl || defaults.cancel,
+      metadata: {
+        orderId: String(orderId),
+        ...Object.fromEntries(
+          Object.entries(metadata).map(([k, v]) => [k, String(v ?? '')])
+        ),
+      },
+    };
+
+    const session = stripeOptions.stripeAccount
+      ? await stripe.checkout.sessions.create(sessionParams, stripeOptions)
+      : await stripe.checkout.sessions.create(sessionParams);
+
+    return sendSuccess(res, 200, 'Checkout session created', {
+      url: session.url,
+      sessionId: session.id,
+      paymentIntentId: typeof session.payment_intent === 'string'
+        ? session.payment_intent
+        : session.payment_intent?.id || null,
+    });
+  } catch (err) {
+    console.error('[Stripe] createCheckoutSession error:', err?.message || err);
+    return sendError(res, 500, err?.message || 'Failed to create checkout session', {
+      code: err?.code || 'STRIPE_ERROR',
+    });
+  }
+};
+
+// GET /api/stripe/checkout-status/:sessionId
+export const getCheckoutStatus = async (req, res) => {
+  try {
+    if (!stripe) {
+      return sendError(res, 500, 'Payment processing unavailable', { code: 'STRIPE_NOT_CONFIGURED' });
+    }
+
+    const sessionId = req.params.sessionId;
+    if (!sessionId) {
+      return sendError(res, 400, 'sessionId is required');
+    }
+
+    const stripeOptions = stripeRequestOptions();
+    const session = stripeOptions.stripeAccount
+      ? await stripe.checkout.sessions.retrieve(sessionId, stripeOptions)
+      : await stripe.checkout.sessions.retrieve(sessionId);
+
+    return sendSuccess(res, 200, 'Checkout session status', {
+      status: session.status,
+      paymentStatus: session.payment_status,
+      amountTotal: (session.amount_total || 0) / 100,
+      currency: session.currency,
+    });
+  } catch (err) {
+    console.error('[Stripe] getCheckoutStatus error:', err?.message || err);
+    return sendError(res, 500, err?.message || 'Failed to retrieve checkout status', {
+      code: err?.code || 'STRIPE_ERROR',
     });
   }
 };
