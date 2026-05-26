@@ -200,6 +200,11 @@ const orderSchema = new mongoose.Schema({
         type : String,
         default : ""
     },
+    /** Stock + confirmation emails sent only after payment (see orderFulfillment.service). */
+    fulfillmentCompleted: {
+        type: Boolean,
+        default: false,
+    },
     order_status : {
         type : String,
         default : "confirm"
