@@ -1,7 +1,12 @@
 import OrderModel from '../models/order.model.js';
+import UserModel from '../models/user.model.js';
 import { env } from '../config/env.js';
 import { sendError, sendSuccess } from '../utils/response.js';
 import { markOrderPaid } from '../services/orderPayment.service.js';
+import {
+  getOrCreateStripeCustomer,
+  listSavedCardPaymentMethods,
+} from '../services/stripeCustomer.service.js';
 import {
   getStripe,
   getStripeCurrency,
@@ -41,7 +46,14 @@ export const createPaymentIntent = async (req, res) => {
     const ready = await assertStripeReady(res);
     if (ready !== true) return;
 
-    const { amount, orderId } = req.body || {};
+    const {
+      amount,
+      orderId,
+      saveCard,
+      customerEmail,
+      customerName,
+      paymentMethodId,
+    } = req.body || {};
     if (!amount || isNaN(amount) || Number(amount) <= 0) {
       return sendError(res, 400, 'Invalid amount. Amount must be a positive number.');
     }
@@ -53,6 +65,12 @@ export const createPaymentIntent = async (req, res) => {
       }
     }
 
+    const userId = req.userId || null;
+    let stripeCustomerId = null;
+    if (userId) {
+      stripeCustomerId = await getOrCreateStripeCustomer(userId, customerEmail, customerName);
+    }
+
     const currency = getStripeCurrency();
     const paymentIntent = await stripeCall((s, opts) => {
       const piParams = {
@@ -62,8 +80,22 @@ export const createPaymentIntent = async (req, res) => {
         metadata: {
           source: 'zuba_mobile',
           ...(orderId ? { orderId: String(orderId) } : {}),
+          ...(userId ? { userId: String(userId) } : {}),
         },
       };
+
+      if (stripeCustomerId) {
+        piParams.customer = stripeCustomerId;
+      }
+
+      if (saveCard && stripeCustomerId) {
+        piParams.setup_future_usage = 'off_session';
+      }
+
+      if (paymentMethodId && stripeCustomerId) {
+        piParams.payment_method = String(paymentMethodId);
+      }
+
       return opts.stripeAccount
         ? s.paymentIntents.create(piParams, opts)
         : s.paymentIntents.create(piParams);
@@ -77,6 +109,31 @@ export const createPaymentIntent = async (req, res) => {
     });
   } catch (err) {
     console.error('[Stripe] createPaymentIntent:', err?.message || err);
+    const mapped = mapStripeError(err);
+    return res.status(mapped.status).json(mapped.body);
+  }
+};
+
+/** GET /api/stripe/saved-payment-methods — logged-in customer's saved cards */
+export const getSavedPaymentMethods = async (req, res) => {
+  try {
+    const ready = await assertStripeReady(res);
+    if (ready !== true) return;
+
+    const userId = req.userId;
+    if (!userId) {
+      return sendError(res, 401, 'Authentication required');
+    }
+
+    const user = await UserModel.findById(userId).select('stripeCustomerId email name');
+    if (!user?.stripeCustomerId) {
+      return sendSuccess(res, 200, 'No saved payment methods', { paymentMethods: [] });
+    }
+
+    const paymentMethods = await listSavedCardPaymentMethods(user.stripeCustomerId);
+    return sendSuccess(res, 200, 'Saved payment methods', { paymentMethods });
+  } catch (err) {
+    console.error('[Stripe] getSavedPaymentMethods:', err?.message || err);
     const mapped = mapStripeError(err);
     return res.status(mapped.status).json(mapped.body);
   }
