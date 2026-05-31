@@ -101,8 +101,11 @@ export const createPaymentIntent = async (req, res) => {
         : s.paymentIntents.create(piParams);
     });
 
-    return res.status(200).json({
-      success: true,
+    if (!paymentIntent?.client_secret) {
+      return sendError(res, 500, 'Failed to create payment intent. Please try again.', { code: 'STRIPE_INTENT_INCOMPLETE' });
+    }
+
+    return sendSuccess(res, 200, 'Payment intent created', {
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
       id: paymentIntent.id,
