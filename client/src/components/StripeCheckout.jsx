@@ -9,6 +9,7 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
+import { unwrapApiResponse } from "../utils/unwrapApiResponse";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
@@ -19,6 +20,11 @@ function getAuthHeaders() {
     headers.Authorization = `Bearer ${token}`;
   }
   return headers;
+}
+
+function extractClientSecret(res) {
+  const payload = unwrapApiResponse(res?.data);
+  return payload?.clientSecret || payload?.client_secret || "";
 }
 
 
@@ -44,8 +50,14 @@ function StripeForm({ amount, onPaid, onFailed, onProcessingChange, onReady }) {
     axios
       .post(`${api}/api/stripe/create-payment-intent`, { amount }, { headers: getAuthHeaders() })
       .then((res) => {
-        console.log("✅ Payment intent created:", res.data.clientSecret.substring(0, 20) + "...");
-        setClientSecret(res.data.clientSecret);
+        const secret = extractClientSecret(res);
+        if (!secret) {
+          setClientSecret("");
+          setIntentError("Payment could not be initialized. Please refresh and try again.");
+          return;
+        }
+        console.log("Payment intent created:", secret.slice(0, 20) + "...");
+        setClientSecret(secret);
       })
       .catch((err) => {
         console.error("Failed to create payment intent:", err.response?.data || err.message);
@@ -109,9 +121,12 @@ function StripeForm({ amount, onPaid, onFailed, onProcessingChange, onReady }) {
         const api = import.meta.env.VITE_API_URL;
         console.log('💳 Creating payment intent for amount:', amount);
         const res = await axios.post(`${api}/api/stripe/create-payment-intent`, { amount }, { headers: getAuthHeaders() });
-        secret = res?.data?.clientSecret || "";
+        secret = extractClientSecret(res);
         setClientSecret(secret);
-        console.log('✅ Payment intent created');
+        if (!secret) {
+          throw new Error("Payment could not be initialized. Please try again.");
+        }
+        console.log('Payment intent created');
       }
     } catch (err) {
       console.error("Failed to create payment intent on submit:", err.response?.data || err.message);
