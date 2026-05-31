@@ -27,7 +27,15 @@ const Login = () => {
   const context  = useContext(MyContext);
   const history = useNavigate();
 
- 
+  const getPostLoginPath = () => {
+    const params = new URLSearchParams(location.search);
+    const redirect = params.get('redirect') || location.state?.from;
+    if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+      return redirect;
+    }
+    return '/';
+  };
+
   useEffect(()=>{
     window.scrollTo(0,0);
     
@@ -42,7 +50,7 @@ const Login = () => {
     // If there's a token and user is marked as logged in, redirect to home
     // If user is on login page, they might have a corrupted session - don't auto-redirect
     if (token !== undefined && token !== null && token !== "" && context?.isLogin && context?.userData) {
-      history("/");
+      history(getPostLoginPath());
     }
     
     // If there's a token but no user data, the session might be corrupted
@@ -149,7 +157,7 @@ const Login = () => {
             }, 1000);
           } else {
             // Regular user login - redirect to home
-            history("/");
+            history(getPostLoginPath());
           }
         } else {
           context.alertBox("error", res?.message);
@@ -217,7 +225,7 @@ const Login = () => {
                   context.mergeGuestCartWithServer();
                 }
     
-                history("/")
+                history(getPostLoginPath())
               } else {
                 context.alertBox("error", res?.message);
                 setIsLoading(false);

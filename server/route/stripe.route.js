@@ -11,7 +11,7 @@ import {
 
 const router = express.Router();
 
-router.post("/create-payment-intent", optionalAuth, createPaymentIntent);
+router.post("/create-payment-intent", auth, createPaymentIntent);
 router.get("/saved-payment-methods", auth, getSavedPaymentMethods);
 router.post("/create-checkout-session", createCheckoutSession);
 router.get("/checkout-status/:sessionId", getCheckoutStatus);

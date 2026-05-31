@@ -12,12 +12,23 @@ import {
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
+function getAuthHeaders() {
+  const token = localStorage.getItem("accessToken");
+  const headers = { "Content-Type": "application/json" };
+  if (token && token !== "undefined" && token !== "null") {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+
 function StripeForm({ amount, onPaid, onFailed, onProcessingChange, onReady }) {
   const stripe = useStripe();
   const elements = useElements();
   const [clientSecret, setClientSecret] = useState("");
   const [processing, setProcessing] = useState(false);
   const [creatingIntent, setCreatingIntent] = useState(false);
+  const [intentError, setIntentError] = useState("");
 
   useEffect(() => {
     const api = import.meta.env.VITE_API_URL;
@@ -28,16 +39,19 @@ function StripeForm({ amount, onPaid, onFailed, onProcessingChange, onReady }) {
       return;
     }
     
-    console.log("💰 Creating payment intent for amount:", amount);
+    setIntentError("");
+    console.log("Creating payment intent for amount:", amount);
     axios
-      .post(`${api}/api/stripe/create-payment-intent`, { amount })
+      .post(`${api}/api/stripe/create-payment-intent`, { amount }, { headers: getAuthHeaders() })
       .then((res) => {
         console.log("✅ Payment intent created:", res.data.clientSecret.substring(0, 20) + "...");
         setClientSecret(res.data.clientSecret);
       })
       .catch((err) => {
-        console.error("❌ Failed to create payment intent:", err.response?.data || err.message);
+        console.error("Failed to create payment intent:", err.response?.data || err.message);
         setClientSecret("");
+        const msg = err.response?.data?.message || err.message || "Failed to initialize payment.";
+        setIntentError(msg);
       });
   }, [amount]);
 
@@ -94,7 +108,7 @@ function StripeForm({ amount, onPaid, onFailed, onProcessingChange, onReady }) {
         setCreatingIntent(true);
         const api = import.meta.env.VITE_API_URL;
         console.log('💳 Creating payment intent for amount:', amount);
-        const res = await axios.post(`${api}/api/stripe/create-payment-intent`, { amount });
+        const res = await axios.post(`${api}/api/stripe/create-payment-intent`, { amount }, { headers: getAuthHeaders() });
         secret = res?.data?.clientSecret || "";
         setClientSecret(secret);
         console.log('✅ Payment intent created');
@@ -138,87 +152,96 @@ function StripeForm({ amount, onPaid, onFailed, onProcessingChange, onReady }) {
       alert('Card form not ready. Please try again.');
       return;
     }
-    
-    console.log('💳 Confirming payment with Stripe...');
-    const result = await stripe.confirmCardPayment(secret, { payment_method: { card } });
-    setProcessing(false);
+    console.log('Confirming payment with Stripe...');
+    try {
+      const result = await stripe.confirmCardPayment(secret, { payment_method: { card } });
+      const { error, paymentIntent } = result || {};
 
-    const { error, paymentIntent } = result || {};
-
-    if (error) {
-      console.error("Stripe payment failed:", error);
-      try {
-        const maybePromise = onFailed?.(error);
-        if (maybePromise && typeof maybePromise.then === 'function') {
-          await maybePromise;
-        }
-      } catch (e) {
-        console.error('Error in onFailed handler:', e);
-      }
-      window.location.href = "/order/failed";
-      return;
-    }
-
-    if (paymentIntent) {
-      console.log('✅ Payment Intent received:', {
-        id: paymentIntent.id,
-        status: paymentIntent.status,
-        amount: paymentIntent.amount
-      });
-      
-      if (paymentIntent.status === 'succeeded') {
-        console.log('✅ Payment succeeded, calling onPaid handler...');
+      if (error) {
+        console.error("Stripe payment failed:", error);
         try {
-          const maybePromise = onPaid?.(paymentIntent);
+          const maybePromise = onFailed?.(error);
           if (maybePromise && typeof maybePromise.then === 'function') {
             await maybePromise;
-            console.log('✅ onPaid handler completed');
-          } else if (onPaid) {
-            // If it's not a promise, just call it
-            onPaid(paymentIntent);
           }
-          
-          // FALLBACK: If redirect didn't happen after 3 seconds, force it
-          setTimeout(() => {
-            if (window.location.pathname !== '/order/success' && window.location.pathname !== '/order/failed') {
-              console.warn('⚠️ onPaid handler did not redirect, forcing redirect to success...');
-              window.location.href = "/order/success";
-            }
-          }, 3000);
         } catch (e) {
-          console.error('❌ Error in onPaid handler:', e);
-          // Even if handler fails, payment succeeded - redirect to success
-          console.log('⚠️ onPaid handler failed, but payment succeeded. Redirecting to success page...');
-          setTimeout(() => {
-            window.location.href = "/order/success";
-          }, 500);
+          console.error('Error in onFailed handler:', e);
         }
-        // onPaid handler will redirect to success when it finishes
+        window.location.href = "/order/failed";
         return;
       }
 
-      // Any other status treat as failure (e.g., requires_action not completed)
-      console.warn('PaymentIntent not succeeded:', paymentIntent.status);
-      const pseudoError = { message: 'Payment not completed', payment_intent: paymentIntent };
-      try {
-        const maybePromise = onFailed?.(pseudoError);
-        if (maybePromise && typeof maybePromise.then === 'function') {
-          await maybePromise;
+      if (paymentIntent) {
+        console.log('Payment Intent received:', {
+          id: paymentIntent.id,
+          status: paymentIntent.status,
+          amount: paymentIntent.amount
+        });
+
+        if (paymentIntent.status === 'succeeded') {
+          console.log('Payment succeeded, calling onPaid handler...');
+          setProcessing(true);
+          try {
+            const maybePromise = onPaid?.(paymentIntent);
+            if (maybePromise && typeof maybePromise.then === 'function') {
+              await maybePromise;
+              console.log('onPaid handler completed');
+            } else if (onPaid) {
+              onPaid(paymentIntent);
+            }
+
+            setTimeout(() => {
+              if (window.location.pathname !== '/order/success' && window.location.pathname !== '/order/failed') {
+                console.warn('onPaid handler did not redirect, forcing redirect to success...');
+                window.location.href = "/order/success";
+              }
+            }, 3000);
+          } catch (e) {
+            console.error('Error in onPaid handler:', e);
+            setTimeout(() => {
+              window.location.href = "/order/success";
+            }, 500);
+          } finally {
+            setProcessing(false);
+          }
+          return;
         }
+
+        console.warn('PaymentIntent not succeeded:', paymentIntent.status);
+        const pseudoError = { message: 'Payment not completed', payment_intent: paymentIntent };
+        try {
+          const maybePromise = onFailed?.(pseudoError);
+          if (maybePromise && typeof maybePromise.then === 'function') {
+            await maybePromise;
+          }
+        } catch (e) {
+          console.error('Error in onFailed handler:', e);
+        }
+        window.location.href = "/order/failed";
+        return;
+      }
+    } catch (confirmErr) {
+      console.error('Stripe confirmCardPayment error:', confirmErr);
+      try {
+        await onFailed?.(confirmErr);
       } catch (e) {
         console.error('Error in onFailed handler:', e);
       }
-      window.location.href = "/order/failed";
-      return;
+      alert('Payment confirmation failed. Please try again.');
+    } finally {
+      setProcessing(false);
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 w-full">
       <CardElement className="p-3 border rounded" />
+      {intentError ? (
+        <p className="text-sm text-red-600" role="alert">{intentError}</p>
+      ) : null}
       <button
         type="submit"
-        disabled={!stripe || processing || !amount || amount <= 0}
+        disabled={!stripe || processing || creatingIntent || !amount || amount <= 0}
         className="btn-org btn-lg w-full"
       >
         {processing || creatingIntent ? "Processing..." : "Place Order"}

@@ -24,7 +24,7 @@ export const addToCartItemController = async (request, response) => {
             return response.status(401).json({
                 error: true,
                 success: false,
-                message: "Please login to add items to cart. Guest checkout is available at checkout page."
+                message: "Please login to add items to cart."
             });
         }
         

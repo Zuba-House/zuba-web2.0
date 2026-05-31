@@ -15,8 +15,8 @@ import {
 
 const orderRouter = Router();
 
-// Guest checkout - use optionalAuth (allows both guests and logged-in users)
-orderRouter.post('/create', optionalAuth, createOrderController)
+// Order creation requires authentication
+orderRouter.post('/create', auth, createOrderController)
 orderRouter.post('/confirm-payment/:orderId', optionalAuth, confirmOrderPaymentController)
 orderRouter.get("/order-list", auth, getOrderDetailsController)
 orderRouter.put('/order-status/:id', auth, updateOrderStatusController)

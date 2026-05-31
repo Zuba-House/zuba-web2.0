@@ -62,7 +62,23 @@ import { isStripeConfigured, stripeCall } from "../services/stripeClient.js";
 
 export const createOrderController = async (request, response) => {
     try {
-        const userId = request.body.userId || request.userId || null;
+        if (request.body.isGuestOrder && !request.userId) {
+            return response.status(401).json({
+                error: true,
+                success: false,
+                message: 'Authentication required to place an order',
+            });
+        }
+
+        if (!request.userId) {
+            return response.status(401).json({
+                error: true,
+                success: false,
+                message: 'Authentication required to place an order',
+            });
+        }
+
+        const userId = request.userId;
         const normalizedProducts = normalizeOrderProducts(request.body.products);
 
         console.log('📦 Order creation request received:', {
@@ -82,23 +98,9 @@ export const createOrderController = async (request, response) => {
                 message: 'Products are required to create an order'
             });
         }
+        const isGuestOrder = false;
 
-        // Authenticated users from JWT must not be treated as guests
-        const isGuestOrder = userId
-            ? false
-            : Boolean(request.body.isGuestOrder ?? request.body.guestCustomer);
-        
-        // Validate guest customer data if it's a guest order
-        if (isGuestOrder && !request.body.guestCustomer) {
-            console.error('❌ Order creation failed: Guest order requires guestCustomer data');
-            return response.status(400).json({
-                error: true,
-                success: false,
-                message: 'Guest customer information is required'
-            });
-        }
-        
-        // Calculate total amount including shipping
+// Calculate total amount including shipping
         const shippingCost = request.body.shippingCost || 0;
         const productsTotal = normalizedProducts.reduce((sum, item) => {
             const lineTotal =

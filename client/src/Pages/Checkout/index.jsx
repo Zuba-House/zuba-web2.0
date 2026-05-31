@@ -4,7 +4,7 @@ import React, { useContext, useEffect, useState } from "react";
 import { Button } from "@mui/material";
 import { MyContext } from '../../App';
 import { Link } from "react-router-dom";
-import { fetchDataFromApi, postData, postPublicData, deleteData } from "../../utils/api";
+import { fetchDataFromApi, postData, deleteData } from "../../utils/api";
 import axios from 'axios';
 import { useNavigate, useLocation } from "react-router-dom";
 import CircularProgress from '@mui/material/CircularProgress';
@@ -49,14 +49,11 @@ const Checkout = () => {
       return;
     }
     
-    // Allow guest checkout - don't require login
-    // Guest checkout is supported by the order controller
-    if (context?.isLogin && context?.userData) {
-      setUserData(context?.userData);
-    } else {
-      // Guest user - set userData to null (will use guest customer info)
-      setUserData(null);
+    if (!context?.isLogin || !context?.userData?._id) {
+      history("/login?redirect=/checkout", { state: { from: "/checkout" } });
+      return;
     }
+    setUserData(context.userData);
     
     // Get address, phone, and shipping rate from location state (passed from Cart page)
     if (location.state?.shippingAddress) {
@@ -197,20 +194,11 @@ const Checkout = () => {
     return true;
   };
 
-
-  const handleStripeSuccess = async (paymentIntent) => {
-    // Prevent double-click / multiple submissions
-    if (isProcessingOrder) {
-      console.log('⚠️ Order is already being processed, please wait...');
-      return;
-    }
-
-    // Validate cart before proceeding
+  const validateCheckoutBeforePayment = async () => {
     if (!validateCartStock()) {
-      return;
+      return false;
     }
 
-    // Validate shipping address and rate
     const shippingRateValue = selectedShippingRate
       ? (selectedShippingRate.cost ?? selectedShippingRate.price)
       : null;
@@ -223,37 +211,49 @@ const Checkout = () => {
 
     if (!hasValidShippingRate) {
       context?.alertBox("error", "Please select a shipping method");
-      return;
+      return false;
     }
 
-    // Validate phone number
     if (!phone || phone.trim() === '') {
       context?.alertBox("error", "Phone number is required for shipping");
       setPhoneError('Phone number is required');
-      return;
+      return false;
     }
 
-    // Validate phone, but be lenient - if it has at least 10 digits, allow it
     const phoneDigits = phone.replace(/\D/g, '');
     if (phoneDigits.length < 10) {
       context?.alertBox("error", "Please enter a valid phone number (at least 10 digits)");
-      return;
+      return false;
     }
-    
-    // Try to validate phone, but don't block if validation service fails
+
     const phoneValid = await validatePhone(phone);
     if (!phoneValid && phoneDigits.length >= 10) {
-      // Phone has enough digits, allow to proceed even if validation service failed
-      console.warn('⚠️ Phone validation failed but phone has sufficient digits, allowing to proceed');
+      console.warn('Phone validation failed but phone has sufficient digits, allowing to proceed');
     } else if (!phoneValid) {
       context?.alertBox("error", "Please enter a valid phone number");
+      return false;
+    }
+
+    if (!shippingAddress || !shippingAddress.city || !shippingAddress.countryCode) {
+      context.alertBox("error", "Shipping address is required. Please go back to cart and enter your address.");
+      history("/cart");
+      return false;
+    }
+
+    return true;
+  };
+
+
+  const handleStripeSuccess = async (paymentIntent) => {
+    if (isProcessingOrder) {
+      console.log('Order is already being processed, please wait...');
       return;
     }
 
     const user = context?.userData;
-    if (!shippingAddress || !shippingAddress.city || !shippingAddress.countryCode) {
-      context.alertBox("error", "Shipping address is required. Please go back to cart and enter your address.");
-      history("/cart");
+    if (!user?._id) {
+      context?.alertBox("error", "You must be logged in to complete your order.");
+      history("/login?redirect=/checkout");
       return;
     }
 
@@ -347,34 +347,16 @@ const Checkout = () => {
       setIsProcessingOrder(false);
       return;
     }
-
-    // Prepare guest customer data if user is not logged in
-    const isGuestOrder = !user?._id;
     const resolvedEmail = (
       customerEmail ||
       location.state?.customerEmail ||
       user?.email ||
-      context?.userData?.email ||
       ''
     ).trim();
 
-    if (isGuestOrder && !resolvedEmail) {
-      context.alertBox("error", "Email is required for guest checkout. Please go back to cart and enter your email.");
-      setIsProcessingOrder(false);
-      history("/cart");
-      return;
-    }
-
-    const guestCustomer = isGuestOrder ? {
-      name: customerName,
-      phone: phone,
-      email: resolvedEmail
-    } : null;
-
     const payLoad = {
-      userId: user?._id || null,
-      isGuestOrder: isGuestOrder,
-      guestCustomer: guestCustomer,
+      userId: user._id,
+      isGuestOrder: false,
       products: formattedProducts, // Use formatted products instead of raw cartData
       paymentId: paymentIntent?.id || '',
       payment_status: "COMPLETED",
@@ -423,18 +405,8 @@ const Checkout = () => {
         }))
       });
       
-      const createOrderRequest = isGuestOrder
-        ? () => postPublicData('/api/order/create', payLoad)
-        : () => postData('/api/order/create', payLoad);
+      let res = await postData('/api/order/create', payLoad);
 
-      let res = await createOrderRequest();
-
-      // Stale tokens can block order creation after payment — retry without auth for everyone
-      if (res?.isAuthError) {
-        console.warn('⚠️ Order hit auth error, retrying without token...');
-        res = await postPublicData('/api/order/create', payLoad);
-      }
-      
       console.log('📦 Order creation response:', res);
       console.log('📦 Response error field:', res?.error);
       console.log('📦 Response success field:', res?.success);
@@ -680,6 +652,15 @@ const Checkout = () => {
   }
 
   return (
+    <>
+      {isProcessingOrder && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg p-6 flex flex-col items-center gap-3 shadow-lg">
+            <CircularProgress size={40} />
+            <p className="text-[15px] font-[600]">Processing your order...</p>
+          </div>
+        </div>
+      )}
     <section className="checkout-page py-3 lg:py-10 px-3">
       <div>
         <div className="checkout-page-layout w-full lg:w-[70%] m-auto flex flex-col md:flex-row gap-5">
@@ -875,14 +856,20 @@ const Checkout = () => {
                 <div className="flex flex-col w-full items-center gap-3 mt-3">
                   <Button
                     className="btn-org btn-lg w-full flex gap-2 items-center"
-                    onClick={() => {
-                      setShowStripeForm((prev) => !prev);
+                    onClick={async () => {
+                      if (showStripeForm) {
+                        setShowStripeForm(false);
+                        return;
+                      }
+                      const ok = await validateCheckoutBeforePayment();
+                      if (!ok) return;
+                      setShowStripeForm(true);
                       setTimeout(() => {
                         const el = document.getElementById("stripe-payment-box");
                         if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
                       }, 600);
                     }}
-                    disabled={isPaying}
+                    disabled={isPaying || isProcessingOrder}
                   >
                     {showStripeForm ? "Hide Card Form" : "Place Order (Card)"}
                   </Button>
@@ -943,6 +930,7 @@ const Checkout = () => {
         </div>
       </div>
     </section>
+    </>
   );
 };
 

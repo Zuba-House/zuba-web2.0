@@ -577,6 +577,11 @@ const CartPage = () => {
                 Number(shippingValue) >= 0;
               
               const handleCheckoutClick = async () => {
+                if (!context?.isLogin || !context?.userData?._id) {
+                  context?.alertBox("error", "Please sign in to place an order");
+                  history("/login?redirect=/checkout");
+                  return;
+                }
                 const isLoggedIn = context?.isLogin && context?.userData;
                 const orderEmail = (customerEmail || context?.userData?.email || '').trim();
 
@@ -674,24 +679,29 @@ const CartPage = () => {
                   </Button>
                 );
               }
-              
-              // Show checkout button - allow guest checkout
-              return (
-                <div className="flex flex-col gap-3">
-                  {!isLoggedIn && (
-                    <div className="p-2 bg-blue-50 border border-blue-200 rounded-md text-center">
-                      <p className="text-[12px] text-blue-800">
-                        💡 <Link to="/login" className="text-primary font-[600] underline">Login</Link> to save your cart and track orders, or continue as guest
-                      </p>
+              if (!isLoggedIn) {
+                return (
+                  <div className="flex flex-col gap-3">
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-center">
+                      <p className="text-[13px] text-amber-900 mb-0">Please sign in to place an order.</p>
                     </div>
-                  )}
-                  <Button 
-                    className="btn-org btn-lg w-full flex gap-2"
-                    onClick={handleCheckoutClick}
-                  >
-                    <BsFillBagCheckFill className="text-[20px]" /> Proceed to Checkout
-                  </Button>
-                </div>
+                    <Button
+                      className="btn-org btn-lg w-full flex gap-2"
+                      onClick={() => history("/login?redirect=/checkout")}
+                    >
+                      Sign In to Checkout
+                    </Button>
+                  </div>
+                );
+              }
+
+              return (
+                <Button
+                  className="btn-org btn-lg w-full flex gap-2"
+                  onClick={handleCheckoutClick}
+                >
+                  <BsFillBagCheckFill className="text-[20px]" /> Proceed to Checkout
+                </Button>
               );
             })()}
           </div>

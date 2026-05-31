@@ -72,8 +72,9 @@ const Header = () => {
     "/my-account",
     "/my-orders",
     "/my-list",
-    "/address"
-    // Note: "/cart" and "/checkout" are NOT protected - guests can shop and checkout
+    "/address",
+    "/checkout"
+    // Note: "/cart" is not protected - guests can shop; checkout requires login
   ];
 
   useEffect(() => {
