@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
+import { unwrapApiResponse, apiOk, getAccessToken } from '../../utils/apiResponse';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://zuba-api.onrender.com';
 
@@ -30,46 +31,47 @@ const Login = () => {
         password
       });
 
-      if (response.data?.error === false && response.data?.data?.accesstoken) {
-        const token = response.data.data.accesstoken;
-        const refreshToken = response.data.data.refreshToken;
-        
-        // Store tokens
+      const body = unwrapApiResponse(response.data);
+      const token = getAccessToken(response.data);
+
+      if (apiOk(body) && token) {
+        const refreshToken = body.refreshToken;
+
         localStorage.setItem('accessToken', token);
-        localStorage.setItem('refreshToken', refreshToken);
-        
-        // Decode token to get user info
+        if (refreshToken) {
+          localStorage.setItem('refreshToken', refreshToken);
+        }
+
         try {
           const decoded = jwtDecode(token);
-          localStorage.setItem('userRole', decoded.role || 'VENDOR');
+          localStorage.setItem('userRole', decoded.role || body.user?.role || 'VENDOR');
           if (decoded.vendorId) {
             localStorage.setItem('vendorId', decoded.vendorId);
           }
         } catch (decodeError) {
           console.error('Token decode error:', decodeError);
+          localStorage.setItem('userRole', body.user?.role || 'VENDOR');
         }
 
-        // Store user and vendor info
-        if (response.data.data.user) {
-          localStorage.setItem('user', JSON.stringify(response.data.data.user));
+        if (body.user) {
+          localStorage.setItem('user', JSON.stringify(body.user));
         }
-        if (response.data.data.vendor) {
-          localStorage.setItem('vendor', JSON.stringify(response.data.data.vendor));
+        if (body.vendor) {
+          localStorage.setItem('vendor', JSON.stringify(body.vendor));
         }
 
-        // Check vendor status
-        const vendorStatus = response.data.data.vendor?.status;
+        const vendorStatus = body.vendor?.status;
         if (vendorStatus === 'PENDING') {
           toast.success('Login successful! Your vendor account is pending approval.');
         } else if (vendorStatus === 'APPROVED') {
           toast.success('Login successful!');
         } else {
-          toast.success('Login successful!');
+          toast.success(body.message || 'Login successful!');
         }
-        
+
         navigate('/dashboard');
       } else {
-        toast.error(response.data?.message || 'Login failed');
+        toast.error(body?.message || response.data?.message || 'Login failed');
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Login failed. Please check your credentials.';

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
+import { unwrapApiResponse, apiOk, getAccessToken } from '../../utils/apiResponse';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://zuba-api.onrender.com';
 
@@ -44,8 +45,9 @@ const Register = () => {
         email: email.toLowerCase().trim()
       });
 
-        if (response.data?.error === false) {
-        if (response.data?.data?.emailVerified) {
+      const body = unwrapApiResponse(response.data);
+      if (apiOk(body)) {
+        if (body.emailVerified) {
           // Email already verified
           setEmailVerified(true);
           setFormData(prev => ({ ...prev, email: email.toLowerCase().trim() }));
@@ -56,11 +58,11 @@ const Register = () => {
           setOtpSent(true);
           
           // Check if email was actually sent
-          if (response.data?.data?.emailSent) {
+          if (body.emailSent) {
             toast.success('Verification code sent to your email! Check your inbox (and spam folder).');
           } else {
             // Email service issue - show OTP if available (local development)
-            const localOtp = response.data?.data?.otp || response.data?.data?.debugOtp;
+            const localOtp = body.otp || body.debugOtp;
             if (localOtp) {
               // Auto-fill the OTP for convenience
               setOtp(localOtp);
@@ -75,7 +77,7 @@ const Register = () => {
           }
         }
       } else {
-        toast.error(response.data?.message || 'Failed to send verification code');
+        toast.error(body?.message || response.data?.message || 'Failed to send verification code');
       }
     } catch (error) {
       const errorData = error.response?.data;
@@ -111,13 +113,14 @@ const Register = () => {
         otp: otp.trim()
       });
 
-      if (response.data?.error === false) {
+      const body = unwrapApiResponse(response.data);
+      if (apiOk(body)) {
         setEmailVerified(true);
         setFormData(prev => ({ ...prev, email: email.toLowerCase().trim() }));
         toast.success('Email verified successfully!');
         setTimeout(() => setStep(2), 1000);
       } else {
-        toast.error(response.data?.message || 'Invalid verification code');
+        toast.error(body?.message || response.data?.message || 'Invalid verification code');
       }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Invalid verification code');
@@ -200,40 +203,39 @@ const Register = () => {
         postalCode: formData.postalCode
       });
 
-      if (response.data?.error === false) {
-        // Save tokens if provided (for auto-login)
-        if (response.data?.data?.accesstoken) {
-          localStorage.setItem('accessToken', response.data.data.accesstoken);
-          if (response.data.data.refreshToken) {
-            localStorage.setItem('refreshToken', response.data.data.refreshToken);
+      const body = unwrapApiResponse(response.data);
+      if (apiOk(body)) {
+        const token = getAccessToken(response.data);
+        if (token) {
+          localStorage.setItem('accessToken', token);
+          if (body.refreshToken) {
+            localStorage.setItem('refreshToken', body.refreshToken);
           }
-          
-          // Store user and vendor info
-          if (response.data.data.user) {
-            localStorage.setItem('user', JSON.stringify(response.data.data.user));
-            localStorage.setItem('userRole', response.data.data.user.role || 'VENDOR');
+
+          if (body.user) {
+            localStorage.setItem('user', JSON.stringify(body.user));
+            localStorage.setItem('userRole', body.user.role || 'VENDOR');
           }
-          if (response.data.data.vendor) {
-            localStorage.setItem('vendor', JSON.stringify(response.data.data.vendor));
-            if (response.data.data.vendorId) {
-              localStorage.setItem('vendorId', response.data.data.vendorId);
+          if (body.vendor) {
+            localStorage.setItem('vendor', JSON.stringify(body.vendor));
+            if (body.vendorId) {
+              localStorage.setItem('vendorId', body.vendorId);
             }
           }
-          
-          toast.success(response.data?.message || 'Application submitted successfully! Redirecting to dashboard...');
+
+          toast.success(body.message || response.data?.message || 'Application submitted successfully! Redirecting to dashboard...');
           setTimeout(() => navigate('/dashboard'), 2000);
         } else {
-          toast.success(response.data?.message || 'Application submitted successfully! Please login.');
+          toast.success(body.message || response.data?.message || 'Application submitted successfully! Please login.');
           setTimeout(() => navigate('/login'), 2000);
         }
       } else {
-        // Check if email verification is required
-        if (response.data?.data?.requiresEmailVerification) {
+        if (body.requiresEmailVerification) {
           toast.error('Please verify your email first');
           setEmailVerified(false);
           setStep(1);
         } else {
-          toast.error(response.data?.message || 'Registration failed');
+          toast.error(body?.message || response.data?.message || 'Registration failed');
         }
       }
     } catch (error) {

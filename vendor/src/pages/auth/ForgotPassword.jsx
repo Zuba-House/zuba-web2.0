@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
+import { unwrapApiResponse, apiOk } from '../../utils/apiResponse';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://zuba-api.onrender.com';
 
@@ -30,11 +31,11 @@ const ForgotPassword = () => {
         email: email.toLowerCase().trim()
       });
 
-      if (response.data?.error === false) {
+      if (apiOk(unwrapApiResponse(response.data))) {
         toast.success('If an account exists, you will receive a reset code.');
         setStep(2);
       } else {
-        toast.error(response.data?.message || 'Failed to send reset code');
+        toast.error(unwrapApiResponse(response.data)?.message || response.data?.message || 'Failed to send reset code');
       }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to send reset code');
@@ -70,11 +71,11 @@ const ForgotPassword = () => {
         newPassword
       });
 
-      if (response.data?.error === false) {
+      if (apiOk(unwrapApiResponse(response.data))) {
         toast.success('Password reset successful! Please login.');
         setTimeout(() => navigate('/login'), 2000);
       } else {
-        toast.error(response.data?.message || 'Failed to reset password');
+        toast.error(unwrapApiResponse(response.data)?.message || response.data?.message || 'Failed to reset password');
       }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to reset password');
@@ -91,11 +92,11 @@ const ForgotPassword = () => {
         email: email.toLowerCase().trim()
       });
 
-      if (response.data?.error === false) {
+      if (apiOk(unwrapApiResponse(response.data))) {
         toast.success('New reset code sent to your email');
         setOtp('');
       } else {
-        toast.error(response.data?.message || 'Failed to resend code');
+        toast.error(unwrapApiResponse(response.data)?.message || response.data?.message || 'Failed to resend code');
       }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to resend code');
