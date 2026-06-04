@@ -1,9 +1,30 @@
+import mongoose from 'mongoose';
 import ProductModel from '../models/product.model.js';
 import VendorModel from '../models/vendor.model.js';
 import { 
   sendAdminProductSubmission, 
   sendVendorProductSubmitted 
 } from '../utils/vendorEmails.js';
+
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(String(id));
+
+const getSortOption = (sort) => {
+  switch (sort) {
+    case 'oldest':
+      return { createdAt: 1 };
+    case 'name_asc':
+      return { name: 1 };
+    case 'name_desc':
+      return { name: -1 };
+    case 'price_low':
+      return { 'pricing.price': 1 };
+    case 'price_high':
+      return { 'pricing.price': -1 };
+    case 'newest':
+    default:
+      return { createdAt: -1 };
+  }
+};
 
 /**
  * GET /api/vendor/products
@@ -129,6 +150,164 @@ export const create = async (req, res) => {
 };
 
 /**
+ * GET /api/vendor/products/available
+ * List platform products not yet claimed by any vendor
+ */
+export const listAvailable = async (req, res) => {
+  try {
+    const { page = 1, limit = 20, search = '', category, sort = 'newest' } = req.query;
+
+    const filter = {
+      vendor: null,
+      vendorId: null,
+      status: 'published',
+      $or: [
+        { approvalStatus: 'APPROVED' },
+        { approvalStatus: { $exists: false } },
+        { productOwnerType: 'PLATFORM' }
+      ]
+    };
+
+    if (search) {
+      filter.$and = [
+        {
+          $or: [
+            { name: { $regex: search, $options: 'i' } },
+            { sku: { $regex: search, $options: 'i' } },
+            { description: { $regex: search, $options: 'i' } }
+          ]
+        }
+      ];
+    }
+
+    if (category) {
+      filter.$and = [
+        ...(filter.$and || []),
+        {
+          $or: [
+            { category },
+            { categories: category }
+          ]
+        }
+      ];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const sortOption = getSortOption(sort);
+
+    const [items, total] = await Promise.all([
+      ProductModel.find(filter)
+        .sort(sortOption)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .populate('category', 'name slug')
+        .populate('categories', 'name slug')
+        .lean(),
+      ProductModel.countDocuments(filter)
+    ]);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      data: {
+        items,
+        total,
+        page: Number(page),
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('vendorProduct.listAvailable error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+/**
+ * POST /api/vendor/products/:id/claim
+ * Claim an unassigned platform product for the current vendor
+ */
+export const claim = async (req, res) => {
+  try {
+    const vendorId = req.vendorId;
+    const productId = req.params.id;
+
+    if (!isValidObjectId(productId)) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Invalid product ID format'
+      });
+    }
+
+    const vendor = await VendorModel.findById(vendorId);
+    if (!vendor) {
+      return res.status(404).json({
+        error: true,
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    const product = await ProductModel.findOneAndUpdate(
+      {
+        _id: productId,
+        vendor: null,
+        vendorId: null
+      },
+      {
+        $set: {
+          vendor: vendorId,
+          vendorId,
+          vendorShopName: vendor.storeName || '',
+          productOwnerType: 'VENDOR',
+          approvalStatus: 'APPROVED'
+        }
+      },
+      { new: true, runValidators: true }
+    )
+      .populate('category', 'name slug')
+      .populate('categories', 'name slug');
+
+    if (!product) {
+      const existing = await ProductModel.findById(productId);
+      if (!existing) {
+        return res.status(404).json({
+          error: true,
+          success: false,
+          message: 'Product not found'
+        });
+      }
+
+      return res.status(409).json({
+        error: true,
+        success: false,
+        message: 'This product has already been claimed by another vendor'
+      });
+    }
+
+    console.log(`🏪 Product claimed by vendor ${vendor.storeName}: ${product.name} (ID: ${productId})`);
+
+    return res.status(200).json({
+      error: false,
+      success: true,
+      message: 'Product added to your store successfully!',
+      data: product
+    });
+  } catch (error) {
+    console.error('vendorProduct.claim error:', error);
+    return res.status(500).json({
+      error: true,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+/**
  * GET /api/vendor/products/:id
  * Get single product (vendor-scoped)
  */
@@ -136,6 +315,14 @@ export const get = async (req, res) => {
   try {
     const vendorId = req.vendorId;
     const productId = req.params.id;
+
+    if (!isValidObjectId(productId)) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Invalid product ID format'
+      });
+    }
 
     const product = await ProductModel.findOne({
       _id: productId,
@@ -176,6 +363,14 @@ export const update = async (req, res) => {
     const vendorId = req.vendorId;
     const productId = req.params.id;
     const updates = req.body;
+
+    if (!isValidObjectId(productId)) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Invalid product ID format'
+      });
+    }
 
     // Remove fields vendor shouldn't change
     delete updates.vendor;
@@ -227,6 +422,14 @@ export const remove = async (req, res) => {
   try {
     const vendorId = req.vendorId;
     const productId = req.params.id;
+
+    if (!isValidObjectId(productId)) {
+      return res.status(400).json({
+        error: true,
+        success: false,
+        message: 'Invalid product ID format'
+      });
+    }
 
     // Find the product first to verify ownership
     const product = await ProductModel.findOne({

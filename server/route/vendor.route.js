@@ -47,6 +47,8 @@ router.get('/dashboard', vendorController.getDashboardStats);
 // Products
 router.get('/products', vendorProductController.list);
 router.post('/products', vendorProductController.create);
+router.get('/products/available', vendorProductController.listAvailable); // Must be before :id route
+router.post('/products/:id/claim', vendorProductController.claim);
 router.get('/products/:id', vendorProductController.get);
 router.put('/products/:id', vendorProductController.update);
 router.delete('/products/:id', vendorProductController.remove);
