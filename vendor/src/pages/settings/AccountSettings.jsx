@@ -374,7 +374,7 @@ const AccountSettings = () => {
               </p>
               
               <p className="text-sm text-gray-500 mt-3">Commission Rate</p>
-              <p className="font-medium text-gray-800">{profile?.commissionRate || 10}%</p>
+              <p className="font-medium text-gray-800">{profile?.commissionRate ?? profile?.commissionValue ?? 15}%</p>
             </div>
           </div>
 

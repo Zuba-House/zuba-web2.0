@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import connectDB from './config/connectDb.js';
+import { seedOwnItDemoData } from './services/ownItDemoSeed.service.js';
 import { validateEnv } from './config/validateEnv.js';
 import { env } from './config/env.js';
 import responseNormalizer from './middlewares/responseNormalizer.js';
@@ -274,6 +275,15 @@ const startServer = async () => {
 
   await connectDB();
   console.log('✅ MongoDB connected successfully');
+
+  try {
+    const seedResult = await seedOwnItDemoData();
+    if (seedResult?.seeded) {
+      console.log('✅ Own It demo data seeded on startup');
+    }
+  } catch (seedError) {
+    console.error('⚠️ Own It demo seed failed (server continues):', seedError.message);
+  }
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on port ${PORT}`);

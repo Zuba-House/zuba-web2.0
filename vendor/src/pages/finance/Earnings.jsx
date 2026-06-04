@@ -156,8 +156,8 @@ const Earnings = () => {
             <p className="text-gray-300 mt-1">Platform commission on each sale</p>
           </div>
           <div className="text-right">
-            <p className="text-4xl font-bold text-[#efb291]">{summary?.commissionRate || 10}%</p>
-            <p className="text-gray-300 text-sm">You keep {100 - (summary?.commissionRate || 10)}%</p>
+            <p className="text-4xl font-bold text-[#efb291]">{summary?.commissionRate ?? 15}%</p>
+            <p className="text-gray-300 text-sm">You keep {100 - (summary?.commissionRate ?? 15)}%</p>
           </div>
         </div>
       </div>

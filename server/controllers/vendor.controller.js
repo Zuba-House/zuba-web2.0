@@ -1030,7 +1030,10 @@ export const getMyProfile = async (req, res) => {
     return res.status(200).json({
       error: false,
       success: true,
-      data: vendor
+      data: {
+        ...vendor.toObject(),
+        commissionRate: vendor.commissionValue ?? 15
+      }
     });
   } catch (error) {
     console.error('getMyProfile error:', error);
@@ -1199,7 +1202,7 @@ export const getDashboardStats = async (req, res) => {
     const totalProducts = await ProductModel.countDocuments({ vendor: vendorId });
     const publishedProducts = await ProductModel.countDocuments({
       vendor: vendorId,
-      status: 'PUBLISHED',
+      status: 'published',
       approvalStatus: 'APPROVED'
     });
 

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "seed:ownit-demo": "node scripts/seedOwnItDemoData.js"
   },
   "dependencies": {
     "@easypost/api": "^8.3.0",

@@ -209,13 +209,13 @@ const AnalyticsOverview = () => {
               <div>
                 <p className="text-gray-300 text-sm">Platform Commission</p>
                 <p className="text-2xl font-bold text-[#efb291]">
-                  {stats?.vendor?.commissionRate || 10}%
+                  {stats?.vendor?.commissionRate ?? stats?.vendor?.commissionValue ?? 15}%
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-gray-300 text-sm">Your Share</p>
                 <p className="text-2xl font-bold">
-                  {100 - (stats?.vendor?.commissionRate || 10)}%
+                  {100 - (stats?.vendor?.commissionRate ?? stats?.vendor?.commissionValue ?? 15)}%
                 </p>
               </div>
             </div>
