@@ -28,18 +28,23 @@ export async function cleanupOwnItDemoData() {
 
   const hadDemo = deletedOrders.deletedCount > 0 || deletedPayouts.deletedCount > 0;
 
-  await VendorModel.findByIdAndUpdate(vendor._id, {
-    $set: {
-      commissionType: 'PERCENT',
-      commissionValue: COMMISSION_RATE,
+  const vendorUpdate = {
+    commissionType: 'PERCENT',
+    commissionValue: COMMISSION_RATE
+  };
+
+  if (hadDemo) {
+    Object.assign(vendorUpdate, {
       totalEarnings: 0,
       availableBalance: 0,
       withdrawnAmount: 0,
       pendingBalance: 0,
       totalSales: 0,
       'stats.totalOrders': 0
-    }
-  });
+    });
+  }
+
+  await VendorModel.findByIdAndUpdate(vendor._id, { $set: vendorUpdate });
 
   if (hadDemo) {
     console.log(
