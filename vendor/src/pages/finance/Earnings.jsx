@@ -23,8 +23,14 @@ const Earnings = () => {
         vendorApi.getFinanceSummary(),
         vendorApi.getPayouts({ limit: 5 })
       ]);
-      setSummary(summaryRes.data.data);
-      setRecentPayouts(payoutsRes.data.data?.items || []);
+      const financeData = summaryRes.data.data || {};
+      setSummary(financeData.summary || {});
+      setRecentPayouts(
+        financeData.recentPayouts ||
+        payoutsRes.data.data?.items ||
+        payoutsRes.data.data?.payouts ||
+        []
+      );
     } catch (error) {
       console.error('Fetch financial data error:', error);
       toast.error('Failed to load financial data');
@@ -77,8 +83,8 @@ const Earnings = () => {
   const earningCards = [
     {
       title: 'Total Sales',
-      value: formatCurrency(summary?.totalSales),
-      description: 'Lifetime gross sales',
+      value: formatCurrency(summary?.totalGrossSales ?? summary?.totalSales),
+      description: `${summary?.productsSold || 0} products sold (gross, USD)`,
       icon: <DollarSign className="w-6 h-6" />,
       color: 'bg-blue-500',
       bgLight: 'bg-blue-50',
@@ -86,8 +92,8 @@ const Earnings = () => {
     },
     {
       title: 'Total Earnings',
-      value: formatCurrency(summary?.totalEarnings),
-      description: 'After platform commission',
+      value: formatCurrency(summary?.totalNetEarnings ?? summary?.totalEarnings),
+      description: `After ${summary?.commissionRate ?? 15}% Zuba House commission`,
       icon: <TrendingUp className="w-6 h-6" />,
       color: 'bg-green-500',
       bgLight: 'bg-green-50',
@@ -241,7 +247,7 @@ const Earnings = () => {
                       {formatCurrency(payout.amount)}
                     </td>
                     <td className="py-3 text-sm text-gray-700">
-                      {payout.paymentMethodSnapshot?.type || 'Bank Transfer'}
+                      {payout.paymentMethodSnapshot?.payoutMethod || payout.paymentMethodSnapshot?.type || 'Bank Transfer'}
                     </td>
                     <td className="py-3">
                       {getPayoutStatusBadge(payout.status)}

@@ -1207,7 +1207,35 @@ export const getDashboardStats = async (req, res) => {
     });
 
     // Get vendor for balance info
-    const vendor = await VendorModel.findById(vendorId).select('totalSales totalEarnings availableBalance pendingBalance');
+    const vendor = await VendorModel.findById(vendorId).select(
+      'totalSales totalEarnings availableBalance pendingBalance withdrawnAmount commissionValue commissionType storeName'
+    );
+
+    let totalGrossSales = 0;
+    let totalNetEarnings = 0;
+    let totalPlatformCommission = 0;
+    let productsSold = 0;
+    let deliveredNetEarnings = 0;
+
+    orders.forEach((order) => {
+      order.products.forEach((item) => {
+        const itemVendorId = item.vendor || item.vendorId;
+        if (itemVendorId && itemVendorId.toString() === String(vendorId)) {
+          const gross = item.subTotal || 0;
+          const net = item.vendorEarning ?? item.subTotal ?? 0;
+          totalGrossSales += gross;
+          totalNetEarnings += net;
+          totalPlatformCommission += item.commissionAmount ?? (gross - net);
+          productsSold += item.quantity || 1;
+          if (item.vendorStatus === 'DELIVERED') {
+            deliveredNetEarnings += net;
+          }
+        }
+      });
+    });
+
+    const round2 = (n) => parseFloat(Number(n).toFixed(2));
+    const commissionRate = vendor?.commissionValue ?? 15;
 
     return res.status(200).json({
       error: false,
@@ -1215,18 +1243,31 @@ export const getDashboardStats = async (req, res) => {
       data: {
         stats: {
           totalOrders,
-          totalRevenue,
+          totalRevenue: round2(totalNetEarnings),
+          totalGrossSales: round2(totalGrossSales),
+          totalPlatformCommission: round2(totalPlatformCommission),
+          productsSold,
           todayOrders,
-          todayRevenue,
+          todayRevenue: round2(todayRevenue),
           totalProducts,
           publishedProducts,
-          orderStatusCounts
+          orderStatusCounts,
+          commissionRate
         },
         earnings: {
-          totalSales: vendor?.totalSales || 0,
-          totalEarnings: vendor?.totalEarnings || 0,
+          totalSales: round2(totalGrossSales),
+          totalEarnings: vendor?.totalEarnings ?? round2(deliveredNetEarnings),
+          totalNetEarnings: round2(totalNetEarnings),
           availableBalance: vendor?.availableBalance || 0,
-          pendingBalance: vendor?.pendingBalance || 0
+          pendingBalance: vendor?.pendingBalance || 0,
+          totalWithdrawn: vendor?.withdrawnAmount || 0,
+          commissionRate,
+          productsSold,
+          platformCommission: round2(totalPlatformCommission)
+        },
+        vendor: {
+          commissionRate,
+          commissionValue: commissionRate
         }
       }
     });

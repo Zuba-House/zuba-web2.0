@@ -44,6 +44,7 @@ const AnalyticsOverview = () => {
 
   const orderStatusData = stats?.stats?.orderStatusCounts || {};
   const totalOrders = stats?.stats?.totalOrders || 0;
+  const commissionRate = stats?.vendor?.commissionRate ?? stats?.earnings?.commissionRate ?? 15;
 
   const orderStatusColors = {
     RECEIVED: { bg: 'bg-gray-500', label: 'Received' },
@@ -67,13 +68,13 @@ const AnalyticsOverview = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-gray-500 text-sm font-medium">Total Revenue</p>
+              <p className="text-gray-500 text-sm font-medium">Total Sales</p>
               <p className="text-2xl font-bold text-gray-800 mt-2">
-                {formatCurrency(stats?.stats?.totalRevenue)}
+                {formatCurrency(stats?.stats?.totalGrossSales ?? stats?.earnings?.totalSales)}
               </p>
               <div className="flex items-center mt-2 text-green-600 text-sm">
                 <TrendingUp className="w-4 h-4 mr-1" />
-                <span>{formatCurrency(stats?.stats?.todayRevenue)} today</span>
+                <span>{stats?.stats?.productsSold || 0} products sold</span>
               </div>
             </div>
             <div className="bg-green-50 text-green-600 p-3 rounded-lg">
@@ -178,15 +179,15 @@ const AnalyticsOverview = () => {
           
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-gray-500 text-sm">Total Sales</p>
+              <p className="text-gray-500 text-sm">Total Sales (Gross)</p>
               <p className="text-xl font-bold text-gray-800 mt-1">
-                {formatCurrency(stats?.earnings?.totalSales)}
+                {formatCurrency(stats?.stats?.totalGrossSales ?? stats?.earnings?.totalSales)}
               </p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-gray-500 text-sm">Total Earnings</p>
+              <p className="text-gray-500 text-sm">Your Earnings (Net)</p>
               <p className="text-xl font-bold text-gray-800 mt-1">
-                {formatCurrency(stats?.earnings?.totalEarnings)}
+                {formatCurrency(stats?.earnings?.totalNetEarnings ?? stats?.stats?.totalRevenue)}
               </p>
             </div>
             <div className="bg-green-50 rounded-lg p-4">
@@ -209,13 +210,13 @@ const AnalyticsOverview = () => {
               <div>
                 <p className="text-gray-300 text-sm">Platform Commission</p>
                 <p className="text-2xl font-bold text-[#efb291]">
-                  {stats?.vendor?.commissionRate ?? stats?.vendor?.commissionValue ?? 15}%
+                  {commissionRate}%
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-gray-300 text-sm">Your Share</p>
                 <p className="text-2xl font-bold">
-                  {100 - (stats?.vendor?.commissionRate ?? stats?.vendor?.commissionValue ?? 15)}%
+                  {100 - commissionRate}%
                 </p>
               </div>
             </div>
@@ -247,13 +248,11 @@ const AnalyticsOverview = () => {
           </div>
 
           <div className="text-center p-4 bg-gray-50 rounded-lg">
-            <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Package className="w-6 h-6 text-yellow-600" />
+            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Package className="w-6 h-6 text-purple-600" />
             </div>
-            <p className="text-2xl font-bold text-gray-800">
-              {(orderStatusData.PROCESSING || 0) + (orderStatusData.SHIPPED || 0)}
-            </p>
-            <p className="text-sm text-gray-500">In Progress</p>
+            <p className="text-2xl font-bold text-gray-800">{stats?.stats?.productsSold || totalOrders}</p>
+            <p className="text-sm text-gray-500">Products Sold</p>
           </div>
 
           <div className="text-center p-4 bg-gray-50 rounded-lg">

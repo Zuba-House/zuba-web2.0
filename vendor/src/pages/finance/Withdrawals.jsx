@@ -26,12 +26,14 @@ const Withdrawals = () => {
         vendorApi.getFinanceSummary(),
         vendorApi.getPayouts({ page: pagination.page, limit: 10 })
       ]);
-      setSummary(summaryRes.data.data);
-      setPayouts(payoutsRes.data.data?.items || []);
+      const financeData = summaryRes.data.data || {};
+      const payoutData = payoutsRes.data.data || {};
+      setSummary(financeData.summary || {});
+      setPayouts(payoutData.items || payoutData.payouts || []);
       setPagination({
-        page: payoutsRes.data.data?.page || 1,
-        pages: payoutsRes.data.data?.pages || 1,
-        total: payoutsRes.data.data?.total || 0,
+        page: payoutData.page || payoutData.pagination?.current || 1,
+        pages: payoutData.pages || payoutData.pagination?.pages || 1,
+        total: payoutData.total || payoutData.pagination?.total || 0,
       });
     } catch (error) {
       console.error('Fetch data error:', error);
@@ -236,14 +238,14 @@ const Withdrawals = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center text-sm text-gray-700">
                           <Building className="w-4 h-4 mr-2 text-gray-400" />
-                          {payout.paymentMethodSnapshot?.type || 'Bank Transfer'}
+                          {payout.paymentMethodSnapshot?.payoutMethod || payout.paymentMethodSnapshot?.type || 'Bank Transfer'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getStatusBadge(payout.status)}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
-                        {payout.adminNote || '-'}
+                        {payout.adminNote || payout.notes || '-'}
                       </td>
                     </tr>
                   ))}

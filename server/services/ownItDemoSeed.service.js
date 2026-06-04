@@ -6,16 +6,27 @@ import PayoutModel from '../models/payout.model.js';
 export const DEMO_PAYMENT_PREFIX = 'DEMO-OWNIT-';
 const COMMISSION_RATE = 15;
 
-const buildItem = (vendor, product, price, quantity, vendorStatus, daysAgo = 0) => {
-  const subTotal = parseFloat((price * quantity).toFixed(2));
-  const platformCommission = parseFloat(((subTotal * COMMISSION_RATE) / 100).toFixed(2));
-  const vendorEarning = parseFloat((subTotal - platformCommission).toFixed(2));
+/** Demo targets (USD, 15% Zuba House commission) */
+const DEMO = {
+  deliveredNet: 965.23,
+  pendingNet: 397.8,
+  withdrawn: 965.23
+};
+
+const round2 = (n) => parseFloat(Number(n).toFixed(2));
+const netFromGross = (gross) => round2(gross * (1 - COMMISSION_RATE / 100));
+const grossFromNet = (net) => round2(net / (1 - COMMISSION_RATE / 100));
+
+const buildItem = (vendor, product, gross, quantity, vendorStatus, daysAgo = 0) => {
+  const subTotal = round2(gross * quantity);
+  const platformCommission = round2((subTotal * COMMISSION_RATE) / 100);
+  const vendorEarning = round2(subTotal - platformCommission);
 
   return {
     productId: String(product._id),
     productTitle: product.name,
     quantity,
-    price,
+    price: gross,
     subTotal,
     image: product.featuredImage || product.images?.[0]?.url || '',
     vendor: vendor._id,
@@ -27,7 +38,7 @@ const buildItem = (vendor, product, price, quantity, vendorStatus, daysAgo = 0) 
     commissionAmount: platformCommission,
     commissionRate: COMMISSION_RATE,
     vendorEarning,
-    unitPrice: price,
+    unitPrice: gross,
     trackingNumber: vendorStatus === 'SHIPPED' ? `RW-DEMO-${Math.random().toString(36).slice(2, 8).toUpperCase()}` : '',
     shippedAt: vendorStatus === 'SHIPPED' ? new Date(Date.now() - daysAgo * 86400000) : null,
     deliveredAt: vendorStatus === 'DELIVERED' ? new Date(Date.now() - daysAgo * 86400000) : null
@@ -36,8 +47,8 @@ const buildItem = (vendor, product, price, quantity, vendorStatus, daysAgo = 0) 
 
 const buildOrder = (vendor, items, daysAgo, suffix) => {
   const createdAt = new Date(Date.now() - daysAgo * 86400000);
-  const totalAmt = items.reduce((sum, item) => sum + item.subTotal, 0);
-  const vendorEarning = items.reduce((sum, item) => sum + item.vendorEarning, 0);
+  const totalAmt = round2(items.reduce((sum, item) => sum + item.subTotal, 0));
+  const vendorEarning = round2(items.reduce((sum, item) => sum + item.vendorEarning, 0));
   const primaryStatus = items[0]?.vendorStatus || 'RECEIVED';
   const statusMap = {
     RECEIVED: 'Received',
@@ -72,14 +83,14 @@ const buildOrder = (vendor, items, daysAgo, suffix) => {
       vendorId: vendor._id,
       vendorShopName: vendor.storeName,
       totalAmount: totalAmt,
-      commission: parseFloat((totalAmt - vendorEarning).toFixed(2)),
+      commission: round2(totalAmt - vendorEarning),
       vendorEarning
     }],
     vendorSummary: [{
       vendor: vendor._id,
       vendorShopName: vendor.storeName,
       grossAmount: totalAmt,
-      commissionAmount: parseFloat((totalAmt - vendorEarning).toFixed(2)),
+      commissionAmount: round2(totalAmt - vendorEarning),
       netEarning: vendorEarning,
       payoutStatus: primaryStatus === 'DELIVERED' ? 'PAID' : 'PENDING',
       itemsCount: items.length
@@ -92,7 +103,19 @@ const buildOrder = (vendor, items, daysAgo, suffix) => {
   };
 };
 
-export async function seedOwnItDemoData() {
+const clearExistingDemoData = async (vendorId) => {
+  await OrderModel.deleteMany({ paymentId: { $regex: `^${DEMO_PAYMENT_PREFIX}` } });
+  await PayoutModel.deleteMany({
+    vendor: vendorId,
+    transactionRef: { $regex: /^DEMO-MOMO-OWNIT/ }
+  });
+};
+
+/**
+ * Seed / refresh demo data for Own It! (Rwanda, USD, 15% commission).
+ * Idempotent — removes old demo records and recreates balanced figures.
+ */
+export async function seedOwnItDemoData({ force = true } = {}) {
   const vendor = await VendorModel.findOne({
     storeName: { $regex: /own\s*it/i }
   });
@@ -106,9 +129,19 @@ export async function seedOwnItDemoData() {
     paymentId: { $regex: `^${DEMO_PAYMENT_PREFIX}` }
   });
 
-  if (existingDemoOrders > 0) {
-    console.log('Own It demo seed: demo data already present, skipping');
+  const needsReseed =
+    force ||
+    existingDemoOrders === 0 ||
+    Math.abs((vendor.totalEarnings || 0) - DEMO.deliveredNet) > 0.5 ||
+    (vendor.commissionValue ?? 10) !== COMMISSION_RATE;
+
+  if (!needsReseed) {
+    console.log('Own It demo seed: balances look correct, skipping');
     return { skipped: true, reason: 'already_seeded', vendorId: vendor._id };
+  }
+
+  if (existingDemoOrders > 0) {
+    await clearExistingDemoData(vendor._id);
   }
 
   const products = await ProductModel.find({ vendor: vendor._id }).limit(6);
@@ -119,33 +152,69 @@ export async function seedOwnItDemoData() {
 
   const p = (index) => products[index % products.length];
 
+  // Delivered — net $965.23 total (withdrawn via MoMo)
+  const deliveredItems = [
+    buildItem(vendor, p(0), 320, 1, 'DELIVERED', 45),
+    buildItem(vendor, p(1), 280, 1, 'DELIVERED', 38),
+    buildItem(vendor, p(2), 255.56, 1, 'DELIVERED', 30),
+    buildItem(vendor, p(3), 280, 1, 'DELIVERED', 22)
+  ];
+  const deliveredNetActual = round2(deliveredItems.reduce((s, item) => s + item.vendorEarning, 0));
+  const deliveredAdjust = round2(DEMO.deliveredNet - deliveredNetActual);
+  if (Math.abs(deliveredAdjust) > 0) {
+    const last = deliveredItems[3];
+    const grossBump = round2(deliveredAdjust / (1 - COMMISSION_RATE / 100));
+    last.subTotal = round2(last.subTotal + grossBump);
+    last.price = last.subTotal;
+    last.commissionAmount = round2((last.subTotal * COMMISSION_RATE) / 100);
+    last.vendorEarning = round2(last.subTotal - last.commissionAmount);
+    last.unitPrice = last.price;
+  }
+
+  // Pending — net $397.80 total
+  const pendingSpecs = [
+    { gross: 125, status: 'SHIPPED', days: 5, product: 4 },
+    { gross: 98, status: 'SHIPPED', days: 3, product: 5 },
+    { gross: 156, status: 'PROCESSING', days: 2, product: 0 },
+    { gross: 89, status: 'RECEIVED', days: 1, product: 1 }
+  ];
+  const pendingItems = pendingSpecs.map((spec) =>
+    buildItem(vendor, p(spec.product), spec.gross, 1, spec.status, spec.days)
+  );
+  const pendingNetActual = round2(pendingItems.reduce((s, item) => s + item.vendorEarning, 0));
+  const pendingAdjust = round2(DEMO.pendingNet - pendingNetActual);
+  if (pendingAdjust !== 0) {
+    const last = pendingItems[3];
+    const grossBump = round2(pendingAdjust / (1 - COMMISSION_RATE / 100));
+    last.subTotal = round2(last.subTotal + grossBump);
+    last.price = last.subTotal;
+    last.commissionAmount = round2((last.subTotal * COMMISSION_RATE) / 100);
+    last.vendorEarning = round2(last.subTotal - last.commissionAmount);
+    last.unitPrice = last.price;
+  }
+
   const demoOrders = [
-    buildOrder(vendor, [buildItem(vendor, p(0), 285.5, 1, 'DELIVERED', 45)], 45, '001'),
-    buildOrder(vendor, [buildItem(vendor, p(1), 312, 1, 'DELIVERED', 38)], 38, '002'),
-    buildOrder(vendor, [buildItem(vendor, p(2), 198.75, 1, 'DELIVERED', 30)], 30, '003'),
-    buildOrder(vendor, [buildItem(vendor, p(3), 339.31, 1, 'DELIVERED', 22)], 22, '004'),
-    buildOrder(vendor, [buildItem(vendor, p(4), 125, 1, 'SHIPPED', 5)], 5, '005'),
-    buildOrder(vendor, [buildItem(vendor, p(5), 98, 1, 'SHIPPED', 3)], 3, '006'),
-    buildOrder(vendor, [buildItem(vendor, p(0), 156, 1, 'PROCESSING', 2)], 2, '007'),
-    buildOrder(vendor, [buildItem(vendor, p(1), 89, 1, 'RECEIVED', 1)], 1, '008')
+    ...deliveredItems.map((item, i) => buildOrder(vendor, [item], 45 - i * 7, `D${i + 1}`)),
+    ...pendingItems.map((item, i) => buildOrder(vendor, [item], pendingSpecs[i].days, `P${i + 1}`))
   ];
 
   await OrderModel.insertMany(demoOrders);
 
-  const pendingEarnings = demoOrders
-    .flatMap((order) => order.products)
-    .filter((item) => item.vendorStatus !== 'DELIVERED')
-    .reduce((sum, item) => sum + item.vendorEarning, 0);
-
-  const totalDeliveredEarnings = 965.23;
+  const allItems = demoOrders.flatMap((o) => o.products);
+  const totalGross = round2(allItems.reduce((s, item) => s + item.subTotal, 0));
+  const totalNet = round2(allItems.reduce((s, item) => s + item.vendorEarning, 0));
+  const totalCommission = round2(totalGross - totalNet);
+  const productsSold = allItems.reduce((s, item) => s + (item.quantity || 1), 0);
+  const deliveredNet = round2(deliveredItems.reduce((s, item) => s + item.vendorEarning, 0));
+  const pendingNet = round2(pendingItems.reduce((s, item) => s + item.vendorEarning, 0));
 
   await PayoutModel.create({
     vendor: vendor._id,
-    amount: totalDeliveredEarnings,
+    amount: DEMO.withdrawn,
     currency: 'USD',
     status: 'PAID',
     requestedBy: vendor.ownerUser,
-    notes: 'Demo withdrawal - Mobile Money (MTN MoMo), Kigali, Rwanda',
+    notes: 'Demo withdrawal — MTN MoMo, Kigali, Rwanda',
     paymentMethodSnapshot: {
       payoutMethod: 'MOMO',
       accountName: vendor.storeName,
@@ -182,11 +251,11 @@ export async function seedOwnItDemoData() {
       city: 'Kigali',
       commissionType: 'PERCENT',
       commissionValue: COMMISSION_RATE,
-      totalEarnings: totalDeliveredEarnings,
+      totalEarnings: deliveredNet,
       availableBalance: 0,
-      withdrawnAmount: totalDeliveredEarnings,
-      pendingBalance: parseFloat(pendingEarnings.toFixed(2)),
-      totalSales: 4,
+      withdrawnAmount: DEMO.withdrawn,
+      pendingBalance: pendingNet,
+      totalSales: deliveredItems.length,
       payoutMethod: 'MOMO',
       isVerified: true,
       onboardingCompleted: true,
@@ -197,17 +266,23 @@ export async function seedOwnItDemoData() {
       },
       'stats.totalProducts': products.length,
       'stats.publishedProducts': publishedCount,
-      'stats.totalOrders': 8
+      'stats.totalOrders': demoOrders.length
     }
   });
 
-  console.log(`Own It demo seed complete for "${vendor.storeName}" (${vendor._id})`);
+  console.log(`Own It demo seed complete for "${vendor.storeName}"`);
   return {
     seeded: true,
     vendorId: vendor._id,
     orders: demoOrders.length,
-    totalEarnings: totalDeliveredEarnings,
-    pendingEarnings: parseFloat(pendingEarnings.toFixed(2))
+    productsSold,
+    totalGross,
+    totalNet,
+    totalCommission,
+    deliveredNet,
+    pendingNet,
+    withdrawn: DEMO.withdrawn,
+    commissionRate: COMMISSION_RATE
   };
 }
 

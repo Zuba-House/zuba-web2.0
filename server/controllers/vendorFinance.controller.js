@@ -60,6 +60,66 @@ export const summary = async (req, res) => {
 
     const pendingData = pendingEarningsResult[0] || { pendingEarnings: 0, pendingOrders: 0 };
 
+    const salesTotals = await OrderModel.aggregate([
+      {
+        $match: {
+          $or: [
+            { 'products.vendor': new mongoose.Types.ObjectId(vendorId) },
+            { 'products.vendorId': new mongoose.Types.ObjectId(vendorId) }
+          ]
+        }
+      },
+      { $unwind: '$products' },
+      {
+        $match: {
+          $or: [
+            { 'products.vendor': new mongoose.Types.ObjectId(vendorId) },
+            { 'products.vendorId': new mongoose.Types.ObjectId(vendorId) }
+          ]
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalGrossSales: { $sum: { $ifNull: ['$products.subTotal', 0] } },
+          totalNetEarnings: { $sum: { $ifNull: ['$products.vendorEarning', '$products.subTotal'] } },
+          totalPlatformCommission: {
+            $sum: {
+              $ifNull: [
+                '$products.commissionAmount',
+                {
+                  $multiply: [
+                    { $ifNull: ['$products.subTotal', 0] },
+                    { $divide: [{ $ifNull: ['$products.commissionValue', vendor.commissionValue || 15] }, 100] }
+                  ]
+                }
+              ]
+            }
+          },
+          productsSold: { $sum: { $ifNull: ['$products.quantity', 1] } },
+          totalOrders: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const salesData = salesTotals[0] || {
+      totalGrossSales: 0,
+      totalNetEarnings: 0,
+      totalPlatformCommission: 0,
+      productsSold: 0,
+      totalOrders: 0
+    };
+
+    const round2 = (n) => parseFloat(Number(n).toFixed(2));
+    const commissionRate = vendor.commissionValue ?? 15;
+    const pendingBalance = round2(pendingData.pendingEarnings || vendor.pendingBalance || 0);
+
+    // Keep vendor pending balance in sync with open orders
+    if (Math.abs((vendor.pendingBalance || 0) - pendingBalance) > 0.01) {
+      vendor.pendingBalance = pendingBalance;
+      await vendor.save();
+    }
+
     // Get recent delivered orders (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -151,10 +211,16 @@ export const summary = async (req, res) => {
       data: {
         summary: {
           availableBalance: vendor.availableBalance || 0,
-          pendingBalance: vendor.pendingBalance || 0,
+          pendingBalance,
           totalEarnings: vendor.totalEarnings || 0,
+          totalNetEarnings: round2(salesData.totalNetEarnings || 0),
+          totalSales: round2(salesData.totalGrossSales || 0),
+          totalGrossSales: round2(salesData.totalGrossSales || 0),
           totalWithdrawn: vendor.withdrawnAmount || 0,
-          commissionRate: vendor.commissionValue || 15,
+          platformCommission: round2(salesData.totalPlatformCommission || 0),
+          productsSold: salesData.productsSold || 0,
+          totalOrders: salesData.totalOrders || 0,
+          commissionRate,
           commissionType: vendor.commissionType || 'PERCENT'
         },
         stats: {
@@ -240,8 +306,12 @@ export const listPayouts = async (req, res) => {
       error: false,
       success: true,
       data: {
+        items: payouts,
         payouts,
         totals,
+        page: parseInt(page),
+        pages: Math.ceil(total / parseInt(limit)),
+        total,
         pagination: {
           current: parseInt(page),
           pages: Math.ceil(total / parseInt(limit)),
