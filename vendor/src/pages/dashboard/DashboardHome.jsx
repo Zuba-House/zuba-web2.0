@@ -72,16 +72,16 @@ const DashboardHome = () => {
     {
       title: 'Total Orders',
       value: stats.totalOrders || 0,
-      subtitle: `${stats.productsSold || 0} units sold · ${stats.todayOrders || 0} today`,
+      subtitle: `${stats.todayOrders || 0} today`,
       icon: <ShoppingCart className="w-5 h-5 md:w-6 md:h-6" />,
       color: 'bg-orange-500',
       bgLight: 'bg-orange-50',
       textColor: 'text-orange-600'
     },
     {
-      title: 'Total Sales',
-      value: formatCurrency(stats.totalGrossSales ?? earnings.totalSales),
-      subtitle: `${formatCurrency(stats.todayRevenue || 0)} today · lifetime gross`,
+      title: 'Total Revenue',
+      value: formatCurrency(stats.totalRevenue),
+      subtitle: `${formatCurrency(stats.todayRevenue)} today`,
       icon: <DollarSign className="w-5 h-5 md:w-6 md:h-6" />,
       color: 'bg-green-500',
       bgLight: 'bg-green-50',
@@ -167,10 +167,7 @@ const DashboardHome = () => {
 
       {/* Order Status Overview */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 md:p-4 lg:p-6 mb-4 md:mb-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-3 md:mb-4">
-          <h2 className="text-base md:text-lg lg:text-xl font-semibold text-gray-800">Order Status Overview</h2>
-          <p className="text-xs md:text-sm text-gray-500">All time · {stats.orderStatusCounts?.DELIVERED || 0} completed sales</p>
-        </div>
+        <h2 className="text-base md:text-lg lg:text-xl font-semibold text-gray-800 mb-3 md:mb-4">Order Status Overview</h2>
         <div className="grid grid-cols-3 md:grid-cols-5 gap-2 md:gap-4">
           {orderStatusCards.map((status) => (
             <div key={status.key} className={`${status.color} rounded-lg p-2 md:p-3 lg:p-4 text-center`}>
@@ -234,16 +231,16 @@ const DashboardHome = () => {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 lg:gap-4">
           <div className="bg-gray-50 rounded-lg p-2.5 md:p-3 lg:p-4">
-            <p className="text-gray-500 text-xs md:text-sm">Total Sales (Gross)</p>
+            <p className="text-gray-500 text-xs md:text-sm">Total Sales</p>
             <p className="text-base md:text-lg lg:text-xl font-bold text-gray-800 truncate">{formatCurrency(earnings.totalSales)}</p>
           </div>
           <div className="bg-gray-50 rounded-lg p-2.5 md:p-3 lg:p-4">
-            <p className="text-gray-500 text-xs md:text-sm">Your Earnings (Net)</p>
-            <p className="text-base md:text-lg lg:text-xl font-bold text-gray-800 truncate">{formatCurrency(earnings.totalNetEarnings ?? earnings.totalEarnings)}</p>
+            <p className="text-gray-500 text-xs md:text-sm">Total Earnings</p>
+            <p className="text-base md:text-lg lg:text-xl font-bold text-gray-800 truncate">{formatCurrency(earnings.totalEarnings)}</p>
           </div>
           <div className="bg-green-50 rounded-lg p-2.5 md:p-3 lg:p-4">
-            <p className="text-green-600 text-xs md:text-sm">Withdrawn</p>
-            <p className="text-base md:text-lg lg:text-xl font-bold text-green-700 truncate">{formatCurrency(earnings.totalWithdrawn)}</p>
+            <p className="text-green-600 text-xs md:text-sm">Available Balance</p>
+            <p className="text-base md:text-lg lg:text-xl font-bold text-green-700 truncate">{formatCurrency(earnings.availableBalance)}</p>
           </div>
           <div className="bg-yellow-50 rounded-lg p-2.5 md:p-3 lg:p-4">
             <p className="text-yellow-600 text-xs md:text-sm">Pending Balance</p>

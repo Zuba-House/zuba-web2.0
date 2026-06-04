@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Menu, LogOut, Bell, User } from 'lucide-react';
+import { Menu, LogOut, User } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 const Topbar = ({ isSidebarOpen, setIsSidebarOpen, isMobile }) => {
   const navigate = useNavigate();
@@ -57,11 +58,7 @@ const Topbar = ({ isSidebarOpen, setIsSidebarOpen, isMobile }) => {
       </div>
       
       <div className="flex items-center gap-2 md:gap-4">
-        {/* Notifications - hidden on very small screens */}
-        <button className="hidden sm:flex p-2 hover:bg-gray-100 rounded-lg transition-colors relative">
-          <Bell className="w-5 h-5 text-gray-600" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-        </button>
+        <NotificationBell />
         
         {/* User avatar - hidden on small screens */}
         <button className="hidden md:flex p-2 hover:bg-gray-100 rounded-lg transition-colors">
