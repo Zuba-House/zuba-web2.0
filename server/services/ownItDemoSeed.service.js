@@ -4,18 +4,17 @@ import OrderModel from '../models/order.model.js';
 import PayoutModel from '../models/payout.model.js';
 
 export const DEMO_PAYMENT_PREFIX = 'DEMO-OWNIT-';
+export const DEMO_SEED_VERSION = 3;
 const COMMISSION_RATE = 15;
 
-/** Demo targets (USD, 15% Zuba House commission) */
+/** Minimum demo order count — reseed if older seed had fewer */
+const MIN_DEMO_ORDERS = 24;
+
 const DEMO = {
-  deliveredNet: 965.23,
-  pendingNet: 397.8,
   withdrawn: 965.23
 };
 
 const round2 = (n) => parseFloat(Number(n).toFixed(2));
-const netFromGross = (gross) => round2(gross * (1 - COMMISSION_RATE / 100));
-const grossFromNet = (net) => round2(net / (1 - COMMISSION_RATE / 100));
 
 const buildItem = (vendor, product, gross, quantity, vendorStatus, daysAgo = 0) => {
   const subTotal = round2(gross * quantity);
@@ -103,6 +102,44 @@ const buildOrder = (vendor, items, daysAgo, suffix) => {
   };
 };
 
+/** Demo order plan — lifetime totals, includes today's activity (daysAgo: 0) */
+const ORDER_PLAN = [
+  // 16 completed sales (delivered)
+  { status: 'DELIVERED', gross: 89, qty: 1, daysAgo: 52, product: 0 },
+  { status: 'DELIVERED', gross: 95, qty: 1, daysAgo: 48, product: 1 },
+  { status: 'DELIVERED', gross: 72, qty: 2, daysAgo: 44, product: 2 },
+  { status: 'DELIVERED', gross: 110, qty: 1, daysAgo: 40, product: 3 },
+  { status: 'DELIVERED', gross: 88, qty: 1, daysAgo: 36, product: 4 },
+  { status: 'DELIVERED', gross: 102, qty: 1, daysAgo: 32, product: 5 },
+  { status: 'DELIVERED', gross: 76, qty: 1, daysAgo: 28, product: 0 },
+  { status: 'DELIVERED', gross: 98, qty: 2, daysAgo: 24, product: 1 },
+  { status: 'DELIVERED', gross: 85, qty: 1, daysAgo: 20, product: 2 },
+  { status: 'DELIVERED', gross: 118, qty: 1, daysAgo: 16, product: 3 },
+  { status: 'DELIVERED', gross: 92, qty: 1, daysAgo: 12, product: 4 },
+  { status: 'DELIVERED', gross: 105, qty: 1, daysAgo: 9, product: 5 },
+  { status: 'DELIVERED', gross: 78, qty: 1, daysAgo: 7, product: 0 },
+  { status: 'DELIVERED', gross: 96, qty: 1, daysAgo: 5, product: 1 },
+  { status: 'DELIVERED', gross: 112, qty: 1, daysAgo: 3, product: 2 },
+  { status: 'DELIVERED', gross: 68, qty: 1, daysAgo: 0, product: 3 }, // sale today
+
+  // 6 shipped (2 today)
+  { status: 'SHIPPED', gross: 125, qty: 1, daysAgo: 0, product: 4 },
+  { status: 'SHIPPED', gross: 98, qty: 1, daysAgo: 0, product: 5 },
+  { status: 'SHIPPED', gross: 142, qty: 2, daysAgo: 1, product: 0 },
+  { status: 'SHIPPED', gross: 87, qty: 1, daysAgo: 2, product: 1 },
+  { status: 'SHIPPED', gross: 115, qty: 1, daysAgo: 4, product: 2 },
+  { status: 'SHIPPED', gross: 93, qty: 1, daysAgo: 6, product: 3 },
+
+  // 3 processing (1 today)
+  { status: 'PROCESSING', gross: 156, qty: 1, daysAgo: 0, product: 4 },
+  { status: 'PROCESSING', gross: 134, qty: 1, daysAgo: 1, product: 5 },
+  { status: 'PROCESSING', gross: 88, qty: 2, daysAgo: 2, product: 0 },
+
+  // 2 new received (1 today)
+  { status: 'RECEIVED', gross: 79, qty: 1, daysAgo: 0, product: 1 },
+  { status: 'RECEIVED', gross: 64, qty: 1, daysAgo: 1, product: 2 }
+];
+
 const clearExistingDemoData = async (vendorId) => {
   await OrderModel.deleteMany({ paymentId: { $regex: `^${DEMO_PAYMENT_PREFIX}` } });
   await PayoutModel.deleteMany({
@@ -111,11 +148,7 @@ const clearExistingDemoData = async (vendorId) => {
   });
 };
 
-/**
- * Seed / refresh demo data for Own It! (Rwanda, USD, 15% commission).
- * Idempotent — removes old demo records and recreates balanced figures.
- */
-export async function seedOwnItDemoData({ force = true } = {}) {
+export async function seedOwnItDemoData({ force = false } = {}) {
   const vendor = await VendorModel.findOne({
     storeName: { $regex: /own\s*it/i }
   });
@@ -132,7 +165,7 @@ export async function seedOwnItDemoData({ force = true } = {}) {
   const needsReseed =
     force ||
     existingDemoOrders === 0 ||
-    Math.abs((vendor.totalEarnings || 0) - DEMO.deliveredNet) > 0.5 ||
+    existingDemoOrders < MIN_DEMO_ORDERS ||
     (vendor.commissionValue ?? 10) !== COMMISSION_RATE;
 
   if (!needsReseed) {
@@ -152,61 +185,30 @@ export async function seedOwnItDemoData({ force = true } = {}) {
 
   const p = (index) => products[index % products.length];
 
-  // Delivered — net $965.23 total (withdrawn via MoMo)
-  const deliveredItems = [
-    buildItem(vendor, p(0), 320, 1, 'DELIVERED', 45),
-    buildItem(vendor, p(1), 280, 1, 'DELIVERED', 38),
-    buildItem(vendor, p(2), 255.56, 1, 'DELIVERED', 30),
-    buildItem(vendor, p(3), 280, 1, 'DELIVERED', 22)
-  ];
-  const deliveredNetActual = round2(deliveredItems.reduce((s, item) => s + item.vendorEarning, 0));
-  const deliveredAdjust = round2(DEMO.deliveredNet - deliveredNetActual);
-  if (Math.abs(deliveredAdjust) > 0) {
-    const last = deliveredItems[3];
-    const grossBump = round2(deliveredAdjust / (1 - COMMISSION_RATE / 100));
-    last.subTotal = round2(last.subTotal + grossBump);
-    last.price = last.subTotal;
-    last.commissionAmount = round2((last.subTotal * COMMISSION_RATE) / 100);
-    last.vendorEarning = round2(last.subTotal - last.commissionAmount);
-    last.unitPrice = last.price;
-  }
-
-  // Pending — net $397.80 total
-  const pendingSpecs = [
-    { gross: 125, status: 'SHIPPED', days: 5, product: 4 },
-    { gross: 98, status: 'SHIPPED', days: 3, product: 5 },
-    { gross: 156, status: 'PROCESSING', days: 2, product: 0 },
-    { gross: 89, status: 'RECEIVED', days: 1, product: 1 }
-  ];
-  const pendingItems = pendingSpecs.map((spec) =>
-    buildItem(vendor, p(spec.product), spec.gross, 1, spec.status, spec.days)
-  );
-  const pendingNetActual = round2(pendingItems.reduce((s, item) => s + item.vendorEarning, 0));
-  const pendingAdjust = round2(DEMO.pendingNet - pendingNetActual);
-  if (pendingAdjust !== 0) {
-    const last = pendingItems[3];
-    const grossBump = round2(pendingAdjust / (1 - COMMISSION_RATE / 100));
-    last.subTotal = round2(last.subTotal + grossBump);
-    last.price = last.subTotal;
-    last.commissionAmount = round2((last.subTotal * COMMISSION_RATE) / 100);
-    last.vendorEarning = round2(last.subTotal - last.commissionAmount);
-    last.unitPrice = last.price;
-  }
-
-  const demoOrders = [
-    ...deliveredItems.map((item, i) => buildOrder(vendor, [item], 45 - i * 7, `D${i + 1}`)),
-    ...pendingItems.map((item, i) => buildOrder(vendor, [item], pendingSpecs[i].days, `P${i + 1}`))
-  ];
+  const demoOrders = ORDER_PLAN.map((spec, i) => {
+    const item = buildItem(vendor, p(spec.product), spec.gross, spec.qty, spec.status, spec.daysAgo);
+    const suffix = `${String(i + 1).padStart(3, '0')}`;
+    return buildOrder(vendor, [item], spec.daysAgo, suffix);
+  });
 
   await OrderModel.insertMany(demoOrders);
 
   const allItems = demoOrders.flatMap((o) => o.products);
+  const deliveredItems = allItems.filter((item) => item.vendorStatus === 'DELIVERED');
+  const pendingItems = allItems.filter((item) => item.vendorStatus !== 'DELIVERED');
+
   const totalGross = round2(allItems.reduce((s, item) => s + item.subTotal, 0));
   const totalNet = round2(allItems.reduce((s, item) => s + item.vendorEarning, 0));
   const totalCommission = round2(totalGross - totalNet);
   const productsSold = allItems.reduce((s, item) => s + (item.quantity || 1), 0);
   const deliveredNet = round2(deliveredItems.reduce((s, item) => s + item.vendorEarning, 0));
   const pendingNet = round2(pendingItems.reduce((s, item) => s + item.vendorEarning, 0));
+  const availableBalance = round2(Math.max(0, deliveredNet - DEMO.withdrawn));
+
+  const statusCounts = allItems.reduce((acc, item) => {
+    acc[item.vendorStatus] = (acc[item.vendorStatus] || 0) + 1;
+    return acc;
+  }, {});
 
   await PayoutModel.create({
     vendor: vendor._id,
@@ -252,7 +254,7 @@ export async function seedOwnItDemoData({ force = true } = {}) {
       commissionType: 'PERCENT',
       commissionValue: COMMISSION_RATE,
       totalEarnings: deliveredNet,
-      availableBalance: 0,
+      availableBalance,
       withdrawnAmount: DEMO.withdrawn,
       pendingBalance: pendingNet,
       totalSales: deliveredItems.length,
@@ -270,7 +272,7 @@ export async function seedOwnItDemoData({ force = true } = {}) {
     }
   });
 
-  console.log(`Own It demo seed complete for "${vendor.storeName}"`);
+  console.log(`Own It demo seed v${DEMO_SEED_VERSION} complete for "${vendor.storeName}"`);
   return {
     seeded: true,
     vendorId: vendor._id,
@@ -281,8 +283,10 @@ export async function seedOwnItDemoData({ force = true } = {}) {
     totalCommission,
     deliveredNet,
     pendingNet,
+    availableBalance,
     withdrawn: DEMO.withdrawn,
-    commissionRate: COMMISSION_RATE
+    commissionRate: COMMISSION_RATE,
+    statusCounts
   };
 }
 
